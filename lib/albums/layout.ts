@@ -11,56 +11,17 @@ import {
   type SignaturesContent,
 } from "./types";
 
+import { lineMm, type LaidOutPage, type LayoutElement, type PrintGeometry } from "../print/elements";
+
+export { estimateFitSize, type LaidOutPage, type LayoutElement } from "../print/elements";
+export type AlbumGeometry = PrintGeometry;
+
 /**
  * Mise en page d'un album : transforme ses blocs (couverture, portraits, page
- * libre, signatures) en pages, chacune une liste d'éléments posés en mm.
- * L'aperçu de l'éditeur (navigateur) et le PDF (lib/albums/render.ts) lisent
- * ces MÊMES boîtes : l'écran montre ce qui sera imprimé.
- *
- * Repère : origine en haut à gauche de la page AVEC son fond perdu, y vers le
- * bas. Le fini commence donc à (bleed, bleed). Tailles de texte en points.
+ * libre, signatures) en pages d'éléments posés en mm (voir lib/print/elements.ts).
  */
 
-export type ImageFocus = "top" | "smart";
-
-export type LayoutElement =
-  | { type: "rect"; x: number; y: number; w: number; h: number; color: string }
-  | { type: "image"; x: number; y: number; w: number; h: number; path: string | null; focus: ImageFocus }
-  | {
-      type: "text";
-      x: number;
-      y: number;
-      w: number;
-      h: number;
-      text: string;
-      font: string;
-      bold: boolean;
-      size: number;
-      color: string;
-      align: "left" | "center";
-      // Lignes au plus : au-delà, le texte rétrécit (jusqu'à 60 %), puis est coupé.
-      maxLines: number;
-    }
-  | { type: "line"; x1: number; y1: number; x2: number; y2: number; color: string; widthPt: number };
-
-export interface LaidOutPage {
-  blockId: string;
-  kind: AlbumPage["kind"];
-  // Numéro imprimé en pied de page, ou null (couverture, numéros masqués).
-  number: number | null;
-  elements: LayoutElement[];
-}
-
-export interface AlbumGeometry {
-  widthMm: number;
-  heightMm: number;
-  bleedMm: number;
-}
-
 const PT_TO_MM = 25.4 / 72;
-const LINE_HEIGHT = 1.25;
-
-const lineMm = (sizePt: number) => sizePt * PT_TO_MM * LINE_HEIGHT;
 
 // Cadre utile d'une page : le fini moins la marge.
 function frame(g: AlbumGeometry, s: AlbumSettings) {
@@ -310,13 +271,4 @@ export function layoutAlbum(
     });
   });
   return pages;
-}
-
-// Taille de texte qui tient dans sa boîte, ESTIMÉE (≈ 0,55 em par caractère) :
-// pour l'aperçu à l'écran seulement, le PDF mesure les vrais glyphes.
-export function estimateFitSize(text: string, w: number, size: number, maxLines: number): number {
-  const longestWord = Math.max(1, ...text.split(/\s+/).map((word) => word.length));
-  const perLine = Math.max(longestWord, Math.ceil(text.length / maxLines));
-  const needed = perLine * size * 0.55 * PT_TO_MM;
-  return needed > w ? Math.max(size * 0.6, (size * w) / needed) : size;
 }

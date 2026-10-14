@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { SpinnerIcon, TrashIcon } from "@/components/icons";
-import AlbumPagePreview from "@/components/albums/AlbumPagePreview";
+import PagePreview from "@/components/print/PagePreview";
 import { layoutAlbum, type AlbumGeometry } from "@/lib/albums/layout";
 import { ACCEPTED_PHOTO_TYPES, PAGE_PHOTO_MAX_PX, uploadAlbumPhotos } from "@/lib/albums/upload";
 import {
@@ -316,7 +316,7 @@ export default function AlbumBlockForm({
         <div className="grid gap-3 sm:grid-cols-2">
           {preview.slice(0, 2).map((page, i) => (
             <div key={i} className="rounded border border-neutral-200 shadow-sm">
-              <AlbumPagePreview page={page} geometry={geometry} thumbs={allThumbs} showTrim />
+              <PagePreview page={page} geometry={geometry} thumbs={allThumbs} showTrim />
             </div>
           ))}
         </div>

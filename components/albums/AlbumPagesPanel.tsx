@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Modal from "@/components/Modal";
 import { ChevronDownIcon, ChevronUpIcon, FilePenIcon, TrashIcon } from "@/components/icons";
-import AlbumPagePreview from "@/components/albums/AlbumPagePreview";
+import PagePreview from "@/components/print/PagePreview";
 import AlbumBlockForm from "@/components/albums/AlbumBlockForm";
 import { layoutAlbum, type AlbumGeometry } from "@/lib/albums/layout";
 import {
@@ -143,7 +143,7 @@ export default function AlbumPagesPanel({
                     className="w-28 shrink-0 overflow-hidden rounded border border-neutral-200 shadow-sm hover:border-neutral-400"
                     title={`Page ${pages.indexOf(page) + 1}`}
                   >
-                    <AlbumPagePreview page={page} geometry={geometry} thumbs={thumbs} />
+                    <PagePreview page={page} geometry={geometry} thumbs={thumbs} />
                   </button>
                 ))}
               </div>

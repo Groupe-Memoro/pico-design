@@ -2,10 +2,10 @@ import type { Font } from "fontkit";
 import { rgb, type PDFPage } from "pdf-lib";
 import { fontOptionById } from "../design/fonts";
 import { loadInstance } from "../pdf/textLayer";
-import type { LayoutElement } from "./layout";
+import type { LayoutElement } from "./elements";
 
 /**
- * Texte d'un album dans le PDF : mesuré avec les vraies polices (celles de
+ * Texte d'un document multipage dans le PDF : mesuré avec les vraies polices (celles de
  * l'outil de design, public/fonts), coupé en lignes, rétréci s'il déborde de
  * sa boîte, puis dessiné en CONTOURS de glyphes (vectoriel, net à toute
  * taille, sans police à embarquer — voir lib/pdf/textLayer.ts).
@@ -93,7 +93,8 @@ export function drawText(page: PDFPage, el: TextElement, pageHeightPt: number) {
   lines.forEach((line, i) => {
     if (!line) return;
     const w = widthPt(font, line, size);
-    const x = el.align === "center" ? left + (el.w * MM_TO_PT - w) / 2 : left;
+    const x =
+      el.align === "center" ? left + (el.w * MM_TO_PT - w) / 2 : el.align === "right" ? left + el.w * MM_TO_PT - w : left;
     const path = linePath(font, line);
     if (path) page.drawSvgPath(path, { x, y: top - ascent - i * lineGap, scale, color });
   });

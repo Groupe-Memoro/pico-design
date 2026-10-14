@@ -1,24 +1,24 @@
 "use client";
 
 import { fontOptionById } from "@/lib/design/fonts";
-import { estimateFitSize, type AlbumGeometry, type LaidOutPage } from "@/lib/albums/layout";
+import { estimateFitSize, type LaidOutPage, type PrintGeometry } from "@/lib/print/elements";
 
 const PT_TO_MM = 25.4 / 72;
 
 /**
- * Aperçu d'une page d'album : les éléments de la mise en page (les mêmes que
+ * Aperçu d'une page (album, agenda) : les éléments de la mise en page (les mêmes que
  * le PDF), placés en pourcentage de la page. Le texte se mesure en unités du
  * conteneur (cqw) : il garde ses proportions à toute taille d'aperçu.
  * Les photos sont leurs vignettes (`thumbs`, chemin → adresse).
  */
-export default function AlbumPagePreview({
+export default function PagePreview({
   page,
   geometry,
   thumbs,
   showTrim = false,
 }: {
   page: LaidOutPage;
-  geometry: AlbumGeometry;
+  geometry: PrintGeometry;
   thumbs: Record<string, string>;
   // Trait du bord de coupe (le fond perdu reste visible autour).
   showTrim?: boolean;
@@ -63,6 +63,19 @@ export default function AlbumPagePreview({
             />
           ) : (
             <div key={i} style={box(el.x, el.y, el.w, el.h)} className="border border-dashed border-neutral-300 bg-neutral-100" />
+          );
+        }
+        if (el.type === "pdf") {
+          // Pas de rendu du PDF à l'écran : une case qui dit quelle page viendra là.
+          return (
+            <div
+              key={i}
+              style={{ ...box(el.x, el.y, el.w, el.h), fontSize: cqw(4) }}
+              className="flex flex-col items-center justify-center gap-1 border border-dashed border-neutral-300 bg-neutral-50 text-neutral-500"
+            >
+              <span className="font-medium">PDF fourni</span>
+              <span>page {el.pageIndex + 1}</span>
+            </div>
           );
         }
         const font = fontOptionById(el.font);

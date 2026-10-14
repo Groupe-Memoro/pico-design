@@ -1,11 +1,12 @@
 import sharp from "sharp";
-import { PDFDocument, type PDFImage } from "pdf-lib";
+import { PDFDocument, type PDFEmbeddedPage, type PDFImage } from "pdf-lib";
 import { mmToPx } from "../pdf/units";
-import type { AlbumGeometry, LaidOutPage, LayoutElement } from "./layout";
+import type { LaidOutPage, LayoutElement, PrintGeometry } from "./elements";
 import { drawText, hexToRgb } from "./text";
 
 /**
- * PDF d'impression d'un album, à partir de sa mise en page (lib/albums/layout.ts).
+ * PDF d'impression d'un document multipage (album, agenda), à partir de sa
+ * mise en page (voir lib/print/elements.ts).
  * Chaque page fait le format fini plus le fond perdu ; ses boîtes TrimBox et
  * BleedBox le disent à l'imprimeur et à l'Imposition. Les photos sont
  * recadrées à la taille exacte de leur case, à 300 dpi.
@@ -16,6 +17,7 @@ const PRINT_DPI = 300;
 const DOWNLOAD_CONCURRENCY = 8;
 
 type ImageElement = Extract<LayoutElement, { type: "image" }>;
+type PdfElement = Extract<LayoutElement, { type: "pdf" }>;
 
 async function pool<T>(items: T[], limit: number, worker: (item: T) => Promise<void>) {
   let next = 0;
@@ -28,11 +30,11 @@ async function pool<T>(items: T[], limit: number, worker: (item: T) => Promise<v
 
 const imageKey = (el: ImageElement) => `${el.path}|${el.w.toFixed(2)}|${el.h.toFixed(2)}|${el.focus}`;
 
-export async function renderAlbumPdf(
-  g: AlbumGeometry,
+export async function renderPrintPdf(
+  g: PrintGeometry,
   pages: LaidOutPage[],
-  // Lit une photo du stockage ; null = introuvable (la case reste vide).
-  loadImage: (path: string) => Promise<Buffer | null>,
+  // Lit un fichier du stockage (photo, PDF fourni) ; null = introuvable.
+  loadFile: (path: string) => Promise<Buffer | null>,
   title: string
 ): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
@@ -44,7 +46,7 @@ export async function renderAlbumPdf(
   const images = pages.flatMap((p) => p.elements).filter((e): e is ImageElement => e.type === "image" && Boolean(e.path));
   const sources = new Map<string, Buffer | null>();
   await pool([...new Set(images.map((e) => e.path!))], DOWNLOAD_CONCURRENCY, async (path) => {
-    sources.set(path, await loadImage(path).catch(() => null));
+    sources.set(path, await loadFile(path).catch(() => null));
   });
   const embedded = new Map<string, PDFImage | null>();
   const unique = [...new Map(images.map((e) => [imageKey(e), e])).values()];
@@ -69,6 +71,25 @@ export async function renderAlbumPdf(
       embedded.set(imageKey(el), null);
     }
   });
+
+  // Pages de PDF fournis : chaque fichier lu et chargé une fois, chaque page
+  // intégrée une fois (même si elle revient).
+  const pdfElements = pages.flatMap((p) => p.elements).filter((e): e is PdfElement => e.type === "pdf");
+  const pdfSources = new Map<string, PDFDocument | null>();
+  for (const path of new Set(pdfElements.map((e) => e.path))) {
+    const bytes = await loadFile(path).catch(() => null);
+    pdfSources.set(path, bytes ? await PDFDocument.load(bytes, { ignoreEncryption: true }).catch(() => null) : null);
+  }
+  const embeddedPages = new Map<string, PDFEmbeddedPage | null>();
+  for (const el of pdfElements) {
+    const key = `${el.path}#${el.pageIndex}`;
+    if (embeddedPages.has(key)) continue;
+    const source = pdfSources.get(el.path);
+    embeddedPages.set(
+      key,
+      source && el.pageIndex < source.getPageCount() ? (await doc.embedPdf(source, [el.pageIndex]))[0] : null
+    );
+  }
 
   const widthPt = (g.widthMm + 2 * g.bleedMm) * MM_TO_PT;
   const heightPt = (g.heightMm + 2 * g.bleedMm) * MM_TO_PT;
@@ -95,6 +116,19 @@ export async function renderAlbumPdf(
           y: heightPt - (el.y + el.h) * MM_TO_PT,
           width: el.w * MM_TO_PT,
           height: el.h * MM_TO_PT,
+        });
+      } else if (el.type === "pdf") {
+        const embeddedPage = embeddedPages.get(`${el.path}#${el.pageIndex}`);
+        if (!embeddedPage) continue;
+        // À l'échelle de la boîte, sans déformation, centrée.
+        const scale = Math.min((el.w * MM_TO_PT) / embeddedPage.width, (el.h * MM_TO_PT) / embeddedPage.height);
+        const w = embeddedPage.width * scale;
+        const h = embeddedPage.height * scale;
+        page.drawPage(embeddedPage, {
+          x: el.x * MM_TO_PT + (el.w * MM_TO_PT - w) / 2,
+          y: heightPt - (el.y + el.h) * MM_TO_PT + (el.h * MM_TO_PT - h) / 2,
+          width: w,
+          height: h,
         });
       } else if (el.type === "line") {
         page.drawLine({

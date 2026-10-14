@@ -1,4 +1,4 @@
-import { BarcodeIcon, BookIcon, Grid3x3Icon, ImageIcon, StickerIcon, BadgeIcon, MonitorCogIcon, PaintbrushVerticalIcon, PencilRulerIcon, RocketIcon, ShopifyIcon, TagIcon, UsersIcon } from "@/components/icons";
+import { BarcodeIcon, BookIcon, CalendarIcon, Grid3x3Icon, ImageIcon, StickerIcon, BadgeIcon, MonitorCogIcon, PaintbrushVerticalIcon, PencilRulerIcon, RocketIcon, ShopifyIcon, TagIcon, UsersIcon } from "@/components/icons";
 
 // Liste centrale des pages de nav / tuiles du tableau de bord, pour que les
 // deux restent synchronisées sur le même ordre (voir `resolveMenuOrder`) et
@@ -9,6 +9,7 @@ export type MenuKey =
   | "illustrations"
   | "stickers"
   | "albums"
+  | "agendas"
   | "themes"
   | "products"
   | "design"
@@ -51,6 +52,12 @@ export const MENU_ITEMS: Record<
     title: "Albums des finissants",
     icon: BookIcon,
     gradient: "from-indigo-400 to-blue-600",
+  },
+  agendas: {
+    href: "/agendas",
+    title: "Agendas scolaires",
+    icon: CalendarIcon,
+    gradient: "from-sky-400 to-cyan-600",
   },
   themes: {
     href: "/themes",
@@ -104,8 +111,9 @@ export const MENU_ITEMS: Record<
   },
 };
 
-// Regroupement du menu, par nature de la tâche : ce qu'on fabrique, ce qui
-// touche à la vente, et l'administration des accès. Les séparateurs de la
+// Regroupement du menu, par nature de la tâche : les produits Pico, la banque
+// de contenus (thèmes, visuels, illustrations), le scolaire, ce qui touche à
+// la vente, et l'administration des accès. Les séparateurs de la
 // barre ne tombent qu'entre ces groupes — avec un trait entre chaque lien,
 // dix entrées se lisaient comme une liste indifférenciée.
 //
@@ -113,7 +121,9 @@ export const MENU_ITEMS: Record<
 // glisser-déposer déplace un lien À L'INTÉRIEUR de son groupe, jamais d'un
 // groupe à l'autre, sans quoi le regroupement ne tiendrait pas.
 export const MENU_GROUPS: MenuKey[][] = [
-  ["products", "templates", "themes", "visuals", "illustrations", "stickers", "albums", "skus", "imposition"],
+  ["products", "templates", "skus", "imposition"],
+  ["themes", "visuals", "illustrations"],
+  ["stickers", "albums", "agendas"],
   ["design", "orders", "settings"],
   ["users"],
 ];
@@ -121,7 +131,7 @@ export const MENU_GROUPS: MenuKey[][] = [
 // Titre de chaque groupe, dans l'ordre de MENU_GROUPS. La barre n'en affiche
 // pas (le trait suffit), le tableau de bord, si : ses groupes sont des
 // sections, l'une sous l'autre.
-const MENU_GROUP_LABELS = ["Fabrication", "Vente", "Administration"] as const;
+const MENU_GROUP_LABELS = ["Produits Pico", "Banque", "Scolaire", "Vente", "Administration"] as const;
 
 // Titre d'un groupe tel que le rend groupMenuOrder (qui retire les groupes
 // vides : on ne peut donc pas se fier à sa position), lu d'après son premier lien.

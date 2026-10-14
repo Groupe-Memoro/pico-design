@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { albumStorage, jsonError, loadAlbum, sessionClient } from "@/lib/albums/server";
 import { layoutAlbum } from "@/lib/albums/layout";
-import { renderAlbumPdf } from "@/lib/albums/render";
+import { renderPrintPdf } from "@/lib/print/render";
 import { pdfDownloadName } from "@/lib/imposition/saved";
 
 export const runtime = "nodejs";
@@ -28,7 +28,7 @@ export async function POST(_request: Request, { params }: { params: { id: string
   const storage = albumStorage();
   let pdf: Uint8Array;
   try {
-    pdf = await renderAlbumPdf(
+    pdf = await renderPrintPdf(
       geometry,
       laidOut,
       async (path) => {
