@@ -54,6 +54,7 @@ export default function TemplateForm({
     logo_margin_x_mm: template?.logo_margin_x_mm ?? 5,
     logo_margin_y_mm: template?.logo_margin_y_mm ?? 5,
     two_sided: template?.two_sided ?? false,
+    tool_module: template?.tool_module ?? "design",
     logo_on_front: template?.logo_on_front ?? true,
     logo_on_back: template?.logo_on_back ?? false,
     allow_orientation_change: template?.allow_orientation_change ?? false,
@@ -339,6 +340,22 @@ export default function TemplateForm({
             Le bouton d&apos;orientation sera masqué dans le formulaire produit pour ce modèle.
           </p>
         )}
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium">Module de l&apos;Outil Shopify</label>
+        <select
+          value={form.tool_module}
+          onChange={(e) => update("tool_module", e.target.value as "design" | "photos")}
+          className="mt-1 w-full rounded border border-neutral-300 px-3 py-2 text-sm"
+        >
+          <option value="design">Création de design</option>
+          <option value="photos">Impression de photos</option>
+        </select>
+        <p className="mt-1 text-xs text-neutral-500">
+          Impression de photos : le client téléverse ses photos (ou un zip), valide le cadrage de chacune et choisit les
+          quantités ; une ligne de panier par photo.
+        </p>
       </div>
 
       <FoldSection

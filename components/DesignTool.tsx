@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import TemplateGallery from "@/components/TemplateGallery";
 import DesignEditor from "@/components/DesignEditor";
 import DesignReviewOverlay from "@/components/DesignReviewOverlay";
+import PhotoPrintTool from "@/components/PhotoPrintTool";
 import { useHideChrome } from "@/components/ChromeVisibility";
 import { DEFAULT_TILE_SIZE_MM, isPdfFile, type ImageSourceValue } from "@/components/ImageSourcePicker";
 import type { VisualWithUrl } from "@/components/VisualsGrid";
@@ -310,7 +311,18 @@ export default function DesignTool({
         </div>
       )}
 
-      {phase === "editor" && template && effectiveTemplate && category && (
+      {/* Module « Impression de photos » (réglage du modèle) : un autre écran
+          que la création de design, même parcours vers le panier. */}
+      {phase === "editor" && template && template.tool_module === "photos" && (
+        <PhotoPrintTool
+          template={template}
+          grant={grant}
+          shopify={shopify}
+          onChangeModel={publicTemplateId ? undefined : () => setPhase("pick")}
+        />
+      )}
+
+      {phase === "editor" && template && template.tool_module !== "photos" && effectiveTemplate && category && (
         <DesignEditor
           key={template.id}
           category={category}

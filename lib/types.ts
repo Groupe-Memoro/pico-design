@@ -58,6 +58,8 @@ export interface Template {
   fold_marks_horizontal_mm: number[] | null;
   // Produit plié (dépliant, carte) : voir lib/folds.ts (parseFold). null = à plat.
   fold: unknown | null;
+  // Module de l'Outil Shopify que ce modèle ouvre (voir 0074_photo_prints.sql).
+  tool_module: "design" | "photos";
   two_sided: boolean;
   logo_on_front: boolean;
   logo_on_back: boolean;

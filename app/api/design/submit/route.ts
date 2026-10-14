@@ -56,9 +56,15 @@ export async function POST(request: Request) {
   }
   // Appel public : compter et plafonner (voir lib/rateLimit.ts). Les
   // utilisateurs connectés ne sont pas limités.
+  // Impression de photos : les photos d'un même envoi partagent un lot (voir
+  // app/api/design/batch), avec son propre plafond — une commande en compte
+  // des dizaines.
+  const batchRaw = formData.get("batchId");
+  const batchId = typeof batchRaw === "string" && /^[0-9a-f-]{36}$/i.test(batchRaw) ? batchRaw : null;
   if (!user) {
-    const limit = await checkRateLimit("submit", request);
-    if (!limit.allowed) return tooManyRequests("submit");
+    const bucket = batchId ? "photos" : "submit";
+    const limit = await checkRateLimit(bucket, request);
+    if (!limit.allowed) return tooManyRequests(bucket);
     // Le débit plafonne les APPELS, pas les octets : sans ça, vingt envois
     // par heure suffisent à écrire plusieurs gigaoctets (voir
     // lib/uploadLimits.ts).
@@ -119,6 +125,7 @@ export async function POST(request: Request) {
       payload: fields,
       source_paths: sourcePaths,
       mockup_path: mockupPath,
+      batch_id: batchId,
       shopify_variant_id:
         typeof variantId === "string" && variantId ? variantId : null,
       quantity:

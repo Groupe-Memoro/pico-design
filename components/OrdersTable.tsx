@@ -124,6 +124,20 @@ export default function OrdersTable({
 }) {
   const [rows, setRows] = useState(orders);
   const [busy, setBusy] = useState<string | null>(null);
+
+  // PDF des tirages d'une commande : fabriqué par le serveur (voir
+  // app/api/orders/[id]/prints), puis téléchargé par son adresse signée.
+  async function downloadPrints(orderId: string) {
+    setBusy(`prints-${orderId}`);
+    const res = await fetch(`/api/orders/${orderId}/prints`, { method: "POST" }).catch(() => null);
+    const data = res ? await res.json().catch(() => ({})) : {};
+    setBusy(null);
+    if (!res?.ok || !data.url) {
+      alert(data.error ?? (res?.status === 504 ? "La génération a pris trop de temps." : "Le PDF des tirages n'a pas pu être fabriqué."));
+      return;
+    }
+    window.location.href = data.url;
+  }
   const [boutique, setBoutique] = useState("toutes");
   const [suivi, setSuivi] = useState("tous");
   const [paiement, setPaiement] = useState("tous");
@@ -486,6 +500,20 @@ export default function OrdersTable({
                         )}
                       </div>
                     ))}
+                    {/* Toutes les lignes, une page par tirage (selon les
+                        quantités) : le fichier à envoyer à l'Imposition. */}
+                    {order.order_items.filter((i) => i.design_submission_id || i.product_id).length > 0 &&
+                      (order.order_items.length > 1 || order.order_items.some((i) => i.quantity > 1)) && (
+                        <button
+                          type="button"
+                          onClick={() => downloadPrints(order.id)}
+                          disabled={busy === `prints-${order.id}`}
+                          className="inline-flex w-fit items-center gap-1 rounded-lg border border-border px-2 py-1 text-xs text-text-muted hover:text-text disabled:opacity-60"
+                        >
+                          {busy === `prints-${order.id}` ? <SpinnerIcon className="h-3.5 w-3.5" /> : <DownloadIcon className="h-3.5 w-3.5" />}
+                          PDF des tirages ({order.order_items.reduce((n, i) => n + (i.design_submission_id || i.product_id ? i.quantity : 0), 0)})
+                        </button>
+                      )}
                   </div>
                 </td>
                 <td className="whitespace-nowrap px-4 py-3 text-right">

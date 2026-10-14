@@ -84,6 +84,7 @@ export async function POST(_request: Request, { params }: { params: { id: string
       fold_marks_vertical_mm: source.fold_marks_vertical_mm,
       fold_marks_horizontal_mm: source.fold_marks_horizontal_mm,
       fold: source.fold ?? null,
+      tool_module: source.tool_module ?? "design",
       created_by: user.id,
     })
     .select()

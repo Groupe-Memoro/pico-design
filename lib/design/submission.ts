@@ -14,7 +14,7 @@ import { createAdminSupabaseClient } from "@/lib/supabase/server";
 type Db = ReturnType<typeof createAdminSupabaseClient>;
 
 // Champs à ne pas conserver : ils n'ont de sens que pour la requête en cours.
-const VOLATILE_FIELDS = new Set(["grant", "templateId", "rotated"]);
+const VOLATILE_FIELDS = new Set(["grant", "templateId", "rotated", "batchId"]);
 
 export interface DesignSubmission {
   id: string;

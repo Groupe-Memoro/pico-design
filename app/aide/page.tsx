@@ -155,8 +155,51 @@ const PRODUCT_BLOCK = String.raw`{%- comment -%}
         location.href = TOOL + "?" + params.toString();
       });
 
-      // Retour : l'outil renvoie ?pico_design=…&variant=…&quantity=…
+      // Retour : l'outil renvoie ?pico_design=…&variant=…&quantity=… (un
+      // design), ou ?pico_batch=…&variant=… (impression de photos : une ligne
+      // de panier par photo, lue chez Pico Design).
       var back = new URLSearchParams(location.search);
+      var batch = back.get("pico_batch");
+      if (batch && /^[0-9a-f-]{36}$/i.test(batch)) {
+        back.delete("pico_batch");
+        history.replaceState(null, "", location.pathname + (back.toString() ? "?" + back.toString() : ""));
+        var batchKey = "pico_batch_added_" + batch;
+        try { if (sessionStorage.getItem(batchKey)) return; } catch (err) {}
+        say("Ajout de tes photos au panier…");
+        var variantId = Number(back.get("variant") || currentVariant());
+        fetch("${SITE}/api/design/batch/" + batch)
+          .then(function (res) { return res.json(); })
+          .then(function (data) {
+            var lines = (data.items || []).map(function (it) {
+              return { id: variantId, quantity: Math.max(1, it.quantity || 1), properties: { _design: it.design } };
+            });
+            if (!lines.length) throw new Error("aucune photo trouvée");
+            // Par paquets : un très gros lot en une seule requête serait refusé.
+            var chain = Promise.resolve();
+            for (var i = 0; i < lines.length; i += 40) {
+              (function (chunk) {
+                chain = chain.then(function () {
+                  return fetch(CART_ADD, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", Accept: "application/json" },
+                    body: JSON.stringify({ items: chunk })
+                  }).then(function (res) {
+                    if (!res.ok) return res.json().then(function (d) { throw new Error(d.description || d.message); });
+                  });
+                });
+              })(lines.slice(i, i + 40));
+            }
+            return chain;
+          })
+          .then(function () {
+            try { sessionStorage.setItem(batchKey, "1"); } catch (err) {}
+            location.href = CART;
+          })
+          .catch(function (err) {
+            say("Tes photos n'ont pas pu être ajoutées au panier" + (err && err.message ? " : " + err.message : "") + ". Réessaie ou contacte-nous.");
+          });
+        return;
+      }
       var design = back.get("pico_design");
       if (!design || !/^[0-9a-f-]{36}$/i.test(design)) { refresh(); return; }
 
@@ -418,7 +461,12 @@ export default async function AidePage() {
         <CodeBlock label="Bloc Liquid personnalisé — fiche produit" code={PRODUCT_BLOCK} />
         <p>
           Au retour de l&apos;outil, ce même bloc ajoute l&apos;article au panier (bonne variante, bonne quantité) et
-          envoie le client sur la page panier.
+          envoie le client sur la page panier. Pour un modèle en <strong>Impression de photos</strong> (réglage du
+          modèle), il ajoute une ligne par photo, avec sa quantité et son aperçu.
+        </p>
+        <p className="text-xs">
+          Bloc collé avant l&apos;arrivée de l&apos;impression de photos ? Recollez-le : l&apos;ancienne version ne sait
+          pas ajouter plusieurs photos au panier.
         </p>
       </Section>
 

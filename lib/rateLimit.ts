@@ -24,7 +24,11 @@ export const LIMITS = {
   preview: { max: 400, windowSeconds: 3600 },
   // Adresses d'envoi direct au stockage (voir app/api/design/stage) : un
   // appel par lot de fichiers, chaque fichier n'étant déposé qu'une fois.
-  stage: { max: 200, windowSeconds: 3600 },
+  // Relevé pour l'impression de photos : une commande de plusieurs centaines
+  // de tirages dépose une photo (et son aperçu) par appel.
+  stage: { max: 1000, windowSeconds: 3600 },
+  // Impression de photos : chaque photo d'un lot est un design enregistré.
+  photos: { max: 1000, windowSeconds: 3600 },
 } as const;
 
 export type LimitBucket = keyof typeof LIMITS;

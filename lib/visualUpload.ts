@@ -1,3 +1,4 @@
+import sharp from "sharp";
 import { isPdfBuffer, rasterizePdfPage } from "./pdf/rasterizePdf";
 
 export const ALLOWED_VISUAL_TYPES = ["image/svg+xml", "image/png", "image/jpeg", "application/pdf"];
@@ -21,6 +22,15 @@ export async function prepareUploadedFile(file: File, pdfPage = 1): Promise<Prep
     const buffer = await rasterizePdfPage(rawBuffer, pdfPage);
     const filename = `${file.name.replace(/\.pdf$/i, "")}.png`;
     return { buffer, contentType: "image/png", filename };
+  }
+  // Photo de téléphone : l'orientation est souvent une simple étiquette EXIF,
+  // que le navigateur respecte à l'écran. Sans la redresser ici, le recadrage
+  // (et donc l'impression) se ferait sur l'image couchée.
+  const meta = await sharp(rawBuffer).metadata().catch(() => null);
+  if (meta?.orientation && meta.orientation > 1) {
+    const upright = sharp(rawBuffer).rotate();
+    const buffer = meta.format === "png" ? await upright.png().toBuffer() : await upright.jpeg({ quality: 95 }).toBuffer();
+    return { buffer, contentType: meta.format === "png" ? "image/png" : "image/jpeg", filename: file.name };
   }
   return { buffer: rawBuffer, contentType: file.type, filename: file.name };
 }

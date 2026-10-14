@@ -1,0 +1,77 @@
+import { NextResponse } from "next/server";
+import { PDFDocument } from "pdf-lib";
+import { createAdminSupabaseClient, createServerSupabaseClient } from "@/lib/supabase/server";
+import { formDataFromSubmission, type DesignSubmission } from "@/lib/design/submission";
+import { renderPdfFromForm } from "@/lib/design/renderPdf";
+import { pdfDownloadName } from "@/lib/imposition/saved";
+
+export const runtime = "nodejs";
+// Une commande de photos peut compter des dizaines de designs à rendre.
+export const maxDuration = 300;
+
+const BUCKET = "outputs";
+
+/**
+ * PDF des tirages d'une commande : chaque ligne (design du client, ou
+ * produit déjà fait) répétée autant de fois que sa quantité — une page par
+ * tirage (deux pour un recto-verso), prêt pour l'Imposition (mode Document).
+ * Chaque design n'est rendu qu'une fois, puis ses pages sont recopiées.
+ *
+ * Trop lourd pour passer dans la réponse (Vercel plafonne à 4,5 Mo) : rangé
+ * dans le stockage, et une adresse de téléchargement est renvoyée.
+ */
+export async function POST(_request: Request, { params }: { params: { id: string } }) {
+  const supabase = createServerSupabaseClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
+
+  const { data: order } = await supabase
+    .from("orders")
+    .select("id, order_number, order_items(design_submission_id, product_id, quantity, title)")
+    .eq("id", params.id)
+    .maybeSingle();
+  if (!order) return NextResponse.json({ error: "Commande introuvable." }, { status: 404 });
+  const items = ((order as { order_items: { design_submission_id: string | null; product_id: string | null; quantity: number; title: string | null }[] }).order_items ?? []).filter(
+    (i) => i.design_submission_id || i.product_id
+  );
+  if (items.length === 0) return NextResponse.json({ error: "Aucune ligne à imprimer dans cette commande." }, { status: 400 });
+
+  const admin = createAdminSupabaseClient();
+  const out = await PDFDocument.create();
+  try {
+    for (const item of items) {
+      let bytes: Uint8Array;
+      if (item.design_submission_id) {
+        const { data } = await admin.from("design_submissions").select("*").eq("id", item.design_submission_id).maybeSingle();
+        if (!data) throw new Error(`Design introuvable pour « ${item.title ?? "une ligne"} ».`);
+        const submission = data as DesignSubmission;
+        const { pdf } = await renderPdfFromForm(admin, await formDataFromSubmission(admin, submission), submission.template_id);
+        bytes = pdf;
+      } else {
+        const { data: product } = await admin.from("products").select("pdf_path").eq("id", item.product_id!).maybeSingle();
+        const path = (product as { pdf_path: string | null } | null)?.pdf_path;
+        const file = path ? (await admin.storage.from(BUCKET).download(path)).data : null;
+        if (!file) throw new Error(`PDF du produit introuvable pour « ${item.title ?? "une ligne"} ».`);
+        bytes = new Uint8Array(await file.arrayBuffer());
+      }
+      const source = await PDFDocument.load(bytes);
+      const indices = source.getPageIndices();
+      for (let copy = 0; copy < Math.max(1, item.quantity); copy++) {
+        for (const page of await out.copyPages(source, indices)) out.addPage(page);
+      }
+    }
+  } catch (err) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Erreur lors de la génération du PDF." }, { status: 500 });
+  }
+
+  const number = ((order as { order_number: string | null }).order_number ?? "").replace(/^#/, "").trim();
+  const path = `orders/${params.id}/tirages.pdf`;
+  const { error } = await admin.storage.from(BUCKET).upload(path, await out.save(), { contentType: "application/pdf", upsert: true });
+  if (error) return NextResponse.json({ error: `Enregistrement du PDF impossible : ${error.message}` }, { status: 500 });
+  const { data: signed } = await admin.storage
+    .from(BUCKET)
+    .createSignedUrl(path, 60 * 30, { download: pdfDownloadName(`${number || "commande"}-tirages`) });
+  return NextResponse.json({ url: signed?.signedUrl ?? null, pages: out.getPageCount() });
+}

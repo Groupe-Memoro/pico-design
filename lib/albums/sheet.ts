@@ -1,3 +1,5 @@
+import { readZipText } from "@/lib/zip";
+
 /**
  * Lecture de la liste des finissants, dans le navigateur : un fichier Excel
  * (.xlsx, première feuille) ou CSV (virgule, point-virgule ou tabulation —
@@ -56,39 +58,6 @@ export function parseCsv(text: string): string[][] {
 
 // --- .xlsx : archive zip de fichiers XML, lue sans bibliothèque. ---
 
-async function unzipEntry(bytes: Uint8Array, name: string): Promise<string | null> {
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  // Fin du répertoire central : signature 0x06054b50, cherchée depuis la fin.
-  let eocd = -1;
-  for (let i = bytes.length - 22; i >= Math.max(0, bytes.length - 65557); i--) {
-    if (view.getUint32(i, true) === 0x06054b50) {
-      eocd = i;
-      break;
-    }
-  }
-  if (eocd < 0) throw new Error("Fichier Excel illisible.");
-  const count = view.getUint16(eocd + 10, true);
-  let p = view.getUint32(eocd + 16, true);
-  for (let n = 0; n < count; n++) {
-    const method = view.getUint16(p + 10, true);
-    const size = view.getUint32(p + 20, true);
-    const nameLen = view.getUint16(p + 28, true);
-    const extraLen = view.getUint16(p + 30, true);
-    const commentLen = view.getUint16(p + 32, true);
-    const local = view.getUint32(p + 42, true);
-    const entryName = new TextDecoder().decode(bytes.subarray(p + 46, p + 46 + nameLen));
-    if (entryName === name) {
-      const start = local + 30 + view.getUint16(local + 26, true) + view.getUint16(local + 28, true);
-      const data = bytes.subarray(start, start + size);
-      if (method === 0) return new TextDecoder().decode(data);
-      const stream = new Blob([new Uint8Array(data)]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
-      return new Response(stream).text();
-    }
-    p += 46 + nameLen + extraLen + commentLen;
-  }
-  return null;
-}
-
 function columnIndex(ref: string): number {
   const letters = ref.replace(/[0-9]/g, "");
   let n = 0;
@@ -99,14 +68,14 @@ function columnIndex(ref: string): number {
 async function readXlsx(bytes: Uint8Array): Promise<string[][]> {
   const parser = new DOMParser();
   const shared: string[] = [];
-  const sharedXml = await unzipEntry(bytes, "xl/sharedStrings.xml");
+  const sharedXml = await readZipText(bytes, "xl/sharedStrings.xml");
   if (sharedXml) {
     const doc = parser.parseFromString(sharedXml, "application/xml");
     for (const si of Array.from(doc.getElementsByTagName("si"))) {
       shared.push(Array.from(si.getElementsByTagName("t")).map((t) => t.textContent ?? "").join(""));
     }
   }
-  const sheetXml = await unzipEntry(bytes, "xl/worksheets/sheet1.xml");
+  const sheetXml = await readZipText(bytes, "xl/worksheets/sheet1.xml");
   if (!sheetXml) throw new Error("Première feuille du fichier Excel introuvable.");
   const doc = parser.parseFromString(sheetXml, "application/xml");
   const rows: string[][] = [];

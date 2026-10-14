@@ -49,7 +49,11 @@ export async function coverCropToBuffer(
       .png()
       .toBuffer();
   }
-  const source = rotation ? await sharp(image).rotate(rotation).toBuffer() : image;
+  // Orientation EXIF (photo de téléphone) d'abord : le navigateur la respecte
+  // à l'écran, le recadrage doit partir de la même image droite.
+  const exif = (await sharp(image).metadata().catch(() => null))?.orientation ?? 1;
+  const upright = exif > 1 ? await sharp(image).rotate().toBuffer() : image;
+  const source = rotation ? await sharp(upright).rotate(rotation).toBuffer() : upright;
   const meta = await sharp(source).metadata();
   const origW = meta.width ?? targetWidthPx;
   const origH = meta.height ?? targetHeightPx;

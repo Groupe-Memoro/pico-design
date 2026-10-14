@@ -109,6 +109,8 @@ export async function POST(request: Request) {
       fold_marks_vertical_mm: parseFoldMarksField(formData.get("foldMarksVertical")),
       fold_marks_horizontal_mm: parseFoldMarksField(formData.get("foldMarksHorizontal")),
       fold: parseFoldField(formData.get("fold")),
+      // Module de l'Outil Shopify : création de design, ou impression de photos.
+      tool_module: formData.get("tool_module") === "photos" ? "photos" : "design",
       created_by: user.id,
     })
     .select()
