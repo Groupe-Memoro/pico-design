@@ -80,8 +80,9 @@ export type LogoShape = "logo" | "pastille";
 // `shape` découpe la photo dans ce rectangle : absente ou "rect", tout le
 // rectangle ; "ellipse", l'ovale inscrit (un cercle si le rectangle est
 // carré sur la page) ; "polygon", le polygone `points`, en ratios 0-1 du
-// rectangle de l'emplacement (voir lib/themeShapes.ts).
-export type ThemeSlotShape = "rect" | "ellipse" | "polygon";
+// rectangle de l'emplacement (voir lib/themeShapes.ts) ; "svg", ce que
+// dessine le SVG `maskSvg`, étiré au rectangle (un masque fourni par l'admin).
+export type ThemeSlotShape = "rect" | "ellipse" | "polygon" | "svg";
 
 export interface ThemeSlotPoint {
   x: number;
@@ -95,6 +96,8 @@ export interface ThemeSlot {
   heightRatio: number;
   shape?: ThemeSlotShape;
   points?: ThemeSlotPoint[];
+  // Masque SVG (forme "svg"), déjà nettoyé : voir sanitizeMaskSvg.
+  maskSvg?: string;
 }
 
 // Ajustement (position/zoom) apporté par le CLIENT à la photo d'un

@@ -13,6 +13,9 @@ import {
   polygonPointsAttr,
   regularPolygon,
   slotClipPath,
+  slotMaskStyle,
+  sanitizeMaskSvg,
+  maskSvgAspect,
   slotShape,
 } from "@/lib/themeShapes";
 
@@ -57,6 +60,7 @@ const SHAPE_OPTIONS: { value: ThemeSlotShape; label: string }[] = [
   { value: "rect", label: "Rectangle" },
   { value: "ellipse", label: "Cercle" },
   { value: "polygon", label: "Polygone" },
+  { value: "svg", label: "Masque SVG" },
 ];
 const DEFAULT_POLYGON_SIDES = 6;
 
@@ -201,13 +205,40 @@ export default function ThemeForm({
   // Forme d'un emplacement. Cercle et polygone partent d'un emplacement
   // carré sur la page (largeur conservée) : un cercle, pas un ovale, tant
   // qu'on ne l'étire pas.
+  // Masque SVG : choisi dans un fichier, nettoyé (voir sanitizeMaskSvg), et
+  // l'emplacement prend les proportions du dessin (largeur conservée).
+  const maskInput = useRef<HTMLInputElement>(null);
+  const maskTarget = useRef<number | null>(null);
+  async function applyMaskFile(file: File | undefined) {
+    const index = maskTarget.current;
+    if (!file || index === null) return;
+    const maskSvg = sanitizeMaskSvg(await file.text());
+    if (!maskSvg) {
+      setError("Ce fichier n'est pas un SVG utilisable (il lui faut une viewBox, ou une largeur et une hauteur).");
+      return;
+    }
+    setError(null);
+    const slot = slots[index];
+    updateSlot(index, {
+      shape: "svg",
+      maskSvg,
+      points: undefined,
+      heightRatio: (slot.widthRatio * pageAspectRatio) / maskSvgAspect(maskSvg),
+    });
+  }
+
   function setSlotShape(index: number, shape: ThemeSlotShape) {
     const slot = slots[index];
+    if (shape === "svg") {
+      maskTarget.current = index;
+      maskInput.current?.click();
+      return;
+    }
     if (!slot || slotShape(slot) === shape) return;
     const square = { heightRatio: slot.widthRatio * pageAspectRatio };
-    if (shape === "rect") updateSlot(index, { shape: undefined, points: undefined });
-    else if (shape === "ellipse") updateSlot(index, { ...square, shape: "ellipse", points: undefined });
-    else updateSlot(index, { ...square, shape: "polygon", points: regularPolygon(DEFAULT_POLYGON_SIDES) });
+    if (shape === "rect") updateSlot(index, { shape: undefined, points: undefined, maskSvg: undefined });
+    else if (shape === "ellipse") updateSlot(index, { ...square, shape: "ellipse", points: undefined, maskSvg: undefined });
+    else updateSlot(index, { ...square, shape: "polygon", points: regularPolygon(DEFAULT_POLYGON_SIDES), maskSvg: undefined });
   }
 
   function setPolygonSides(index: number, sides: number) {
@@ -504,6 +535,18 @@ export default function ThemeForm({
                   >
                     ✎ Tracer
                   </button>
+                  {slotShape(slot) === "svg" && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        maskTarget.current = i;
+                        maskInput.current?.click();
+                      }}
+                      className="rounded-lg border border-neutral-300 px-2.5 py-1 text-neutral-700 hover:bg-neutral-50"
+                    >
+                      Remplacer le SVG
+                    </button>
+                  )}
                   {slotShape(slot) === "polygon" && (
                     <label className="flex items-center gap-1.5 text-neutral-600">
                       Côtés
@@ -524,7 +567,17 @@ export default function ThemeForm({
           )}
         </div>
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        <input
+        ref={maskInput}
+        type="file"
+        accept=".svg,image/svg+xml"
+        className="hidden"
+        onChange={(e) => {
+          applyMaskFile(e.target.files?.[0]);
+          e.target.value = "";
+        }}
+      />
+      {error && <p className="text-sm text-red-600">{error}</p>}
 
         <div className="flex justify-end gap-3 pt-2">
           <button
@@ -622,8 +675,8 @@ export default function ThemeForm({
                 {slotShape(slot) !== "rect" && (
                   <>
                     <div className="absolute inset-0 border border-dashed border-blue-400/60" />
-                    <div className="absolute inset-0 bg-blue-500/25" style={{ clipPath: slotClipPath(slot) }} />
-                    <SlotOutline slot={slot} />
+                    <div className="absolute inset-0 bg-blue-500/25" style={{ clipPath: slotClipPath(slot), ...slotMaskStyle(slot) }} />
+                    {slotShape(slot) !== "svg" && <SlotOutline slot={slot} />}
                   </>
                 )}
                 <span className="relative">Photo {i + 1}</span>

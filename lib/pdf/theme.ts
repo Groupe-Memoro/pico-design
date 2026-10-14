@@ -1,7 +1,7 @@
 import sharp from "sharp";
 import { coverCropToBuffer } from "./crop";
 import type { ThemeSlot, ThemeSlotAdjust } from "../types";
-import { MAX_THEME_SLOTS, sanitizeSlotShape, slotShape, slotSvgShape } from "../themeShapes";
+import { MAX_THEME_SLOTS, maskSvgSized, sanitizeSlotShape, slotShape, slotSvgShape } from "../themeShapes";
 
 const DEFAULT_ADJUST: ThemeSlotAdjust = { positionX: 0.5, positionY: 0.5, scale: 1 };
 
@@ -81,6 +81,16 @@ export async function composeThemeImage(
 // la forme est gardée, le reste devient transparent et laisse voir le fond).
 async function cutToShape(cropped: Buffer, slot: ThemeSlot, widthPx: number, heightPx: number): Promise<Buffer> {
   if (slotShape(slot) === "rect") return cropped;
+  if (slotShape(slot) === "svg") {
+    // Masque fourni : rendu à la taille exacte de l'emplacement (étiré), son
+    // opacité garde la photo là où il dessine.
+    const svgMask = await sharp(Buffer.from(maskSvgSized(slot.maskSvg!, widthPx, heightPx)))
+      .resize(widthPx, heightPx, { fit: "fill" })
+      .ensureAlpha()
+      .png()
+      .toBuffer();
+    return sharp(cropped).ensureAlpha().composite([{ input: svgMask, blend: "dest-in" }]).png().toBuffer();
+  }
   const mask = Buffer.from(
     `<svg xmlns="http://www.w3.org/2000/svg" width="${widthPx}" height="${heightPx}" viewBox="0 0 ${widthPx} ${heightPx}"><g fill="#fff">${slotSvgShape(slot, widthPx, heightPx)}</g></svg>`
   );

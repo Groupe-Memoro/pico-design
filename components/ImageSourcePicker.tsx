@@ -7,7 +7,7 @@ import type { VisualWithUrl } from "@/components/VisualsGrid";
 import VisualPicker from "@/components/VisualPicker";
 import FileDropZone from "@/components/FileDropZone";
 import { mmToIn, inToMm } from "@/lib/pdf/units";
-import { slotClipPath, slotShape, slotSvgShape } from "@/lib/themeShapes";
+import { slotClipPath, slotMaskStyle, slotShape, slotSvgShape } from "@/lib/themeShapes";
 import { stageLargeFiles } from "@/lib/design/stageUpload";
 import { filePreviewUrl } from "@/lib/design/filePreview";
 import { SpinnerIcon, UploadIcon } from "@/components/icons";
@@ -1610,6 +1610,8 @@ export default function ImageSourcePicker({
                         outline: shaped ? undefined : isSelected ? "2px solid var(--accent)" : "1px dashed rgba(0,0,0,0.25)",
                         outlineOffset: -1,
                         clipPath: slotClipPath(slot),
+                        // Masque SVG fourni par l'admin (forme « svg »).
+                        ...slotMaskStyle(slot),
                       }}
                     >
                       {url && (
