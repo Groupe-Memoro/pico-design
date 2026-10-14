@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CheckIcon, ChevronLeftIcon, ChevronRightIcon, SpinnerIcon, TrashIcon, UploadIcon, XIcon } from "@/components/icons";
+import { CheckIcon, ChevronLeftIcon, ChevronRightIcon, HelpCircleIcon, SpinnerIcon, TrashIcon, UploadIcon, XIcon } from "@/components/icons";
+import ToolTopBar from "@/components/ToolTopBar";
 import { applyOrientation, isLandscape } from "@/lib/pdf/orientation";
 import { formatIn } from "@/lib/pdf/units";
 import { stageLargeFiles } from "@/lib/design/stageUpload";
@@ -249,12 +250,18 @@ export default function PhotoPrintTool({
   grant,
   shopify,
   onChangeModel,
+  brandScope = "tool",
+  shopHome = null,
 }: {
   template: Template;
   grant?: string;
   shopify?: { variantId: string; quantity: number; returnUrl: string | null };
   onChangeModel?: () => void;
+  // Logo et retour à la boutique de la barre du haut (voir ToolTopBar).
+  brandScope?: string;
+  shopHome?: string | null;
 }) {
+  const [helpOpen, setHelpOpen] = useState(false);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState<string | null>(null);
   const [editing, setEditing] = useState<number | null>(null);
@@ -377,17 +384,44 @@ export default function PhotoPrintTool({
 
   return (
     <div className="flex min-h-screen flex-col bg-background text-text">
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-surface px-5 py-3">
-        <div>
-          <p className="font-medium">{template.name}</p>
-          <p className="text-xs text-text-muted">Impression de photos · {format}</p>
-        </div>
-        {onChangeModel && (
-          <button type="button" onClick={onChangeModel} className="rounded-lg border border-border px-3 py-1.5 text-sm text-text-muted hover:bg-surface-muted">
-            Changer de modèle
-          </button>
-        )}
-      </header>
+      <ToolTopBar
+        brandScope={brandScope}
+        shopHome={shopHome}
+        title={template.name}
+        subtitle={`${format} po · Impression de photos`}
+        onChangeModel={onChangeModel}
+        actions={
+          <>
+            {sending && (
+              <span className="hidden items-center gap-2 text-sm text-text-muted sm:flex">
+                <SpinnerIcon className="h-4 w-4" /> {sending}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => setHelpOpen(true)}
+              aria-label="Aide"
+              className="flex items-center gap-1.5 rounded-full bg-[rgba(79,10,31,0.06)] px-3 py-1.5 text-sm font-medium text-primary hover:bg-[rgba(79,10,31,0.12)]"
+            >
+              <HelpCircleIcon className="h-4 w-4 shrink-0" />
+              <span className="hidden whitespace-nowrap md:inline">Aide</span>
+            </button>
+            <button
+              type="button"
+              onClick={finish}
+              disabled={Boolean(sending) || total === 0}
+              className="rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-text-on-brand hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {shopify?.returnUrl ? `Ajouter au panier${total ? ` (${total})` : ""}` : `Enregistrer${total ? ` (${total})` : ""}`}
+            </button>
+          </>
+        }
+      />
+      {sending && (
+        <p className="flex items-center justify-center gap-2 border-b border-border bg-surface py-2 text-sm text-text-muted sm:hidden">
+          <SpinnerIcon className="h-4 w-4" /> {sending}
+        </p>
+      )}
 
       <main className="mx-auto w-full max-w-6xl flex-1 px-5 py-6">
         <div
@@ -492,22 +526,24 @@ export default function PhotoPrintTool({
         )}
       </main>
 
-      {photos.length > 0 && (
-        <footer className="sticky bottom-0 flex flex-wrap items-center justify-end gap-3 border-t border-border bg-surface px-5 py-3">
-          {sending && (
-            <span className="flex items-center gap-2 text-sm text-text-muted">
-              <SpinnerIcon className="h-4 w-4" /> {sending}
-            </span>
-          )}
-          <button
-            type="button"
-            onClick={finish}
-            disabled={Boolean(sending) || total === 0}
-            className="rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-text-on-brand hover:bg-primary-hover disabled:opacity-50"
-          >
-            {shopify?.returnUrl ? `Ajouter au panier (${total} tirage${total > 1 ? "s" : ""})` : `Enregistrer (${total} tirage${total > 1 ? "s" : ""})`}
-          </button>
-        </footer>
+
+      {helpOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setHelpOpen(false)}>
+          <div className="w-full max-w-lg rounded-2xl bg-surface p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 flex items-center justify-between">
+              <p className="font-display text-lg font-semibold">Aide — tes tirages, pas à pas</p>
+              <button type="button" onClick={() => setHelpOpen(false)} className="rounded-lg p-1.5 text-text-muted hover:bg-surface-muted" aria-label="Fermer">
+                <XIcon className="h-5 w-5" />
+              </button>
+            </div>
+            <ol className="list-decimal space-y-2 pl-5 text-sm text-text-muted">
+              <li>Ajoute tes photos : glisse-les dans la zone, ou un fichier .zip qui les contient.</li>
+              <li>Clique une photo pour vérifier son cadrage : glisse-la pour la placer, zoome au besoin. Ce qui dépasse le trait rose sera coupé.</li>
+              <li>« Valider le cadrage » passe à la photo suivante. Une pastille « Qualité moyenne » ou « Risque de flou » signale une photo trop petite pour ce format.</li>
+              <li>Choisis la quantité de chaque photo (ou la même pour toutes), puis ajoute le tout au panier : une ligne par photo.</li>
+            </ol>
+          </div>
+        </div>
       )}
 
       {current && editing !== null && (

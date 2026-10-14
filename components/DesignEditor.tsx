@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { MAX_MOSAIC_SIDE } from "@/lib/design/mosaicGrid";
 import Modal from "@/components/Modal";
+import ToolTopBar from "@/components/ToolTopBar";
 import DesignHelpContent from "@/components/DesignHelpContent";
 import Link from "next/link";
 import ImageSourcePicker, {
@@ -556,45 +557,15 @@ export default function DesignEditor({
           <DesignHelpContent />
         </Modal>
       )}
-      {/* Barre du haut */}
-      <header className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-border bg-surface px-4 py-3 sm:px-6">
-        <div className="flex min-w-0 items-center gap-3">
-          <Link href={shopHome ?? "/"} className="shrink-0" aria-label={shopHome ? "Retour à la boutique" : undefined}>
-            {/* Logo réglable (module Paramètres) : celui de la boutique
-                d'origine, à défaut celui de l'Outil Shopify. Le fichier codé
-                en dur qui était ici ignorait les réglages — et c'est le SEUL
-                logo qu'un client Shopify voit, la barre de navigation étant
-                masquée pendant l'édition (voir useHideChrome). La route
-                renvoie le fichier d'origine tant que rien n'est téléversé. */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={`/api/settings/${brandScope}/asset/logo`}
-              alt="Pico"
-              className="h-6 w-auto"
-            />
-          </Link>
-          <span className="h-7 w-px shrink-0 bg-border" aria-hidden="true" />
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-text">
-              {template.name}
-            </p>
-            <p className="truncate text-xs text-text-subtle">
-              {formatIn(template.width_mm)} × {formatIn(template.height_mm)} po
-              {template.two_sided ? " · Recto verso" : " · Recto"}
-            </p>
-          </div>
-          {onChangeModel && (
-            <button
-              type="button"
-              onClick={onChangeModel}
-              className="ml-2 shrink-0 rounded-lg border border-border px-3 py-1.5 text-xs text-text-muted hover:bg-surface-muted"
-            >
-              Changer de modèle
-            </button>
-          )}
-        </div>
-
-        {template.two_sided && (
+      {/* Barre du haut, commune aux modules de l'Outil Shopify */}
+      <ToolTopBar
+        brandScope={brandScope}
+        shopHome={shopHome}
+        title={template.name}
+        subtitle={`${formatIn(template.width_mm)} × ${formatIn(template.height_mm)} po${template.two_sided ? " · Recto verso" : " · Recto"}`}
+        onChangeModel={onChangeModel}
+        center={
+          template.two_sided && (
           <div className="hidden shrink-0 rounded-full border border-border bg-background p-0.5 text-sm sm:flex">
             <button
               type="button"
@@ -621,9 +592,10 @@ export default function DesignEditor({
               <SideDot ready={backReady} />
             </button>
           </div>
-        )}
-
-        <div className="flex shrink-0 items-center gap-3">
+          )
+        }
+        actions={
+          <>
           {/* Aide, à côté du bouton principal. Fond : #4F0A1F à 6 %, en
               rgba() littéral — les couleurs du projet sont des variables CSS
               complètes, le modificateur d'opacité de Tailwind
@@ -672,8 +644,9 @@ export default function DesignEditor({
               Vérifier et commander
             </button>
           )}
-        </div>
-      </header>
+          </>
+        }
+      />
 
       {/* Recto/Verso, version mobile (la pilule du haut est masquée sous sm) */}
       {template.two_sided && (

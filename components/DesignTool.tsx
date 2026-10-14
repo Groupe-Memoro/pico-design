@@ -319,6 +319,8 @@ export default function DesignTool({
           grant={grant}
           shopify={shopify}
           onChangeModel={publicTemplateId ? undefined : () => setPhase("pick")}
+          brandScope={brandScope}
+          shopHome={shopHomeOf(shopify?.returnUrl ?? null)}
         />
       )}
 
