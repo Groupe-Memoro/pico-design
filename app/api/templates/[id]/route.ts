@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { uploadBeautyShotBundle } from "@/lib/templateBeautyShotUpload";
 import { parseOverlayOpacitiesField } from "@/lib/pdf/beautyShot";
-import { parseFoldMarksField } from "@/lib/pdf/foldMarks";
+import { parseFoldField, parseFoldMarksField } from "@/lib/pdf/foldMarks";
 
 const STRING_FIELDS = ["name", "category_id", "logo_h_align", "logo_v_align"] as const;
 const NULLABLE_STRING_FIELDS = ["sku_id"] as const;
@@ -100,6 +100,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     if (formData.has("foldMarksVertical")) {
       update.fold_marks_vertical_mm = parseFoldMarksField(formData.get("foldMarksVertical"));
     }
+    if (formData.has("fold")) update.fold = parseFoldField(formData.get("fold"));
     if (formData.has("foldMarksHorizontal")) {
       update.fold_marks_horizontal_mm = parseFoldMarksField(formData.get("foldMarksHorizontal"));
     }

@@ -8,6 +8,9 @@ import { formatIn } from "@/lib/pdf/units";
 import { stageLargeFiles } from "@/lib/design/stageUpload";
 import { SpinnerIcon, XIcon } from "@/components/icons";
 import MockupGallery, { type MockupView } from "@/components/MockupGallery";
+import FoldedPreview from "@/components/FoldedPreview";
+import { parseFold } from "@/lib/folds";
+import { applyOrientation } from "@/lib/pdf/orientation";
 import { layerImageFieldName, type DesignLayer } from "@/lib/design/layers";
 
 // Ajoute les calques d'un côté au formulaire : un champ JSON (métadonnées
@@ -81,6 +84,8 @@ interface ViewSpec {
   label: string;
   side: "front" | "back";
   mockupId: string | null;
+  // Côté à plat, au format fini : la matière de l'aperçu plié, pas une vue de la galerie.
+  flat?: boolean;
 }
 
 /**
@@ -152,6 +157,16 @@ export default function DesignReviewOverlay({
     if (template.two_sided) specs.push({ key: "back", label: "Verso", side: "back", mockupId: null });
     return specs;
   }, [mockups, template.two_sided]);
+  // Produit plié : ses deux côtés à plat, pour l'aperçu plié (les plis
+  // tournent avec le format, voir applyOrientation).
+  const oriented = useMemo(() => applyOrientation(template, rotated), [template, rotated]);
+  const fold = useMemo(() => (oriented.two_sided ? parseFold(oriented.fold) : null), [oriented]);
+  const flatSpecs: ViewSpec[] = fold
+    ? [
+        { key: "flat-front", label: "", side: "front", mockupId: null, flat: true },
+        { key: "flat-back", label: "", side: "back", mockupId: null, flat: true },
+      ]
+    : [];
 
   const [mockupStates, setMockupStates] = useState<Record<string, MockupState>>(() =>
     Object.fromEntries(viewSpecs.map((v) => [v.key, { loading: true, url: null }]))
@@ -322,6 +337,7 @@ export default function DesignReviewOverlay({
         body.append("side", side);
         // Quel mockup rendre, quand le modèle en a plusieurs.
         if (mockupId) body.append("mockupId", mockupId);
+        if (spec.flat) body.append("flat", "1");
         if (isTheme && selectedTheme) {
           appendThemeToForm(body, value, selectedTheme.id);
         } else if (isMosaic) {
@@ -348,7 +364,7 @@ export default function DesignReviewOverlay({
       }
     }
 
-    for (const spec of viewSpecs) {
+    for (const spec of [...viewSpecs, ...flatSpecs]) {
       if (spec.side === "back") fetchMockup(spec, back, backLayers, backFromPdf ?? undefined);
       else fetchMockup(spec, front, frontLayers);
     }
@@ -464,7 +480,16 @@ export default function DesignReviewOverlay({
           </div>
 
           {hasMockupColumn && (
-            <div className="order-1 flex items-start justify-center md:order-none">
+            <div className="order-1 flex flex-col items-center gap-6 md:order-none">
+              {fold && mockupStates["flat-front"]?.url && mockupStates["flat-back"]?.url && (
+                <FoldedPreview
+                  fold={fold}
+                  widthMm={oriented.width_mm}
+                  heightMm={oriented.height_mm}
+                  frontUrl={mockupStates["flat-front"].url}
+                  backUrl={mockupStates["flat-back"].url}
+                />
+              )}
               <MockupGallery
                 views={views}
                 activeKey={activeMockupKey}

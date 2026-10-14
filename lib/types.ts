@@ -56,6 +56,8 @@ export interface Template {
   // jamais dans le PDF imprimé (voir lib/pdf/preview.ts). null/vide = aucune.
   fold_marks_vertical_mm: number[] | null;
   fold_marks_horizontal_mm: number[] | null;
+  // Produit plié (dépliant, carte) : voir lib/folds.ts (parseFold). null = à plat.
+  fold: unknown | null;
   two_sided: boolean;
   logo_on_front: boolean;
   logo_on_back: boolean;

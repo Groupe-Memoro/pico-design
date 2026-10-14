@@ -1,3 +1,5 @@
+import { parseFold, type FoldConfig } from "../folds";
+
 // Lit les champs "foldMarksVertical"/"foldMarksHorizontal" envoyés par
 // TemplateForm (un tableau de distances en mm depuis le bord de coupe, JSON,
 // un par pli) — voir generateTemplatePreviewPng, qui les dessine en aperçu
@@ -12,6 +14,17 @@ export function parseFoldMarksField(raw: FormDataEntryValue | null): number[] | 
     const values = parsed.map((v) => Number(v));
     if (values.some((n) => !Number.isFinite(n) || n < 0)) return null;
     return values;
+  } catch {
+    return null;
+  }
+}
+
+// Champ "fold" envoyé par TemplateForm (le pli du modèle, JSON) : vide ou
+// invalide = produit à plat.
+export function parseFoldField(raw: FormDataEntryValue | null): FoldConfig | null {
+  if (typeof raw !== "string" || !raw) return null;
+  try {
+    return parseFold(JSON.parse(raw));
   } catch {
     return null;
   }

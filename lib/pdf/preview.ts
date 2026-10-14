@@ -1,4 +1,6 @@
 import sharp from "sharp";
+import { foldAxisLength, foldPanels, parseFold } from "../folds";
+import { svgCenteredText } from "./svgText";
 import { mmToPx } from "./units";
 import { rasterizeLogoToPng, isSvg } from "./logo";
 import { logoOverlay } from "./logoShadow";
@@ -43,7 +45,9 @@ export async function generateTemplatePreviewPng(
   transparent = false,
   logoShadow: LogoShadowSettings | null = null,
   guides = true,
-  zoom = 1
+  zoom = 1,
+  // Côté montré : les volets d'un produit plié n'y sont pas au même endroit.
+  side: "front" | "back" = "front"
 ): Promise<Buffer> {
   const pageWidthMm = template.width_mm + template.bleed_mm * 2;
   const pageHeightMm = template.height_mm + template.bleed_mm * 2;
@@ -94,6 +98,44 @@ export async function generateTemplatePreviewPng(
         }),
       ].join("\n");
 
+  // Produit plié : chaque pli, une zone de sécurité de part et d'autre, et le
+  // nom de chaque volet de ce côté (voir lib/folds.ts). Écran seulement.
+  const fold = parseFold(template.fold);
+  let foldSvg = "";
+  if (fold && !hasOverlay) {
+    const vertical = fold.direction === "vertical";
+    const length = foldAxisLength(fold, template.width_mm, template.height_mm);
+    const panels = foldPanels(fold, length, side);
+    const safetyPx = mmToPx(fold.safetyMm, previewDpi);
+    const labelPx = Math.max(11, Math.min(trimW, trimH) * 0.035);
+    foldSvg = panels
+      .map((panel, i) => {
+        const start = mmToPx(panel.start, previewDpi);
+        const size = mmToPx(panel.size, previewDpi);
+        const parts: string[] = [];
+        if (i > 0) {
+          if (vertical) {
+            const x = trimX + start;
+            parts.push(
+              `<rect x="${x - safetyPx}" y="${trimY}" width="${safetyPx * 2}" height="${trimH}" fill="#ef4444" fill-opacity="0.12"/>`,
+              `<line x1="${x}" y1="0" x2="${x}" y2="${pageHeightPx}" stroke="#16a34a" stroke-width="1.5" stroke-dasharray="6 3"/>`
+            );
+          } else {
+            const y = trimY + start;
+            parts.push(
+              `<rect x="${trimX}" y="${y - safetyPx}" width="${trimW}" height="${safetyPx * 2}" fill="#ef4444" fill-opacity="0.12"/>`,
+              `<line x1="0" y1="${y}" x2="${pageWidthPx}" y2="${y}" stroke="#16a34a" stroke-width="1.5" stroke-dasharray="6 3"/>`
+            );
+          }
+        }
+        const cx = vertical ? trimX + start + size / 2 : trimX + trimW / 2;
+        const top = (vertical ? trimY : trimY + start) + safetyPx + labelPx * 1.6;
+        parts.push(svgCenteredText(panel.label, cx, top, labelPx, "#16a34a", (vertical ? size : trimW) * 0.9));
+        return parts.join("\n");
+      })
+      .join("\n");
+  }
+
   const linesSvg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="${pageWidthPx}" height="${pageHeightPx}">
       ${showPlaceholder ? `<rect width="100%" height="100%" fill="#ffffff"/>` : ""}
@@ -108,6 +150,7 @@ export async function generateTemplatePreviewPng(
           : ""
       }
       ${foldMarksLinesSvg}
+      ${foldSvg}
     </svg>
   `;
 

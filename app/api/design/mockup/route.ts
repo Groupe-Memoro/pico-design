@@ -96,6 +96,9 @@ export async function POST(request: Request) {
   const db = user ? supabase : createAdminSupabaseClient();
   const rotated = formData.get("rotated") === "true";
   const side = formData.get("side") === "back" ? "back" : "front";
+  // Le côté à plat, au format fini (aperçu d'un produit plié) : toujours le
+  // rendu générique, même pour un modèle à mockup réaliste.
+  const flat = formData.get("flat") === "1";
   // Quel mockup rendre, quand le modèle en a plusieurs (voir
   // resolveMockupBundle) — absent = le premier.
   const mockupIdField = formData.get("mockupId");
@@ -174,7 +177,7 @@ export async function POST(request: Request) {
   // Les modèles à bundle réaliste sont toujours à recto seul (aucun n'a de
   // second rendu "verso") — un appel side=back pour l'un d'eux n'a rien à
   // montrer, comme un modèle générique sans verso.
-  if (side === "back" && (hasRealisticBundle || !rawTemplate.two_sided)) {
+  if (side === "back" && ((hasRealisticBundle && !flat) || !rawTemplate.two_sided)) {
     return new NextResponse(null, { status: 204 });
   }
 
@@ -245,7 +248,7 @@ export async function POST(request: Request) {
     }
   }
 
-  if (!hasRealisticBundle) {
+  if (!hasRealisticBundle || flat) {
     try {
       const png = await generateStationeryMockupPng({
         template,
@@ -255,10 +258,11 @@ export async function POST(request: Request) {
         zoom,
         rotation: imageRotation,
         layers,
+        flat,
       });
       return new NextResponse(new Uint8Array(png), {
         headers: {
-          "Content-Type": "image/png",
+          "Content-Type": flat ? "image/jpeg" : "image/png",
           "Cache-Control": "private, no-store",
         },
       });

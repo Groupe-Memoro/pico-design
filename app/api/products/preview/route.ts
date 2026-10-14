@@ -169,6 +169,9 @@ export async function POST(request: Request) {
       0.5,
       true,
       logoShadow,
+      true,
+      1,
+      side,
     );
     return new NextResponse(new Uint8Array(png), {
       headers: {
@@ -252,6 +255,7 @@ export async function POST(request: Request) {
     logoShadow,
     guides,
     zoom,
+    side,
   );
 
   return new NextResponse(new Uint8Array(png), {

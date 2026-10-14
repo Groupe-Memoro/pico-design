@@ -13,6 +13,7 @@ import type { ThemeWithOverlayUrl } from "@/components/ThemesTable";
 import type { Category, Template, ThemeSlotAdjust, IllustrationWithUrl } from "@/lib/types";
 import { isLandscape } from "@/lib/pdf/orientation";
 import { formatIn, mmToPx } from "@/lib/pdf/units";
+import { parseFold } from "@/lib/folds";
 import {
   BoldIcon,
   CheckIcon,
@@ -1370,9 +1371,13 @@ export default function DesignEditor({
                   dashed
                   label={`Fond perdu : ${formatIn(template.bleed_mm)} po`}
                 />
-                {((rawTemplate.fold_marks_vertical_mm?.length ?? 0) > 0 ||
+                {(Boolean(parseFold(rawTemplate.fold)) ||
+                  (rawTemplate.fold_marks_vertical_mm?.length ?? 0) > 0 ||
                   (rawTemplate.fold_marks_horizontal_mm?.length ?? 0) > 0) && (
-                  <LegendPill color="#16a34a" dashed label="Marques de pli" />
+                  <LegendPill color="#16a34a" dashed label="Plis" />
+                )}
+                {parseFold(rawTemplate.fold) && (
+                  <LegendPill color="#ef4444" label="Zone du pli (éviter le texte)" />
                 )}
               </>
             )}

@@ -5,6 +5,7 @@ import type { Category, LogoHAlign, LogoVAlign, Sku, Template } from "@/lib/type
 import { inToMm, mmToIn } from "@/lib/pdf/units";
 import { SpinnerIcon } from "@/components/icons";
 import SkuPicker from "@/components/SkuPicker";
+import { FOLD_TYPES, foldAxisLength, foldPanels, parseFold, type FoldConfig, type FoldDirection, type FoldType } from "@/lib/folds";
 
 type Unit = "mm" | "in";
 
@@ -77,6 +78,8 @@ export default function TemplateForm({
   const [foldMarksHorizontal, setFoldMarksHorizontal] = useState<number[]>(
     template?.fold_marks_horizontal_mm ?? []
   );
+  // Produit plié (dépliant, carte) : ses volets se calculent (voir lib/folds.ts).
+  const [fold, setFold] = useState<FoldConfig | null>(parseFold(template?.fold));
 
   function handleOverlayChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0] ?? null;
@@ -147,6 +150,7 @@ export default function TemplateForm({
     // laisserait d'anciennes marques en place après les avoir toutes retirées.
     formData.append("foldMarksVertical", JSON.stringify(foldMarksVertical));
     formData.append("foldMarksHorizontal", JSON.stringify(foldMarksHorizontal));
+    formData.append("fold", fold ? JSON.stringify(fold) : "");
 
     const res = await fetch(isEditing ? `/api/templates/${template!.id}` : "/api/templates", {
       method: isEditing ? "PATCH" : "POST",
@@ -337,6 +341,19 @@ export default function TemplateForm({
         )}
       </div>
 
+      <FoldSection
+        fold={fold}
+        widthMm={form.width_mm}
+        heightMm={form.height_mm}
+        unit={unit}
+        onChange={(next) => {
+          setFold(next);
+          // Un produit plié s'imprime des deux côtés (l'extérieur et l'intérieur).
+          if (next) update("two_sided", true);
+        }}
+      />
+
+      {!fold && (
       <div>
         <label className="block text-sm font-medium">Marques de pli</label>
         <p className="mt-1 text-xs text-neutral-500">
@@ -412,6 +429,7 @@ export default function TemplateForm({
           </div>
         </div>
       </div>
+      )}
 
       <div>
         <label className="mb-2 block text-sm font-medium">Impression</label>
@@ -602,5 +620,112 @@ export default function TemplateForm({
         {loading ? "Enregistrement..." : isEditing ? "Enregistrer" : "Créer le modèle"}
       </button>
     </form>
+  );
+}
+
+// Produit plié : type de pli, direction, volets et zone de sécurité ; les
+// volets calculés s'affichent au recto (extérieur) et au verso (intérieur).
+function FoldSection({
+  fold,
+  widthMm,
+  heightMm,
+  unit,
+  onChange,
+}: {
+  fold: FoldConfig | null;
+  widthMm: number;
+  heightMm: number;
+  unit: Unit;
+  onChange: (fold: FoldConfig | null) => void;
+}) {
+  const fmt = (mm: number) => (unit === "mm" ? `${Math.round(mm * 10) / 10} mm` : `${Math.round(mmToIn(mm) * 1000) / 1000} po`);
+  const set = (patch: Partial<FoldConfig>) => onChange(parseFold({ ...(fold ?? {}), ...patch }));
+  const length = fold ? foldAxisLength(fold, widthMm, heightMm) : 0;
+
+  return (
+    <div>
+      <label className="block text-sm font-medium">Produit plié</label>
+      <p className="mt-1 text-xs text-neutral-500">
+        Dépliant ou carte pliée : l&apos;outil montre les plis, le nom de chaque volet et une zone de sécurité autour des
+        plis — jamais imprimés.
+      </p>
+      <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-4">
+        <select
+          value={fold?.type ?? ""}
+          onChange={(e) => (e.target.value ? set({ type: e.target.value as FoldType }) : onChange(null))}
+          className="rounded border border-neutral-300 px-3 py-2 text-sm sm:col-span-2"
+          aria-label="Type de pli"
+        >
+          <option value="">Aucun pli (à plat)</option>
+          {FOLD_TYPES.map((t) => (
+            <option key={t.type} value={t.type}>
+              {t.label}
+            </option>
+          ))}
+        </select>
+        {fold && (
+          <select
+            value={fold.direction}
+            onChange={(e) => set({ direction: e.target.value as FoldDirection })}
+            className="rounded border border-neutral-300 px-3 py-2 text-sm"
+            aria-label="Direction des plis"
+          >
+            <option value="vertical">Plis verticaux (volets côte à côte)</option>
+            <option value="horizontal">Plis horizontaux (volets empilés)</option>
+          </select>
+        )}
+        {fold?.type === "accordion" && (
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="number"
+              min={3}
+              max={8}
+              value={fold.panels}
+              onChange={(e) => set({ panels: Number(e.target.value) })}
+              className="w-16 rounded border border-neutral-300 px-2 py-2"
+            />
+            volets
+          </label>
+        )}
+      </div>
+      {fold && (
+        <>
+          <label className="mt-3 flex items-center gap-2 text-sm">
+            Zone de sécurité de chaque côté d&apos;un pli :
+            <input
+              type="number"
+              step={unit === "mm" ? "0.1" : "0.01"}
+              min={0}
+              value={unit === "mm" ? fold.safetyMm : Math.round(mmToIn(fold.safetyMm) * 1000) / 1000}
+              onChange={(e) => set({ safetyMm: unit === "mm" ? Number(e.target.value) : inToMm(Number(e.target.value)) })}
+              className="w-24 rounded border border-neutral-300 px-2 py-1.5"
+            />
+            {unit === "mm" ? "mm" : "po"}
+          </label>
+          <div className="mt-3 grid grid-cols-1 gap-3 text-xs sm:grid-cols-2">
+            {(["front", "back"] as const).map((side) => (
+              <div key={side} className="rounded-lg bg-neutral-50 p-3">
+                <p className="mb-1 font-semibold uppercase tracking-wide text-neutral-500">
+                  {side === "front" ? "Recto (extérieur)" : "Verso (intérieur)"}
+                </p>
+                <ol className="space-y-0.5">
+                  {foldPanels(fold, length, side).map((p, i) => (
+                    <li key={i} className="flex justify-between gap-2">
+                      <span>{p.label}</span>
+                      <span className="text-neutral-500">{fmt(p.size)}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            ))}
+          </div>
+          {fold.type === "roll" && (
+            <p className="mt-2 text-xs text-neutral-500">
+              Le volet rabattu est plus étroit de 1/16 po, pour bien rentrer à l&apos;intérieur.
+            </p>
+          )}
+        </>
+      )}
+    </div>
   );
 }

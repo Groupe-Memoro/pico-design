@@ -30,6 +30,9 @@ export interface StationeryMockupInput {
   rotation?: number;
   // Calques additionnels (texte/image) de ce côté, dans l'ordre d'empilement.
   layers?: ResolvedLayer[];
+  // Le côté seul, au format fini, sans ombre ni marge : la matière de
+  // l'aperçu d'un produit plié (components/FoldedPreview), qui le découpe en volets.
+  flat?: boolean;
 }
 
 /**
@@ -53,6 +56,7 @@ export async function generateStationeryMockupPng({
   zoom,
   rotation = 0,
   layers = [],
+  flat = false,
 }: StationeryMockupInput): Promise<Buffer> {
   // Résolution plafonnée (mockup à l'écran, pas un fichier d'impression) —
   // même logique que generateProductMockupPng.
@@ -67,6 +71,7 @@ export async function generateStationeryMockupPng({
   // clé avec le recadrage du PDF, qui inclut toujours le fond perdu.
   const cropped = await coverCropToBuffer(image, cardWidthPx, cardHeightPx, positionX, positionY, zoom, rotation);
   const withLayers = await compositeLayers(cropped, layers, cardWidthPx, cardHeightPx, dpi);
+  if (flat) return sharp(withLayers).flatten({ background: "#ffffff" }).jpeg({ quality: 88 }).toBuffer();
   // `ensureAlpha` : la silhouette que l'ombre portée dessine vient du canal
   // alpha (voir addDropShadow) — sans lui, une image sans transparence (le
   // cas courant ici) ne projetterait aucune ombre.

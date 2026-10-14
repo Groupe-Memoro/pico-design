@@ -1,4 +1,10 @@
+import { parseFold } from "../folds";
 import type { Template } from "../types";
+
+function rotateFold(raw: unknown) {
+  const fold = parseFold(raw);
+  return fold ? { ...fold, direction: fold.direction === "vertical" ? "horizontal" : "vertical" } : raw ?? null;
+}
 
 /**
  * Retourne le modèle avec largeur/hauteur (et les marges qui ont un axe
@@ -18,6 +24,10 @@ export function applyOrientation(template: Template, rotated: boolean): Template
     print_margin_y_mm: template.print_margin_x_mm,
     logo_margin_x_mm: template.logo_margin_y_mm,
     logo_margin_y_mm: template.logo_margin_x_mm,
+    // Les plis tournent avec le format : verticaux deviennent horizontaux.
+    fold_marks_vertical_mm: template.fold_marks_horizontal_mm,
+    fold_marks_horizontal_mm: template.fold_marks_vertical_mm,
+    fold: rotateFold(template.fold),
   };
 }
 
