@@ -12,7 +12,7 @@ import { loadBeautyShotBundle } from "@/lib/pdf/beautyShotBundle";
 import { resolveMockupBundle } from "@/lib/templateMockups";
 import { grantAllows } from "@/lib/publicDesign";
 import { publicUploadError } from "@/lib/uploadLimits";
-import { MAX_MOSAIC_SIDE, isValidMosaicSide } from "@/lib/design/mosaicGrid";
+import { MAX_MOSAIC_SIDE, isValidMosaicGrid } from "@/lib/design/mosaicGrid";
 import { parsePositionValue } from "@/lib/pdf/crop";
 import { applyOrientation } from "@/lib/pdf/orientation";
 import { generateStationeryMockupPng } from "@/lib/pdf/stationeryMockup";
@@ -126,7 +126,8 @@ export async function POST(request: Request) {
     mosaicCols > 0 &&
     mosaicRows > 0;
   // Plafond imposé ici et pas seulement à l'écran (voir lib/design/mosaicGrid.ts).
-  if (hasMosaicGrid && (!isValidMosaicSide(mosaicCols) || !isValidMosaicSide(mosaicRows))) {
+  const mosaicPanels = formData.get("mosaicPanels") === "1";
+  if (hasMosaicGrid && !isValidMosaicGrid(mosaicCols, mosaicRows, mosaicPanels)) {
     return errorResponse(`Grille de mosaïque invalide : ${MAX_MOSAIC_SIDE} colonnes et ${MAX_MOSAIC_SIDE} rangées au maximum.`);
   }
   const mosaicFiles: (File | null)[] | null = hasMosaicGrid
@@ -217,6 +218,7 @@ export async function POST(request: Request) {
         mosaicFiles,
         mosaicCols,
         mosaicRows,
+        mosaicPanelSide: mosaicPanels ? side : null,
         mosaicCellAdjust,
       });
       resolvedBuffer = resolved.buffer;

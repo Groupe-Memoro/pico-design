@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { hydrateStagedFiles } from "@/lib/design/stagedFiles";
+import { panelsToSideImages } from "@/lib/products/panelsForm";
 import { parseLogoShadowForm } from "@/lib/logoShadowSettings";
 import { createServerSupabaseClient, createAdminSupabaseClient } from "@/lib/supabase/server";
 import { planUploadedPdf, resolveProductImage } from "@/lib/pdf/productSource";
@@ -16,7 +18,14 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
 
-  const formData = await request.formData();
+  // Envoi direct au stockage pour les gros fichiers (voir stageLargeFiles), puis
+  // composition par volet d'un produit plié, assemblée en une image par côté.
+  let formData: FormData;
+  try {
+    formData = await panelsToSideImages(supabase, await hydrateStagedFiles(await request.formData()));
+  } catch (err) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Erreur lors du traitement des volets." }, { status: 400 });
+  }
   const name = formData.get("name");
   const templateId = formData.get("templateId");
   const file = formData.get("image");

@@ -7,7 +7,7 @@ import {
   createAdminSupabaseClient,
 } from "@/lib/supabase/server";
 import { grantAllows } from "@/lib/publicDesign";
-import { MAX_MOSAIC_SIDE, isValidMosaicSide } from "@/lib/design/mosaicGrid";
+import { MAX_MOSAIC_SIDE, isValidMosaicGrid } from "@/lib/design/mosaicGrid";
 import { resolveProductImage } from "@/lib/pdf/productSource";
 import { generateTemplatePreviewPng } from "@/lib/pdf/preview";
 import { loadLogoImage } from "@/lib/pdf/logo";
@@ -66,8 +66,10 @@ export async function POST(request: Request) {
     Number.isFinite(mosaicColsRaw) && mosaicColsRaw > 0 ? mosaicColsRaw : null;
   const mosaicRows =
     Number.isFinite(mosaicRowsRaw) && mosaicRowsRaw > 0 ? mosaicRowsRaw : null;
+  // Par volet (produit plié) : les cases sont les volets du côté montré.
+  const mosaicPanels = formData.get("mosaicPanels") === "1";
   // Plafond imposé ici et pas seulement à l'écran (voir lib/design/mosaicGrid.ts).
-  if ((mosaicCols && !isValidMosaicSide(mosaicCols)) || (mosaicRows && !isValidMosaicSide(mosaicRows))) {
+  if (mosaicCols && mosaicRows && !isValidMosaicGrid(mosaicCols, mosaicRows, mosaicPanels)) {
     return NextResponse.json({ error: `Grille de mosaïque invalide : ${MAX_MOSAIC_SIDE} colonnes et ${MAX_MOSAIC_SIDE} rangées au maximum.` }, { status: 400 });
   }
   const mosaicFiles: (File | null)[] | null =
@@ -198,6 +200,7 @@ export async function POST(request: Request) {
       mosaicFiles,
       mosaicCols,
       mosaicRows,
+      mosaicPanelSide: mosaicPanels ? side : null,
       mosaicCellAdjust,
       themeId,
       themeSlotFiles,

@@ -10,6 +10,7 @@ import type { VisualWithUrl } from "@/components/VisualsGrid";
 import type { ThemeWithOverlayUrl } from "@/components/ThemesTable";
 import type { Category, Sku, Template, TemplateMockup, IllustrationWithUrl } from "@/lib/types";
 import { pdfPageCount, planPdfPages } from "@/lib/pdf/pdfPages";
+import { parseFold } from "@/lib/folds";
 import { applyOrientation } from "@/lib/pdf/orientation";
 import type { DesignLayer } from "@/lib/design/layers";
 
@@ -109,7 +110,7 @@ export default function DesignTool({
   const [rotated, setRotated] = useState(false);
   const [front, setFront] = useState<ImageSourceValue>(() => emptySource(visuals));
   const [back, setBack] = useState<ImageSourceValue>(() => emptySource(visuals));
-  const [designType, setDesignType] = useState<"single" | "mosaic" | "theme">("single");
+  const [designType, setDesignType] = useState<"single" | "mosaic" | "theme" | "panels">("single");
   const [mosaicGrid, setMosaicGrid] = useState(DEFAULT_MOSAIC_GRID);
   const [selectedTheme, setSelectedTheme] = useState<ThemeWithOverlayUrl | null>(null);
   const [reviewOpen, setReviewOpen] = useState(false);
@@ -117,8 +118,26 @@ export default function DesignTool({
   const [backLayers, setBackLayers] = useState<DesignLayer[]>([]);
 
   const effectiveTemplate = template ? applyOrientation(template, rotated) : null;
+  // Par volet : une mosaïque d'une rangée (plis verticaux) ou d'une colonne
+  // (plis horizontaux), une case par volet. Tirée du modèle orienté : elle
+  // suit le passage portrait/paysage.
+  const effectiveFold = effectiveTemplate ? parseFold(effectiveTemplate.fold) : null;
+  const gridForDesign =
+    designType === "panels" && effectiveFold
+      ? effectiveFold.direction === "vertical"
+        ? { cols: effectiveFold.panels, rows: 1 }
+        : { cols: 1, rows: effectiveFold.panels }
+      : mosaicGrid;
   const themesForTemplate = themes.filter((t) => t.template_id === template?.id);
   const mockupsForTemplate = mockups.filter((m) => m.template_id === template?.id);
+
+  // Un modèle plié conçu seulement « par volet » s'ouvre directement ainsi.
+  useEffect(() => {
+    if (template && parseFold(template.fold)?.designMode === "panels" && designType !== "panels") {
+      handleSelectDesignType("panels");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [template?.id]);
 
   function handleSelectTemplate(t: Template, c: Category) {
     setCategory(c);
@@ -153,9 +172,25 @@ export default function DesignTool({
   // jamais ceux des autres modes, qui restent intacts pour un retour
   // ultérieur.
   function handleSelectDesignType(
-    type: "single" | "mosaic" | "theme",
+    type: "single" | "mosaic" | "theme" | "panels",
     extra?: { grid?: { cols: number; rows: number }; theme?: ThemeWithOverlayUrl }
   ) {
+    if (type === "panels") {
+      // Une case par volet, au recto comme au verso ; les cases déjà remplies
+      // restent si le nombre de volets n'a pas changé.
+      const count = parseFold(template?.fold)?.panels ?? 0;
+      setDesignType("panels");
+      setSelectedTheme(null);
+      const toPanels = (v: ImageSourceValue): ImageSourceValue => ({
+        ...v,
+        sourceMode: "mosaic",
+        mosaicFiles: v.mosaicFiles?.length === count && designType === "panels" ? v.mosaicFiles : Array.from({ length: count }, () => null),
+        mosaicCellAdjust: v.mosaicFiles?.length === count && designType === "panels" ? v.mosaicCellAdjust : [],
+      });
+      setFront(toPanels);
+      setBack(toPanels);
+      return;
+    }
     const nextGrid = extra?.grid ?? mosaicGrid;
     const previousTheme = selectedTheme;
     setDesignType(type);
@@ -299,7 +334,7 @@ export default function DesignTool({
           frontReady={frontReady}
           backReady={backReady}
           designType={designType}
-          mosaicGrid={mosaicGrid}
+          mosaicGrid={gridForDesign}
           selectedTheme={selectedTheme}
           onChangeDesignType={handleSelectDesignType}
           // En mode public il n'y a pas d'autre modèle à proposer.
@@ -321,7 +356,8 @@ export default function DesignTool({
           frontLayers={frontLayers}
           backLayers={backLayers}
           backFromPdf={backFromPdf}
-          mosaicGrid={mosaicGrid}
+          mosaicGrid={gridForDesign}
+          panels={designType === "panels"}
           selectedTheme={selectedTheme}
           mockups={mockupsForTemplate}
           grant={grant}

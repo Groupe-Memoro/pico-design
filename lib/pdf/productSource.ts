@@ -4,6 +4,7 @@ import { composeFullCoverImage, composeTiledImage } from "./visual";
 import { composeMosaicImage } from "./mosaic";
 import { composeThemeImage } from "./theme";
 import { applyOrientation } from "./orientation";
+import { panelCells } from "../folds";
 import { prepareUploadedFile } from "../visualUpload";
 import { isPdfBuffer } from "./rasterizePdf";
 import { pdfPageCount, planPdfPages, type PdfPagePlan } from "./pdfPages";
@@ -30,6 +31,9 @@ export interface ResolveProductImageInput {
   // Cadrage de chaque case de la mosaïque (position/zoom), dans l'ordre des
   // cases — voir composeMosaicImage. Absent = photos centrées.
   mosaicCellAdjust?: ThemeSlotAdjust[] | null;
+  // Composition par volet (produit plié) : les cases sont les volets de ce
+  // côté du modèle (voir panelCells), pas une grille égale.
+  mosaicPanelSide?: "front" | "back" | null;
   // Thème (Design Shopify, étape « Type de design ») : un graphisme préfait
   // attribué au modèle, avec un ou plusieurs emplacements où les photos du client sont
   // recadrées — voir composeThemeImage. Prioritaire sur mosaic/file/visualId.
@@ -149,7 +153,8 @@ export async function resolveProductImage(
       input.mosaicRows ?? 1,
       targetWidthPx,
       targetHeightPx,
-      input.mosaicCellAdjust ?? []
+      input.mosaicCellAdjust ?? [],
+      input.mosaicPanelSide ? panelCells(template, input.mosaicPanelSide) : null
     );
     return { buffer, contentType: "image/jpeg", filename: "mosaic.jpg" };
   }

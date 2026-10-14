@@ -1,5 +1,6 @@
 import sharp from "sharp";
 import { coverCropToBuffer } from "./crop";
+import { isPdfBuffer, rasterizePdfPage } from "./rasterizePdf";
 import type { ThemeSlotAdjust } from "../types";
 
 /**
@@ -20,6 +21,11 @@ import type { ThemeSlotAdjust } from "../types";
  * `cellAdjust[i]` : le cadrage choisi par le client pour la case i (position
  * et zoom, même mécanique que les emplacements d'un thème, voir
  * ThemeSlotAdjust). Absent = photo centrée en "cover", comme avant.
+ *
+ * `edges` : limites des colonnes et des rangées (fractions 0-1 de la page),
+ * pour des cases inégales — les volets d'un produit plié (voir panelCells,
+ * lib/folds.ts). Absent = cases égales. Une case peut alors recevoir un
+ * fichier fini, PDF compris (sa première page).
  */
 export async function composeMosaicImage(
   cells: (Buffer | null)[],
@@ -27,17 +33,23 @@ export async function composeMosaicImage(
   rows: number,
   targetWidthPx: number,
   targetHeightPx: number,
-  cellAdjust: (ThemeSlotAdjust | null | undefined)[] = []
+  cellAdjust: (ThemeSlotAdjust | null | undefined)[] = [],
+  edges: { cols: number[]; rows: number[] } | null = null
 ): Promise<Buffer> {
-  const c = Math.max(1, Math.floor(cols));
-  const r = Math.max(1, Math.floor(rows));
-  const colEdges = Array.from({ length: c + 1 }, (_, i) => Math.round((i * targetWidthPx) / c));
-  const rowEdges = Array.from({ length: r + 1 }, (_, i) => Math.round((i * targetHeightPx) / r));
+  const c = edges ? edges.cols.length - 1 : Math.max(1, Math.floor(cols));
+  const r = edges ? edges.rows.length - 1 : Math.max(1, Math.floor(rows));
+  const colEdges = edges
+    ? edges.cols.map((f) => Math.round(f * targetWidthPx))
+    : Array.from({ length: c + 1 }, (_, i) => Math.round((i * targetWidthPx) / c));
+  const rowEdges = edges
+    ? edges.rows.map((f) => Math.round(f * targetHeightPx))
+    : Array.from({ length: r + 1 }, (_, i) => Math.round((i * targetHeightPx) / r));
 
   const composites: { input: Buffer; left: number; top: number }[] = [];
   for (let row = 0; row < r; row++) {
     for (let col = 0; col < c; col++) {
-      const cell = cells[row * c + col] ?? null;
+      const raw = cells[row * c + col] ?? null;
+      const cell = raw && isPdfBuffer(raw) ? await rasterizePdfPage(raw, 1) : raw;
       const cellWidth = colEdges[col + 1] - colEdges[col];
       const cellHeight = rowEdges[row + 1] - rowEdges[row];
       if (!cell || cellWidth <= 0 || cellHeight <= 0) continue;

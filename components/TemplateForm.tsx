@@ -5,7 +5,7 @@ import type { Category, LogoHAlign, LogoVAlign, Sku, Template } from "@/lib/type
 import { inToMm, mmToIn } from "@/lib/pdf/units";
 import { SpinnerIcon } from "@/components/icons";
 import SkuPicker from "@/components/SkuPicker";
-import { FOLD_TYPES, foldAxisLength, foldPanels, parseFold, type FoldConfig, type FoldDirection, type FoldType } from "@/lib/folds";
+import { FOLD_DESIGN_MODES, FOLD_TYPES, foldAxisLength, foldPanels, parseFold, type FoldConfig, type FoldDesignMode, type FoldDirection, type FoldType } from "@/lib/folds";
 
 type Unit = "mm" | "in";
 
@@ -690,6 +690,24 @@ function FoldSection({
       </div>
       {fold && (
         <>
+          <label className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+            Conception :
+            <select
+              value={fold.designMode}
+              onChange={(e) => set({ designMode: e.target.value as FoldDesignMode })}
+              className="rounded border border-neutral-300 px-3 py-1.5 text-sm"
+            >
+              {FOLD_DESIGN_MODES.map((m) => (
+                <option key={m.mode} value={m.mode}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="mt-1 text-xs text-neutral-500">
+            Par volet : une photo ou un fichier par volet, dans l&apos;outil de design comme pour les produits. Le texte se
+            place sur la feuille, avec les guides des volets.
+          </p>
           <label className="mt-3 flex items-center gap-2 text-sm">
             Zone de sécurité de chaque côté d&apos;un pli :
             <input

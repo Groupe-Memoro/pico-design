@@ -9,6 +9,7 @@ import FileDropZone from "@/components/FileDropZone";
 import { mmToIn, inToMm } from "@/lib/pdf/units";
 import { slotClipPath, slotShape, slotSvgShape } from "@/lib/themeShapes";
 import { stageLargeFiles } from "@/lib/design/stageUpload";
+import { filePreviewUrl } from "@/lib/design/filePreview";
 import { SpinnerIcon, UploadIcon } from "@/components/icons";
 import { fontOptionById } from "@/lib/design/fonts";
 import { maxTextSizeMmForTemplate, type DesignLayer, type ImageLayer } from "@/lib/design/layers";
@@ -302,22 +303,39 @@ function LayerHandles({
 // Une case de la grille mosaïque (sourceMode "mosaic") : une miniature très
 // compacte (carrée), pas le grand FileDropZone habituel — il y en a
 // plusieurs à la fois, côte à côte, pas la place pour son texte d'aide.
-function MosaicCellDropZone({ file, onFileChange }: { file: File | null; onFileChange: (file: File | null) => void }) {
+function MosaicCellDropZone({
+  file,
+  onFileChange,
+  label,
+  acceptPdf = false,
+  previewUrl,
+}: {
+  file: File | null;
+  onFileChange: (file: File | null) => void;
+  // Nom du volet (composition par volet).
+  label?: string;
+  acceptPdf?: boolean;
+  // Aperçu fourni par le parent (un PDF rendu par le serveur) ; absent =
+  // l'image du fichier elle-même.
+  previewUrl?: string | null;
+}) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
-  const [preview, setPreview] = useState<string | null>(null);
+  const [ownPreview, setPreview] = useState<string | null>(null);
+  const preview = previewUrl !== undefined ? previewUrl : ownPreview;
 
   useEffect(() => {
-    if (!file) {
+    if (previewUrl !== undefined || !file) {
       setPreview(null);
       return;
     }
     const url = URL.createObjectURL(file);
     setPreview(url);
     return () => URL.revokeObjectURL(url);
-  }, [file]);
+  }, [file, previewUrl]);
 
   return (
+    <div className="flex flex-col gap-0.5">
     <div
       onDragOver={(e) => {
         e.preventDefault();
@@ -345,7 +363,7 @@ function MosaicCellDropZone({ file, onFileChange }: { file: File | null; onFileC
       <input
         ref={inputRef}
         type="file"
-        accept="image/*"
+        accept={acceptPdf ? "image/*,application/pdf" : "image/*"}
         onChange={(e) => onFileChange(e.target.files?.[0] ?? null)}
         className="hidden"
       />
@@ -368,6 +386,8 @@ function MosaicCellDropZone({ file, onFileChange }: { file: File | null; onFileC
           ✕
         </button>
       )}
+    </div>
+    {label && <span className="truncate text-center text-[10px] text-text-muted">{label}</span>}
     </div>
   );
 }
@@ -525,6 +545,7 @@ export default function ImageSourcePicker({
   onChangeLayers,
   selectedLayerId = null,
   mosaicGrid = { cols: 2, rows: 2 },
+  panelCells = null,
   themeId = null,
   themeSlots = [],
   themeOverlayUrl = null,
@@ -588,6 +609,10 @@ export default function ImageSourcePicker({
   // une fois pour tout le design (voir DesignTypePicker), partagées entre
   // recto et verso : ignoré pour les autres modes.
   mosaicGrid?: { cols: number; rows: number };
+  // Composition par volet d'un produit plié (sourceMode "mosaic") : les cases
+  // sont les volets de ce côté (limites en fractions de la page, et leurs
+  // noms), plutôt qu'une grille égale — voir panelCells (lib/folds.ts).
+  panelCells?: { cols: number[]; rows: number[]; labels: string[] } | null;
   // Thème choisi (sourceMode "theme") — id envoyé au serveur pour la
   // génération finale (voir composeThemeImage) ; le nombre d'emplacements
   // vient de `value.themeSlotFiles.length` (déjà dimensionné par DesignTool).
@@ -813,8 +838,20 @@ export default function ImageSourcePicker({
   // de la grille. Même affichage, même glisser, même zoom pour les deux ; le
   // serveur recadre ensuite de la même façon (composeThemeImage /
   // composeMosaicImage).
+  const panelSlots: ThemeSlot[] | null =
+    isMosaic && panelCells
+      ? Array.from({ length: (panelCells.cols.length - 1) * (panelCells.rows.length - 1) }, (_, i) => {
+          const c = i % (panelCells.cols.length - 1);
+          const r = Math.floor(i / (panelCells.cols.length - 1));
+          const [x0, x1] = [panelCells.cols[c], panelCells.cols[c + 1]];
+          const [y0, y1] = [panelCells.rows[r], panelCells.rows[r + 1]];
+          return { positionX: (x0 + x1) / 2, positionY: (y0 + y1) / 2, widthRatio: x1 - x0, heightRatio: y1 - y0 };
+        })
+      : null;
   const slots: ThemeSlot[] = isTheme
     ? themeSlots
+    : panelSlots
+    ? panelSlots
     : isMosaic
     ? Array.from({ length: mosaicGrid.cols * mosaicGrid.rows }, (_, i) => ({
         positionX: ((i % mosaicGrid.cols) + 0.5) / mosaicGrid.cols,
@@ -1047,10 +1084,23 @@ export default function ImageSourcePicker({
   // fichiers change (themeSlotFilesKey, déjà dérivé plus haut).
   const [themeSlotPreviewUrls, setThemeSlotPreviewUrls] = useState<(string | null)[]>([]);
   useEffect(() => {
-    const urls = slotFiles.map((f) => (f ? URL.createObjectURL(f) : null));
-    setThemeSlotPreviewUrls(urls);
+    // Un PDF (fichier fini déposé dans un volet) s'affiche par sa première
+    // page, rendue par le serveur (voir filePreviewUrl) ; une image, telle quelle.
+    let cancelled = false;
+    const created: string[] = [];
+    Promise.all(
+      slotFiles.map((f) => (f && template ? filePreviewUrl(f, { templateId: template.id, grant }) : Promise.resolve(null)))
+    ).then((urls) => {
+      urls.forEach((u, i) => {
+        const f = slotFiles[i];
+        if (u && f && !isPdfFile(f)) created.push(u);
+      });
+      if (cancelled) created.forEach((u) => URL.revokeObjectURL(u));
+      else setThemeSlotPreviewUrls(urls);
+    });
     return () => {
-      urls.forEach((u) => u && URL.revokeObjectURL(u));
+      cancelled = true;
+      created.forEach((u) => URL.revokeObjectURL(u));
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slotFilesKey]);
@@ -1227,15 +1277,21 @@ export default function ImageSourcePicker({
         allowFileChange && (
           <div>
             <label className="block text-sm font-medium">
-              Photos ({mosaicGrid.cols}×{mosaicGrid.rows})
+              {panelCells ? "Un fichier par volet" : `Photos (${mosaicGrid.cols}×${mosaicGrid.rows})`}
             </label>
+            {panelCells && (
+              <p className="mt-0.5 text-xs text-text-subtle">Photo ou fichier fini (image ou PDF), cadré dans son volet.</p>
+            )}
             <div
               className="mt-1 grid gap-1.5"
-              style={{ gridTemplateColumns: `repeat(${mosaicGrid.cols}, minmax(0, 1fr))` }}
+              style={{ gridTemplateColumns: `repeat(${panelCells ? Math.min(4, mosaicGrid.cols * mosaicGrid.rows) : mosaicGrid.cols}, minmax(0, 1fr))` }}
             >
               {Array.from({ length: mosaicGrid.cols * mosaicGrid.rows }, (_, i) => (
                 <MosaicCellDropZone
                   key={i}
+                  label={panelCells?.labels[i]}
+                  acceptPdf={Boolean(panelCells)}
+                  previewUrl={panelCells ? themeSlotPreviewUrls[i] ?? null : undefined}
                   file={mosaicFiles[i] ?? null}
                   onFileChange={(f) => {
                     const next = mosaicFiles.slice(0, mosaicGrid.cols * mosaicGrid.rows);

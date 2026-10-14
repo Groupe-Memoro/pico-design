@@ -23,7 +23,21 @@ export interface FoldConfig {
   panels: number;
   // Zone de sécurité de chaque côté d'un pli.
   safetyMm: number;
+  // Comment se compose le produit : sur la feuille entière (recto-verso), par
+  // volet (une photo ou un fichier par volet), ou au choix.
+  designMode: FoldDesignMode;
 }
+
+export type FoldDesignMode = "sheet" | "panels" | "both";
+
+export const FOLD_DESIGN_MODES: { mode: FoldDesignMode; label: string }[] = [
+  { mode: "sheet", label: "Feuille entière (fichier recto-verso)" },
+  { mode: "panels", label: "Par volet" },
+  { mode: "both", label: "Au choix : feuille entière ou par volet" },
+];
+
+export const allowsPanels = (fold: FoldConfig | null) => Boolean(fold && fold.designMode !== "sheet");
+export const allowsSheet = (fold: FoldConfig | null) => !fold || fold.designMode !== "panels";
 
 export const FOLD_TYPES: { type: FoldType; label: string }[] = [
   { type: "half", label: "Pli simple (2 volets)" },
@@ -44,7 +58,14 @@ export function parseFold(raw: unknown): FoldConfig | null {
   const direction: FoldDirection = r.direction === "horizontal" ? "horizontal" : "vertical";
   const panels = type === "half" ? 2 : type === "roll" ? 3 : Math.min(8, Math.max(3, Math.round(Number(r.panels)) || 3));
   const safety = Number(r.safetyMm);
-  return { type, direction, panels, safetyMm: Number.isFinite(safety) && safety >= 0 && safety <= 20 ? safety : DEFAULT_FOLD_SAFETY_MM };
+  const designMode: FoldDesignMode = r.designMode === "panels" || r.designMode === "both" ? r.designMode : "sheet";
+  return {
+    type,
+    direction,
+    panels,
+    safetyMm: Number.isFinite(safety) && safety >= 0 && safety <= 20 ? safety : DEFAULT_FOLD_SAFETY_MM,
+    designMode,
+  };
 }
 
 export interface FoldPanel {
@@ -106,4 +127,27 @@ export function foldLines(fold: FoldConfig, length: number, side: "front" | "bac
 // Longueur de l'axe des plis d'un format fini.
 export function foldAxisLength(fold: FoldConfig, widthMm: number, heightMm: number): number {
   return fold.direction === "vertical" ? widthMm : heightMm;
+}
+
+/**
+ * Cases d'une composition par volet, sur la PAGE (fond perdu compris), pour un
+ * côté : limites des colonnes et des rangées en fractions 0-1 (comme une
+ * mosaïque, mais aux plis réels), et le nom de chaque volet. Les volets du
+ * bord prennent le fond perdu ; deux volets voisins se touchent au pli.
+ */
+export function panelCells(
+  t: { width_mm: number; height_mm: number; bleed_mm: number; fold: unknown },
+  side: "front" | "back"
+): { cols: number[]; rows: number[]; labels: string[] } | null {
+  const fold = parseFold(t.fold);
+  if (!fold) return null;
+  const vertical = fold.direction === "vertical";
+  const panels = foldPanels(fold, foldAxisLength(fold, t.width_mm, t.height_mm), side);
+  const page = (vertical ? t.width_mm : t.height_mm) + 2 * t.bleed_mm;
+  const edges = [0, ...panels.slice(1).map((p) => (t.bleed_mm + p.start) / page), 1];
+  return {
+    cols: vertical ? edges : [0, 1],
+    rows: vertical ? [0, 1] : edges,
+    labels: panels.map((p) => p.label),
+  };
 }

@@ -9,6 +9,8 @@ import { formatIn } from "@/lib/pdf/units";
 import { pdfPageCount, planPdfPages } from "@/lib/pdf/pdfPages";
 import { LOGO_COLOR_PALETTE } from "@/lib/logoColors";
 import { applyOrientation, isLandscape } from "@/lib/pdf/orientation";
+import { allowsPanels, allowsSheet, panelCells, parseFold } from "@/lib/folds";
+import { stageLargeFiles } from "@/lib/design/stageUpload";
 import { SpinnerIcon } from "@/components/icons";
 import ColorPickerButton from "@/components/ColorPickerButton";
 
@@ -118,6 +120,37 @@ export default function ProductForm({
     }
   }, [previewTemplateId]);
   const showBackSection = !isMultiTemplate && Boolean(previewTemplate?.two_sided);
+
+  // Produit plié : composé sur la feuille entière (fichier recto-verso) ou
+  // par volet (un fichier par volet), selon le réglage du modèle.
+  const fold = effectiveTemplate ? parseFold(effectiveTemplate.fold) : null;
+  const canPanels = !isMultiTemplate && allowsPanels(fold);
+  const canSheet = allowsSheet(fold);
+  const [panelMode, setPanelMode] = useState(false);
+  const panelGrid = fold ? (fold.direction === "vertical" ? { cols: fold.panels, rows: 1 } : { cols: 1, rows: fold.panels }) : { cols: 1, rows: 1 };
+  function choosePanelMode(on: boolean) {
+    setPanelMode(on);
+    const count = fold?.panels ?? 0;
+    const toMode = (v: ImageSourceValue): ImageSourceValue =>
+      on
+        ? {
+            ...v,
+            sourceMode: "mosaic",
+            mosaicFiles: v.mosaicFiles?.length === count ? v.mosaicFiles : Array.from({ length: count }, () => null),
+            mosaicCellAdjust: v.mosaicFiles?.length === count ? v.mosaicCellAdjust : [],
+          }
+        : { ...v, sourceMode: v.sourceMode === "mosaic" ? "upload" : v.sourceMode };
+    setFront(toMode);
+    setBack(toMode);
+    if (on) setSameAsFront(false);
+  }
+  // Un modèle conçu seulement par volet y passe d'office ; changer de modèle
+  // repart du mode par défaut de ce modèle.
+  useEffect(() => {
+    choosePanelMode(canPanels && !canSheet);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [previewTemplateId, canPanels, canSheet]);
+  const usePanels = panelMode && canPanels;
 
   // Un PDF de deux pages importé pour le recto fournit aussi le verso d'un
   // modèle recto-verso (page 2). Le serveur applique la même règle
@@ -237,6 +270,22 @@ export default function ProductForm({
     if (cId) formData.append("collectionId", cId);
     formData.append("rotated", String(rotated));
     formData.append("showLogo", String(showLogo));
+    if (usePanels) {
+      // Un fichier par volet, au recto et au verso : le serveur assemble chaque
+      // côté aux plis du modèle (voir lib/products/panelsForm.ts).
+      for (const [value, prefix] of [[front, ""], [back, "back"]] as const) {
+        const field = (name: string) => (prefix ? `back${name.charAt(0).toUpperCase()}${name.slice(1)}` : name);
+        if (!(value.mosaicFiles ?? []).some(Boolean)) continue;
+        formData.append(field("mosaicPanels"), "1");
+        formData.append(field("mosaicCols"), String(panelGrid.cols));
+        formData.append(field("mosaicRows"), String(panelGrid.rows));
+        (value.mosaicFiles ?? []).forEach((f, i) => {
+          if (f) formData.append(prefix ? `backMosaicCell${i}` : `mosaicCell${i}`, f);
+        });
+        if (value.mosaicCellAdjust?.length) formData.append(field("mosaicCellAdjust"), JSON.stringify(value.mosaicCellAdjust));
+      }
+      return formData;
+    }
     if (front.sourceMode === "upload") {
       if (front.file) formData.append("image", front.file);
     } else {
@@ -263,15 +312,20 @@ export default function ProductForm({
       setError("Choisis au moins un modèle.");
       return;
     }
-    if (!isEditing && front.sourceMode === "upload" && !front.file) {
+    if (usePanels) {
+      if (!isEditing && !(front.mosaicFiles ?? []).some(Boolean)) {
+        setError("Ajoute au moins un fichier de volet au recto.");
+        return;
+      }
+    } else if (!isEditing && front.sourceMode === "upload" && !front.file) {
       setError("Une image est requise.");
       return;
     }
-    if (front.sourceMode !== "upload" && !front.visualId) {
+    if (!usePanels && front.sourceMode !== "upload" && !front.visualId) {
       setError("Choisis un visuel dans la banque.");
       return;
     }
-    if (showBackSection) {
+    if (showBackSection && !usePanels) {
       const hasExistingBack = isEditing && Boolean(currentBackImageUrl);
       if (back.sourceMode === "upload" && !back.file && !hasExistingBack && !backFromPdf) {
         setError("Une image de verso est requise (modèle recto-verso).");
@@ -290,9 +344,19 @@ export default function ProductForm({
     if (isEditing || !isMultiTemplate) {
       const tId = isEditing ? templateId : selectedTemplateIds[0];
       const formData = buildFormData(name, tId, collectionId);
+      let body: FormData = formData;
+      try {
+        // Les fichiers de volets passent par le stockage : plusieurs fichiers
+        // dépasseraient vite la limite de 4,5 Mo d'une requête.
+        if (usePanels) body = await stageLargeFiles(formData);
+      } catch (err) {
+        setLoading(false);
+        setError(err instanceof Error ? err.message : "Envoi des fichiers impossible.");
+        return;
+      }
       const res = await fetch(isEditing ? `/api/products/${product!.id}` : "/api/products", {
         method: isEditing ? "PATCH" : "POST",
-        body: formData,
+        body,
       });
       const data = await res.json();
       setLoading(false);
@@ -537,10 +601,31 @@ export default function ProductForm({
         </div>
       )}
 
+      {canPanels && canSheet && (
+        <div>
+          <p className="mb-1 text-sm font-medium">Conception</p>
+          <div className="flex rounded-lg border border-neutral-300 p-0.5 text-sm">
+            {([false, true] as const).map((on) => (
+              <button
+                key={String(on)}
+                type="button"
+                onClick={() => choosePanelMode(on)}
+                className={`flex-1 rounded-md px-2 py-1.5 ${usePanels === on ? "bg-pico-black text-white" : "text-neutral-600 hover:bg-neutral-100"}`}
+              >
+                {on ? "Par volet" : "Fichier recto-verso"}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div>
-        <p className="mb-1 text-sm font-medium">Recto</p>
+        <p className="mb-1 text-sm font-medium">Recto{usePanels ? " (extérieur)" : ""}</p>
         <ImageSourcePicker
           side="front"
+          {...(usePanels && effectiveTemplate
+            ? { sourceModes: ["mosaic" as const], mosaicGrid: panelGrid, panelCells: panelCells(effectiveTemplate, "front") }
+            : {})}
           template={effectiveTemplate}
           rotated={rotated}
           visuals={visuals}
@@ -699,6 +784,7 @@ export default function ProductForm({
             <p className="text-sm font-medium">
               Verso <span className="font-normal text-neutral-400">(modèle recto-verso)</span>
             </p>
+            {!usePanels && (
             <label className="flex items-center gap-2 text-sm text-pico-black">
               <input
                 type="checkbox"
@@ -707,6 +793,7 @@ export default function ProductForm({
               />
               Même visuel que le recto
             </label>
+            )}
           </div>
           {sameAsFront ? (
             <p className="text-xs text-neutral-500">
@@ -716,6 +803,9 @@ export default function ProductForm({
           ) : (
             <ImageSourcePicker
               side="back"
+              {...(usePanels && effectiveTemplate
+                ? { sourceModes: ["mosaic" as const], mosaicGrid: panelGrid, panelCells: panelCells(effectiveTemplate, "back") }
+                : {})}
               template={effectiveTemplate}
               rotated={rotated}
               visuals={visuals}

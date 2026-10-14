@@ -10,7 +10,6 @@ import { SpinnerIcon, XIcon } from "@/components/icons";
 import MockupGallery, { type MockupView } from "@/components/MockupGallery";
 import FoldedPreview from "@/components/FoldedPreview";
 import { parseFold } from "@/lib/folds";
-import { applyOrientation } from "@/lib/pdf/orientation";
 import { layerImageFieldName, type DesignLayer } from "@/lib/design/layers";
 
 // Ajoute les calques d'un côté au formulaire : un champ JSON (métadonnées
@@ -42,8 +41,11 @@ function appendMosaicToForm(
   body: FormData,
   value: ImageSourceValue,
   mosaicGrid: { cols: number; rows: number },
-  backPrefixed: boolean
+  backPrefixed: boolean,
+  // Par volet (produit plié) : les cases sont les volets du modèle.
+  panels = false
 ) {
+  if (panels) body.append(backPrefixed ? "backMosaicPanels" : "mosaicPanels", "1");
   body.append(backPrefixed ? "backMosaicCols" : "mosaicCols", String(mosaicGrid.cols));
   body.append(backPrefixed ? "backMosaicRows" : "mosaicRows", String(mosaicGrid.rows));
   (value.mosaicFiles ?? []).forEach((f, i) => {
@@ -110,6 +112,7 @@ export default function DesignReviewOverlay({
   backLayers,
   backFromPdf,
   mosaicGrid,
+  panels = false,
   selectedTheme,
   mockups,
   grant,
@@ -126,6 +129,8 @@ export default function DesignReviewOverlay({
   backLayers: DesignLayer[];
   backFromPdf: { file: File; page: number } | null;
   mosaicGrid: { cols: number; rows: number };
+  // Composition par volet d'un produit plié (voir DesignTool).
+  panels?: boolean;
   selectedTheme: ThemeWithOverlayUrl | null;
   // Mockups configurés pour ce modèle (0, 1 ou plusieurs — voir
   // supabase/migrations/0049_template_mockups.sql). Vide = on retombe sur
@@ -157,9 +162,9 @@ export default function DesignReviewOverlay({
     if (template.two_sided) specs.push({ key: "back", label: "Verso", side: "back", mockupId: null });
     return specs;
   }, [mockups, template.two_sided]);
-  // Produit plié : ses deux côtés à plat, pour l'aperçu plié (les plis
-  // tournent avec le format, voir applyOrientation).
-  const oriented = useMemo(() => applyOrientation(template, rotated), [template, rotated]);
+  // Produit plié : ses deux côtés à plat, pour l'aperçu plié. `template` est
+  // déjà orienté par DesignTool (applyOrientation) : ses plis aussi.
+  const oriented = template;
   const fold = useMemo(() => (oriented.two_sided ? parseFold(oriented.fold) : null), [oriented]);
   const flatSpecs: ViewSpec[] = fold
     ? [
@@ -251,7 +256,7 @@ export default function DesignReviewOverlay({
       if (front.sourceMode === "theme" && selectedTheme) {
         appendThemeToForm(body, front, selectedTheme.id);
       } else if (front.sourceMode === "mosaic") {
-        appendMosaicToForm(body, front, mosaicGrid, false);
+        appendMosaicToForm(body, front, mosaicGrid, false, panels);
       } else if (front.file) {
         body.append("image", front.file);
       }
@@ -263,7 +268,7 @@ export default function DesignReviewOverlay({
       appendLayersToForm(body, "front", frontLayers);
       if (template.two_sided) {
         if (back.sourceMode === "mosaic") {
-          appendMosaicToForm(body, back, mosaicGrid, true);
+          appendMosaicToForm(body, back, mosaicGrid, true, panels);
         } else if (backFromPdf) {
           body.append("backImage", backFromPdf.file);
           body.append("backPdfPage", String(backFromPdf.page));
@@ -341,7 +346,7 @@ export default function DesignReviewOverlay({
         if (isTheme && selectedTheme) {
           appendThemeToForm(body, value, selectedTheme.id);
         } else if (isMosaic) {
-          appendMosaicToForm(body, value, mosaicGrid, false);
+          appendMosaicToForm(body, value, mosaicGrid, false, panels);
         } else if (file) {
           body.append("image", file);
         }

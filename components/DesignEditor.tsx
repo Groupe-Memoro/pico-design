@@ -13,7 +13,7 @@ import type { ThemeWithOverlayUrl } from "@/components/ThemesTable";
 import type { Category, Template, ThemeSlotAdjust, IllustrationWithUrl } from "@/lib/types";
 import { isLandscape } from "@/lib/pdf/orientation";
 import { formatIn, mmToPx } from "@/lib/pdf/units";
-import { parseFold } from "@/lib/folds";
+import { allowsPanels, allowsSheet, panelCells, parseFold } from "@/lib/folds";
 import {
   BoldIcon,
   CheckIcon,
@@ -324,11 +324,11 @@ export default function DesignEditor({
   pdfWarning: PdfPagePlan["warning"];
   frontReady: boolean;
   backReady: boolean;
-  designType: "single" | "mosaic" | "theme";
+  designType: "single" | "mosaic" | "theme" | "panels";
   mosaicGrid: { cols: number; rows: number };
   selectedTheme: ThemeWithOverlayUrl | null;
   onChangeDesignType: (
-    type: "single" | "mosaic" | "theme",
+    type: "single" | "mosaic" | "theme" | "panels",
     extra?: {
       grid?: { cols: number; rows: number };
       theme?: ThemeWithOverlayUrl;
@@ -346,6 +346,9 @@ export default function DesignEditor({
   onReview: () => void;
 }) {
   const [activeSide, setActiveSide] = useState<"front" | "back">("front");
+  // Produit plié (modèle déjà orienté) : décide des modes offerts (feuille
+  // entière et/ou par volet, voir FoldConfig.designMode).
+  const fold = parseFold(template.fold);
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
   const [selectedThemeSlot, setSelectedThemeSlot] = useState<number | null>(
     null,
@@ -714,6 +717,23 @@ export default function DesignEditor({
               // que les trois tiennent sur une ligne même avec "Mosaïque",
               // le plus long des trois.
               <div className="flex rounded-full border border-border bg-background p-0.5 text-xs">
+                {allowsPanels(fold) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setThemePickerOpen(false);
+                      onChangeDesignType("panels");
+                    }}
+                    className={`flex flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-full px-1.5 py-2 font-medium ${
+                      designType === "panels"
+                        ? "bg-primary text-text-on-brand shadow-sm"
+                        : "text-text-muted hover:text-text"
+                    }`}
+                  >
+                    <LayoutGridIcon className="h-3.5 w-3.5 shrink-0" /> Par volet
+                  </button>
+                )}
+                {allowsSheet(fold) && (
                 <button
                   type="button"
                   onClick={() => {
@@ -726,8 +746,10 @@ export default function DesignEditor({
                       : "text-text-muted hover:text-text"
                   }`}
                 >
-                  <ImageIcon className="h-3.5 w-3.5 shrink-0" /> Image
+                  <ImageIcon className="h-3.5 w-3.5 shrink-0" /> {fold ? "Feuille" : "Image"}
                 </button>
+                )}
+                {allowsSheet(fold) && !fold && (
                 <button
                   type="button"
                   onClick={() => {
@@ -742,7 +764,8 @@ export default function DesignEditor({
                 >
                   <LayoutGridIcon className="h-3.5 w-3.5 shrink-0" /> Mosaïque
                 </button>
-                {themesForTemplate.length > 0 && (
+                )}
+                {allowsSheet(fold) && themesForTemplate.length > 0 && (
                   <button
                     type="button"
                     onClick={() => {
@@ -986,6 +1009,7 @@ export default function DesignEditor({
                 sourceModes={[activeValue.sourceMode]}
                 showPreview={false}
                 mosaicGrid={mosaicGrid}
+                panelCells={designType === "panels" ? panelCells(template, side) : null}
                 themeId={side === "front" ? (selectedTheme?.id ?? null) : null}
               />
             )}
@@ -1326,6 +1350,7 @@ export default function DesignEditor({
                 sourceModes={[activeValue.sourceMode]}
                 allowFileChange={false}
                 mosaicGrid={mosaicGrid}
+                panelCells={designType === "panels" ? panelCells(template, side) : null}
                 themeId={side === "front" ? (selectedTheme?.id ?? null) : null}
                 themeSlots={side === "front" ? (selectedTheme?.slots ?? []) : []}
                 themeOverlayUrl={
