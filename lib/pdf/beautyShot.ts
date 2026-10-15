@@ -6,6 +6,8 @@ import { logoOverlay } from "./logoShadow";
 import { compositeLayers, type ResolvedLayer } from "./layers";
 import type { LogoShadowSettings } from "../logoShadowSettings";
 import type { Template } from "../types";
+import { warpIntoQuad, type Quad } from "./quadWarp";
+import { foldPanels, parseFold } from "../folds";
 
 /**
  * Format "beauty shot" (repris du schéma Mediaclip gifting:beautyShot) :
@@ -46,6 +48,10 @@ export interface BeautyShotZone {
   top: number;
   width: number;
   height: number;
+  // Maillage de 4 points (2 × 2) : la zone est ce quadrilatère, en
+  // perspective (haut-gauche, haut-droite, bas-droite, bas-gauche), et non
+  // son rectangle englobant. Voir renderQuadZones.
+  quad?: Quad;
 }
 
 export interface BeautyShotConfig {
@@ -83,19 +89,21 @@ function assetNameFromUrl(url: string | undefined): string | null {
   return url.startsWith("asset:") ? url.slice("asset:".length) : url;
 }
 
-function parseMeshBounds(meshText: string): { left: number; top: number; width: number; height: number } {
+function parseMeshBounds(meshText: string): { left: number; top: number; width: number; height: number; quad?: Quad } {
   const points = Array.from(meshText.matchAll(/(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/g)).map((m) => ({
     x: parseFloat(m[1]),
     y: parseFloat(m[2]),
   }));
   if (points.length === 0) return { left: 0, top: 0, width: 0, height: 0 };
+  // Mesh Mediaclip ligne par ligne : haut-gauche, haut-droite ; bas-gauche, bas-droite.
+  const quad: Quad | undefined = points.length === 4 ? [points[0], points[1], points[3], points[2]] : undefined;
   const xs = points.map((p) => p.x);
   const ys = points.map((p) => p.y);
   const left = Math.min(...xs);
   const top = Math.min(...ys);
   const width = Math.max(...xs) - left;
   const height = Math.max(...ys) - top;
-  return { left, top, width, height };
+  return { left, top, width, height, quad };
 }
 
 export function parseBeautyShotXml(xml: string): BeautyShotConfig {
@@ -537,67 +545,79 @@ export async function generateBeautyShotMockupPng(
     );
   }
 
-  // Rectangle réellement occupé par le visuel dans le mesh, une fois les
-  // marges retirées. C'est lui qui sert de référence pour la résolution :
-  // sinon le visuel serait calculé pour une surface qu'il n'occupe pas —
-  // c'est ce qui l'agrandissait sur les tasses, dont le mesh couvre toute la
-  // scène alors que la tasse n'en occupe que le milieu.
-  const zoneWidth = Math.round(zone.width);
-  const zoneHeight = Math.round(zone.height);
-  const marginLeftPx = Math.round(zoneWidth * Math.min(0.9, Math.max(0, marginLeft)));
-  const marginRightPx = Math.round(zoneWidth * Math.min(0.9, Math.max(0, marginRight)));
-  const marginTopPx = Math.round(zoneHeight * Math.min(0.9, Math.max(0, marginTop)));
-  const marginBottomPx = Math.round(zoneHeight * Math.min(0.9, Math.max(0, marginBottom)));
-  const designWidth = Math.max(1, zoneWidth - marginLeftPx - marginRightPx);
-  const designHeight = Math.max(1, zoneHeight - marginTopPx - marginBottomPx);
+  // Zones en perspective (maillage de 4 points, ex. un dépliant ouvert) :
+  // chaque zone reçoit un volet de l'imprimé, déformé dans son quadrilatère.
+  // Sinon, la zone rectangulaire d'origine, avec marges et masque.
+  const quadZones = config.zones.filter((z) => z.quad);
+  let designComposites: sharp.OverlayOptions[];
+  if (quadZones.length > 0) {
+    designComposites = await renderQuadZones(template, quadZones, canvasWidth, canvasHeight, (w, h) =>
+      buildDesignForZone(template, sourceImage, logoImage, w, h, positionX, positionY, logoShadow, zoom, imageRotation, layers, 0.5, 0.5, 1)
+    );
+  } else {
+    // Rectangle réellement occupé par le visuel dans le mesh, une fois les
+    // marges retirées. C'est lui qui sert de référence pour la résolution :
+    // sinon le visuel serait calculé pour une surface qu'il n'occupe pas —
+    // c'est ce qui l'agrandissait sur les tasses, dont le mesh couvre toute la
+    // scène alors que la tasse n'en occupe que le milieu.
+    const zoneWidth = Math.round(zone.width);
+    const zoneHeight = Math.round(zone.height);
+    const marginLeftPx = Math.round(zoneWidth * Math.min(0.9, Math.max(0, marginLeft)));
+    const marginRightPx = Math.round(zoneWidth * Math.min(0.9, Math.max(0, marginRight)));
+    const marginTopPx = Math.round(zoneHeight * Math.min(0.9, Math.max(0, marginTop)));
+    const marginBottomPx = Math.round(zoneHeight * Math.min(0.9, Math.max(0, marginBottom)));
+    const designWidth = Math.max(1, zoneWidth - marginLeftPx - marginRightPx);
+    const designHeight = Math.max(1, zoneHeight - marginTopPx - marginBottomPx);
 
-  const designInner = await buildDesignForZone(
-    template,
-    sourceImage,
-    logoImage,
-    designWidth,
-    designHeight,
-    // Cadrage du visuel SUR LA PAGE : celui du produit ou du client.
-    positionX,
-    positionY,
-    logoShadow,
-    zoom,
-    imageRotation,
-    layers,
-    // Cadrage de la PRISE DE VUE : celui du mockup.
-    viewPositionX,
-    viewPositionY,
-    viewZoom
-  );
+    const designInner = await buildDesignForZone(
+      template,
+      sourceImage,
+      logoImage,
+      designWidth,
+      designHeight,
+      // Cadrage du visuel SUR LA PAGE : celui du produit ou du client.
+      positionX,
+      positionY,
+      logoShadow,
+      zoom,
+      imageRotation,
+      layers,
+      // Cadrage de la PRISE DE VUE : celui du mockup.
+      viewPositionX,
+      viewPositionY,
+      viewZoom
+    );
 
-  // Replacé dans le mesh à sa marge : ce qui reste de part et d'autre est
-  // transparent, et de toute façon découpé par le masque.
-  const design =
-    designWidth !== zoneWidth || designHeight !== zoneHeight
-      ? await sharp({
-          create: { width: zoneWidth, height: zoneHeight, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
-        })
-          .composite([{ input: designInner, left: marginLeftPx, top: marginTopPx }])
+    // Replacé dans le mesh à sa marge : ce qui reste de part et d'autre est
+    // transparent, et de toute façon découpé par le masque.
+    const design =
+      designWidth !== zoneWidth || designHeight !== zoneHeight
+        ? await sharp({
+            create: { width: zoneWidth, height: zoneHeight, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+          })
+            .composite([{ input: designInner, left: marginLeftPx, top: marginTopPx }])
+            .png()
+            .toBuffer()
+        : designInner;
+
+    const maskBuffer = config.maskAssetName ? assets.get(config.maskAssetName) : null;
+    const maskedDesign = maskBuffer
+      ? await sharp(design)
+          .composite([
+            {
+              input: await sharp(maskBuffer)
+                .resize(zoneWidth, zoneHeight, { fit: "fill" })
+                .ensureAlpha()
+                .png()
+                .toBuffer(),
+              blend: "dest-in",
+            },
+          ])
           .png()
           .toBuffer()
-      : designInner;
-
-  const maskBuffer = config.maskAssetName ? assets.get(config.maskAssetName) : null;
-  const maskedDesign = maskBuffer
-    ? await sharp(design)
-        .composite([
-          {
-            input: await sharp(maskBuffer)
-              .resize(zoneWidth, zoneHeight, { fit: "fill" })
-              .ensureAlpha()
-              .png()
-              .toBuffer(),
-            blend: "dest-in",
-          },
-        ])
-        .png()
-        .toBuffer()
-    : design;
+      : design;
+    designComposites = [{ input: maskedDesign, left: Math.round(zone.left), top: Math.round(zone.top) }];
+  }
 
   // La scène se monte du bas vers le haut : couches du dessous (une ombre
   // portée, typiquement), puis le fond, puis le design découpé, puis les
@@ -642,10 +662,7 @@ export async function generateBeautyShotMockupPng(
       .toBuffer();
   }
 
-  composed = await sharp(composed)
-    .composite([{ input: maskedDesign, left: Math.round(zone.left), top: Math.round(zone.top) }])
-    .png()
-    .toBuffer();
+  composed = await sharp(composed).composite(designComposites).png().toBuffer();
 
   for (let index = 0; index < config.overlays.length; index++) {
     const overlay = config.overlays[index];
@@ -677,4 +694,43 @@ export async function generateBeautyShotMockupPng(
   }
 
   return composed;
+}
+
+/**
+ * Volets de l'imprimé posés en perspective, un par zone à 4 coins, de gauche
+ * à droite (centre des zones) : les volets du recto selon le pli du modèle
+ * (voir lib/folds.ts), à défaut des parts égales de sa largeur.
+ */
+async function renderQuadZones(
+  template: Template,
+  zones: BeautyShotZone[],
+  canvasWidth: number,
+  canvasHeight: number,
+  printAt: (widthPx: number, heightPx: number) => Promise<Buffer>
+): Promise<sharp.OverlayOptions[]> {
+  const ordered = [...zones].sort(
+    (a, b) => a.quad!.reduce((n, p) => n + p.x, 0) - b.quad!.reduce((n, p) => n + p.x, 0)
+  );
+  // L'imprimé entier (format fini), un peu plus grand que le plus haut volet.
+  const tallest = Math.max(...ordered.map((z) => Math.max(...z.quad!.map((p) => p.y)) - Math.min(...z.quad!.map((p) => p.y))));
+  const printHeight = Math.max(64, Math.round(tallest * 1.25));
+  const printWidth = Math.max(64, Math.round((printHeight * template.width_mm) / template.height_mm));
+  const print = await printAt(printWidth, printHeight);
+
+  const fold = parseFold(template.fold);
+  const n = ordered.length;
+  const ranges =
+    fold && fold.direction === "vertical" && fold.panels === n
+      ? foldPanels(fold, template.width_mm, "front").map((p) => [p.start / template.width_mm, (p.start + p.size) / template.width_mm])
+      : Array.from({ length: n }, (_, i) => [i / n, (i + 1) / n]);
+
+  return Promise.all(
+    ordered.map(async (zone, i) => {
+      const [from, to] = ranges[i];
+      const left = Math.round(from * printWidth);
+      const width = Math.max(1, Math.min(printWidth - left, Math.round((to - from) * printWidth)));
+      const panel = await sharp(print).extract({ left, top: 0, width, height: printHeight }).png().toBuffer();
+      return { input: await warpIntoQuad(panel, zone.quad!, canvasWidth, canvasHeight), left: 0, top: 0 };
+    })
+  );
 }
