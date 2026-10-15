@@ -180,6 +180,7 @@ function coerceTextLayer(raw: Record<string, unknown>): TextLayer | null {
     blendMode: coerceBlendMode(raw.blendMode),
     strokeWidthMm: typeof raw.strokeWidthMm === "number" && raw.strokeWidthMm > 0 ? raw.strokeWidthMm : 0,
     strokeColor: isHexColor(raw.strokeColor) ? raw.strokeColor : "#ffffff",
+    strokeJoin: raw.strokeJoin === "miter" || raw.strokeJoin === "bevel" ? raw.strokeJoin : "round",
   };
 }
 

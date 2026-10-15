@@ -19,6 +19,7 @@ import {
 import { FONT_OPTIONS } from "@/lib/design/fonts";
 import {
   BLEND_MODES,
+  STROKE_JOINS,
   newImageLayer,
   newShapeLayer,
   newTextLayer,
@@ -442,6 +443,29 @@ export default function LayersPanel({
               label="Couleur de la bordure"
             />
           </div>
+          {selectedLayer.strokeWidthMm > 0 && (
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-text-subtle">Angles</span>
+              <div className="flex rounded-full border border-border bg-background p-0.5 text-xs">
+                {STROKE_JOINS.map((j) => (
+                  <button
+                    key={j.value}
+                    type="button"
+                    title={j.title}
+                    aria-pressed={(selectedLayer.strokeJoin ?? "round") === j.value}
+                    onClick={() => updateLayer(selectedLayer.id, { strokeJoin: j.value })}
+                    className={`rounded-full px-2.5 py-1 ${
+                      (selectedLayer.strokeJoin ?? "round") === j.value
+                        ? "bg-primary text-text-on-brand"
+                        : "text-text-muted hover:text-text"
+                    }`}
+                  >
+                    {j.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

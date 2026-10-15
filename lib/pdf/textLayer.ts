@@ -142,7 +142,9 @@ export function textLayerToSvgGroup(
     strokeWidthPx > 0 && glyphScale > 0
       ? `<g fill="none" stroke="${layer.strokeColor}" stroke-width="${
           (strokeWidthPx * 2) / glyphScale
-        }" stroke-linejoin="round" stroke-linecap="round">${lineGroups}</g>`
+        }" stroke-linejoin="${layer.strokeJoin ?? "round"}" stroke-linecap="${
+          (layer.strokeJoin ?? "round") === "round" ? "round" : "butt"
+        }" stroke-miterlimit="4">${lineGroups}</g>`
       : "";
 
   // Rotation autour du centre du bloc — appliquée en dernier (englobe tout),

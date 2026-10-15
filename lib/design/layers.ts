@@ -11,6 +11,16 @@
 
 export type ShapeKind = "rectangle" | "ellipse";
 
+// Forme des angles de la bordure d'un texte (SVG/canvas `linejoin`) :
+// pointus, coupés en biseau, ou arrondis.
+export type StrokeJoin = "miter" | "bevel" | "round";
+
+export const STROKE_JOINS: { value: StrokeJoin; label: string; title: string }[] = [
+  { value: "miter", label: "Pointus", title: "Angles pointus (miter)" },
+  { value: "bevel", label: "Biseautés", title: "Angles coupés en biseau (bevel)" },
+  { value: "round", label: "Arrondis", title: "Angles arrondis (round)" },
+];
+
 // Correspond à la fois aux valeurs CSS `mix-blend-mode` (aperçu écran) et,
 // via sharpBlendFor (lib/pdf/layers.ts), aux modes de fusion de sharp/libvips
 // (impression) — seule l'orthographe américaine ("color-…") diffère de
@@ -82,6 +92,8 @@ export interface TextLayer extends BaseLayer {
   // voir lib/pdf/textLayer.ts).
   strokeWidthMm: number;
   strokeColor: string;
+  // Angles de la bordure. Absent = arrondis (le rendu d'origine).
+  strokeJoin?: StrokeJoin;
 }
 
 export interface ImageLayer extends BaseLayer {
@@ -140,6 +152,7 @@ export function newTextLayer(): TextLayer {
     blendMode: "normal",
     strokeWidthMm: 0,
     strokeColor: "#ffffff",
+    strokeJoin: "round",
   };
 }
 

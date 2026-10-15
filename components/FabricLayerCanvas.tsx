@@ -206,6 +206,10 @@ export default function FabricLayerCanvas({
           stroke: layer.strokeWidthMm > 0 ? layer.strokeColor : undefined,
           strokeWidth: layer.strokeWidthMm > 0 ? layer.strokeWidthMm * pxPerMm * 2 : 0,
           paintFirst: "stroke" as const,
+          // Angles de la bordure, comme à l'impression (lib/pdf/textLayer.ts).
+          strokeLineJoin: layer.strokeJoin ?? "round",
+          strokeLineCap: (layer.strokeJoin ?? "round") === "round" ? ("round" as const) : ("butt" as const),
+          strokeMiterLimit: 4,
         };
         if (!obj) {
           obj = new fabric.IText(layer.content, { ...props, ...controls }) as unknown as LayerObject;
