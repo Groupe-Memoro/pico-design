@@ -7,9 +7,9 @@ import type { DesignLayer } from "@/lib/design/layers";
 
 /**
  * Calques de l'Outil Shopify (texte, image, forme) édités avec Fabric.js —
- * l'éditeur par défaut (les employés peuvent revenir à l'ancien, voir
- * « Ancien éditeur » dans DesignEditor ; un calque en mode de fusion y
- * repasse d'office, le canevas ne le mélangeant pas au fond).
+ * l'éditeur des calques. Seul un calque en mode de fusion repasse d'office
+ * sur l'aperçu d'origine (voir DesignEditor) : le canevas ne le mélange pas
+ * au fond.
  *
  * Fabric ne sert qu'à l'ÉCRAN : poignées, rotation, texte modifiable sur
  * place. Les calques (DesignLayer, en fractions de la page et en mm) restent

@@ -351,26 +351,6 @@ export default function DesignEditor({
   // entière et/ou par volet, voir FoldConfig.designMode).
   const fold = parseFold(template.fold);
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
-  // Éditeur des calques : Fabric.js par défaut (voir FabricLayerCanvas). Les
-  // employés peuvent revenir à l'ancien (choix gardé dans ce navigateur),
-  // jamais le public.
-  const [legacyEditor, setLegacyEditor] = useState(false);
-  useEffect(() => {
-    if (grant) return;
-    try {
-      setLegacyEditor(localStorage.getItem("pico.legacyLayerEditor") === "1");
-    } catch {
-      // Stockage indisponible : le nouvel éditeur.
-    }
-  }, [grant]);
-  function toggleLegacyEditor(on: boolean) {
-    setLegacyEditor(on);
-    try {
-      localStorage.setItem("pico.legacyLayerEditor", on ? "1" : "0");
-    } catch {
-      // Pas grave : le choix vaut pour cette session.
-    }
-  }
   const [selectedThemeSlot, setSelectedThemeSlot] = useState<number | null>(
     null,
   );
@@ -1343,9 +1323,7 @@ export default function DesignEditor({
                 onSelectLayer={setSelectedLayerId}
                 // Un mode de fusion ne se mélange pas au fond dans le canevas
                 // Fabric : l'ancien aperçu le montre juste.
-                layerEngine={
-                  legacyEditor || activeLayers.some((l) => (l.blendMode ?? "normal") !== "normal") ? "dom" : "fabric"
-                }
+                layerEngine={activeLayers.some((l) => (l.blendMode ?? "normal") !== "normal") ? "dom" : "fabric"}
                 sourceModes={[activeValue.sourceMode]}
                 allowFileChange={false}
                 mosaicGrid={mosaicGrid}
@@ -1386,14 +1364,6 @@ export default function DesignEditor({
                 label="Afficher les guides d'impression"
               />
             </div>
-            {/* Retour à l'ancien éditeur de calques : employés seulement
-                (jamais en mode public, sans laissez-passer). */}
-            {!grant && (
-              <div className="flex items-center gap-2 rounded-full border border-dashed border-border bg-surface py-1 pl-3 pr-1.5 text-xs text-text">
-                Ancien éditeur
-                <Switch checked={legacyEditor} onChange={toggleLegacyEditor} label="Utiliser l'ancien éditeur de calques" />
-              </div>
-            )}
             {showGuides && (
               <>
                 <LegendPill color="#ff00ff" label="Coupe" />
