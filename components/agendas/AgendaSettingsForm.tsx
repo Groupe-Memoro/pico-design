@@ -8,7 +8,8 @@ import { AGENDA_FORMATS, type Agenda, type AgendaSettings } from "@/lib/agendas/
 const inputClass = "mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm";
 const labelClass = "block text-sm font-medium";
 const MM_PER_IN = 25.4;
-const round2 = (n: number) => Math.round(n * 100) / 100;
+// Trois décimales : 1/8 po (0,125) ne doit pas devenir 0,13.
+const round3 = (n: number) => Math.round(n * 1000) / 1000;
 
 // Réglages de l'agenda : identité, année scolaire, format et style.
 export default function AgendaSettingsForm({ agenda, onSaved }: { agenda: Agenda; onSaved: () => void }) {
@@ -17,9 +18,9 @@ export default function AgendaSettingsForm({ agenda, onSaved }: { agenda: Agenda
   const [yearLabel, setYearLabel] = useState(agenda.year_label);
   const [start, setStart] = useState(agenda.start_date);
   const [end, setEnd] = useState(agenda.end_date);
-  const [widthIn, setWidthIn] = useState(round2(Number(agenda.width_mm) / MM_PER_IN));
-  const [heightIn, setHeightIn] = useState(round2(Number(agenda.height_mm) / MM_PER_IN));
-  const [bleedIn, setBleedIn] = useState(round2(Number(agenda.bleed_mm) / MM_PER_IN));
+  const [widthIn, setWidthIn] = useState(round3(Number(agenda.width_mm) / MM_PER_IN));
+  const [heightIn, setHeightIn] = useState(round3(Number(agenda.height_mm) / MM_PER_IN));
+  const [bleedIn, setBleedIn] = useState(round3(Number(agenda.bleed_mm) / MM_PER_IN));
   const [s, setS] = useState<AgendaSettings>(agenda.settings);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -77,7 +78,7 @@ export default function AgendaSettingsForm({ agenda, onSaved }: { agenda: Agenda
   const inches = (label: string, valueMm: number, onChange: (mm: number) => void, max = 2) => (
     <div>
       <label className={labelClass}>{label}</label>
-      <input type="number" step="0.05" min={0} max={max} value={round2(valueMm / MM_PER_IN)} onChange={(e) => onChange(Number(e.target.value) * MM_PER_IN)} className={inputClass} />
+      <input type="number" step="any" min={0} max={max} value={round3(valueMm / MM_PER_IN)} onChange={(e) => onChange(Number(e.target.value) * MM_PER_IN)} className={inputClass} />
     </div>
   );
 
@@ -143,8 +144,8 @@ export default function AgendaSettingsForm({ agenda, onSaved }: { agenda: Agenda
               onChange={(e) => {
                 const f = AGENDA_FORMATS.find((x) => x.id === e.target.value);
                 if (f) {
-                  setWidthIn(round2(f.widthMm / MM_PER_IN));
-                  setHeightIn(round2(f.heightMm / MM_PER_IN));
+                  setWidthIn(round3(f.widthMm / MM_PER_IN));
+                  setHeightIn(round3(f.heightMm / MM_PER_IN));
                 }
               }}
               className={inputClass}
@@ -159,15 +160,15 @@ export default function AgendaSettingsForm({ agenda, onSaved }: { agenda: Agenda
           </div>
           <div>
             <label className={labelClass}>Largeur</label>
-            <input type="number" step="0.01" min={2} value={widthIn} onChange={(e) => setWidthIn(Number(e.target.value))} className={inputClass} />
+            <input type="number" step="any" min={2} value={widthIn} onChange={(e) => setWidthIn(Number(e.target.value))} className={inputClass} />
           </div>
           <div>
             <label className={labelClass}>Hauteur</label>
-            <input type="number" step="0.01" min={2} value={heightIn} onChange={(e) => setHeightIn(Number(e.target.value))} className={inputClass} />
+            <input type="number" step="any" min={2} value={heightIn} onChange={(e) => setHeightIn(Number(e.target.value))} className={inputClass} />
           </div>
           <div>
             <label className={labelClass}>Fond perdu</label>
-            <input type="number" step="0.025" min={0} max={0.75} value={bleedIn} onChange={(e) => setBleedIn(Number(e.target.value))} className={inputClass} />
+            <input type="number" step="any" min={0} max={0.75} value={bleedIn} onChange={(e) => setBleedIn(Number(e.target.value))} className={inputClass} />
           </div>
         </div>
         <div className="grid gap-3 sm:grid-cols-4">

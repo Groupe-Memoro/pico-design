@@ -228,7 +228,7 @@ export default function TemplateForm({
             <label className="block text-sm font-medium">Largeur ({unit === "mm" ? "mm" : "po"})</label>
             <input
               type="number"
-              step={unit === "mm" ? "0.1" : "0.01"}
+              step="any"
               value={toDisplay(form.width_mm)}
               onChange={(e) => updateFromDisplay("width_mm", parseFloat(e.target.value) || 0)}
               className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
@@ -238,7 +238,7 @@ export default function TemplateForm({
             <label className="block text-sm font-medium">Hauteur ({unit === "mm" ? "mm" : "po"})</label>
             <input
               type="number"
-              step={unit === "mm" ? "0.1" : "0.01"}
+              step="any"
               value={toDisplay(form.height_mm)}
               onChange={(e) => updateFromDisplay("height_mm", parseFloat(e.target.value) || 0)}
               className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
@@ -250,7 +250,7 @@ export default function TemplateForm({
             </label>
             <input
               type="number"
-              step={unit === "mm" ? "0.1" : "0.01"}
+              step="any"
               value={toDisplay(form.bleed_mm)}
               onChange={(e) => updateFromDisplay("bleed_mm", parseFloat(e.target.value) || 0)}
               className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
@@ -271,7 +271,7 @@ export default function TemplateForm({
             </label>
             <input
               type="number"
-              step={unit === "mm" ? "0.1" : "0.01"}
+              step="any"
               value={toDisplay(form.safety_margin_x_mm)}
               onChange={(e) =>
                 updateFromDisplay("safety_margin_x_mm", parseFloat(e.target.value) || 0)
@@ -285,7 +285,7 @@ export default function TemplateForm({
             </label>
             <input
               type="number"
-              step={unit === "mm" ? "0.1" : "0.01"}
+              step="any"
               value={toDisplay(form.safety_margin_y_mm)}
               onChange={(e) =>
                 updateFromDisplay("safety_margin_y_mm", parseFloat(e.target.value) || 0)
@@ -299,7 +299,7 @@ export default function TemplateForm({
             </label>
             <input
               type="number"
-              step={unit === "mm" ? "0.1" : "0.01"}
+              step="any"
               value={toDisplay(form.print_margin_x_mm)}
               onChange={(e) =>
                 updateFromDisplay("print_margin_x_mm", parseFloat(e.target.value) || 0)
@@ -313,7 +313,7 @@ export default function TemplateForm({
             </label>
             <input
               type="number"
-              step={unit === "mm" ? "0.1" : "0.01"}
+              step="any"
               value={toDisplay(form.print_margin_y_mm)}
               onChange={(e) =>
                 updateFromDisplay("print_margin_y_mm", parseFloat(e.target.value) || 0)
@@ -387,7 +387,7 @@ export default function TemplateForm({
                 <span className="w-12 shrink-0 text-xs text-neutral-500">Pli {i + 1}</span>
                 <input
                   type="number"
-                  step={unit === "mm" ? "0.1" : "0.01"}
+                  step="any"
                   value={toDisplay(mm)}
                   onChange={(e) => updateFold("vertical", i, parseFloat(e.target.value) || 0)}
                   aria-label={`Distance du pli vertical ${i + 1} depuis le bord gauche`}
@@ -420,7 +420,7 @@ export default function TemplateForm({
                 <span className="w-12 shrink-0 text-xs text-neutral-500">Pli {i + 1}</span>
                 <input
                   type="number"
-                  step={unit === "mm" ? "0.1" : "0.01"}
+                  step="any"
                   value={toDisplay(mm)}
                   onChange={(e) => updateFold("horizontal", i, parseFloat(e.target.value) || 0)}
                   aria-label={`Distance du pli horizontal ${i + 1} depuis le bord du haut`}
@@ -556,7 +556,7 @@ export default function TemplateForm({
               <label className="block text-sm font-medium">Largeur logo ({unit === "mm" ? "mm" : "po"})</label>
               <input
                 type="number"
-                step={unit === "mm" ? "0.1" : "0.01"}
+                step="any"
                 value={toDisplay(form.logo_width_mm)}
                 onChange={(e) => updateFromDisplay("logo_width_mm", parseFloat(e.target.value) || 0)}
                 className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
@@ -566,7 +566,7 @@ export default function TemplateForm({
               <label className="block text-sm font-medium">Marge côtés ({unit === "mm" ? "mm" : "po"})</label>
               <input
                 type="number"
-                step={unit === "mm" ? "0.1" : "0.01"}
+                step="any"
                 value={toDisplay(form.logo_margin_x_mm)}
                 onChange={(e) => updateFromDisplay("logo_margin_x_mm", parseFloat(e.target.value) || 0)}
                 disabled={form.logo_h_align === "center"}
@@ -577,7 +577,7 @@ export default function TemplateForm({
               <label className="block text-sm font-medium">Marge hauteur ({unit === "mm" ? "mm" : "po"})</label>
               <input
                 type="number"
-                step={unit === "mm" ? "0.1" : "0.01"}
+                step="any"
                 value={toDisplay(form.logo_margin_y_mm)}
                 onChange={(e) => updateFromDisplay("logo_margin_y_mm", parseFloat(e.target.value) || 0)}
                 className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
@@ -729,7 +729,7 @@ function FoldSection({
             Zone de sécurité de chaque côté d&apos;un pli :
             <input
               type="number"
-              step={unit === "mm" ? "0.1" : "0.01"}
+              step="any"
               min={0}
               value={unit === "mm" ? fold.safetyMm : Math.round(mmToIn(fold.safetyMm) * 1000) / 1000}
               onChange={(e) => set({ safetyMm: unit === "mm" ? Number(e.target.value) : inToMm(Number(e.target.value)) })}
