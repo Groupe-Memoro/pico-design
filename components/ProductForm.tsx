@@ -11,7 +11,7 @@ import { LOGO_COLOR_PALETTE } from "@/lib/logoColors";
 import { applyOrientation, isLandscape } from "@/lib/pdf/orientation";
 import { allowsPanels, allowsSheet, panelCells, parseFold } from "@/lib/folds";
 import { stageLargeFiles } from "@/lib/design/stageUpload";
-import { SpinnerIcon } from "@/components/icons";
+import { PanelLeftRightDashedIcon, SpinnerIcon, SquareSplitHorizontalIcon } from "@/components/icons";
 import ColorPickerButton from "@/components/ColorPickerButton";
 import { templateOptionLabel } from "@/lib/templateLabel";
 
@@ -609,9 +609,10 @@ export default function ProductForm({
                 key={String(on)}
                 type="button"
                 onClick={() => choosePanelMode(on)}
-                className={`flex-1 rounded-md px-2 py-1.5 ${usePanels === on ? "bg-pico-black text-white" : "text-neutral-600 hover:bg-neutral-100"}`}
+                className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 ${usePanels === on ? "bg-pico-black text-white" : "text-neutral-600 hover:bg-neutral-100"}`}
               >
-                {on ? "Par volet" : "Fichier recto-verso"}
+                {on ? <SquareSplitHorizontalIcon className="h-4 w-4 shrink-0" /> : <PanelLeftRightDashedIcon className="h-4 w-4 shrink-0" />}
+                {on ? "Par volet" : "Par planche"}
               </button>
             ))}
           </div>

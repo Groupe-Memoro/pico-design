@@ -31,9 +31,9 @@ export interface FoldConfig {
 export type FoldDesignMode = "sheet" | "panels" | "both";
 
 export const FOLD_DESIGN_MODES: { mode: FoldDesignMode; label: string }[] = [
-  { mode: "sheet", label: "Feuille entière (fichier recto-verso)" },
+  { mode: "sheet", label: "Par planche (fichier recto-verso)" },
   { mode: "panels", label: "Par volet" },
-  { mode: "both", label: "Au choix : feuille entière ou par volet" },
+  { mode: "both", label: "Au choix : par planche ou par volet" },
 ];
 
 export const allowsPanels = (fold: FoldConfig | null) => Boolean(fold && fold.designMode !== "sheet");

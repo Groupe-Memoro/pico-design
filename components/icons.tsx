@@ -980,3 +980,31 @@ export function CalendarIcon({ className }: { className?: string }) {
     </svg>
   );
 }
+
+// Lucide « panel-left-right-dashed » : composition par planche (produit plié).
+export function PanelLeftRightDashedIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M15 10V9" />
+      <path d="M15 15v-1" />
+      <path d="M15 21v-2" />
+      <path d="M15 5V3" />
+      <path d="M9 10V9" />
+      <path d="M9 15v-1" />
+      <path d="M9 21v-2" />
+      <path d="M9 5V3" />
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+    </svg>
+  );
+}
+
+// Lucide « square-split-horizontal » : composition par volet (produit plié).
+export function SquareSplitHorizontalIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M12 2v20" />
+      <path d="M16 3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3" />
+      <path d="M8 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3" />
+    </svg>
+  );
+}

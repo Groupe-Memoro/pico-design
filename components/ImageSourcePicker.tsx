@@ -11,6 +11,7 @@ import { slotClipPath, slotMaskStyle, slotShape, slotSvgShape } from "@/lib/them
 import { stageLargeFiles } from "@/lib/design/stageUpload";
 import { filePreviewUrl } from "@/lib/design/filePreview";
 import FabricLayerCanvas from "@/components/FabricLayerCanvas";
+import { foldAxisLength, foldPanels, parseFold } from "@/lib/folds";
 import { SpinnerIcon, UploadIcon } from "@/components/icons";
 import { fontOptionById } from "@/lib/design/fonts";
 import { maxTextSizeMmForTemplate, type DesignLayer, type ImageLayer } from "@/lib/design/layers";
@@ -1178,6 +1179,19 @@ export default function ImageSourcePicker({
   // taille de police d'un calque texte (en mm, comme le reste du modèle) en
   // pixels d'écran pour cette boîte précise.
   const pxPerMm = template && boxSize.width > 0 ? boxSize.width / (template.width_mm + template.bleed_mm * 2) : 0;
+  // Volets d'un produit plié (avec les guides) : leur nom et leur centre, en
+  // fraction de la page (fond perdu compris), pour les nommer hors du visuel.
+  const foldGuide = showGuides && template ? parseFold(template.fold) : null;
+  const panelGuidesVertical = foldGuide?.direction !== "horizontal";
+  const panelGuides =
+    foldGuide && template
+      ? foldPanels(foldGuide, foldAxisLength(foldGuide, template.width_mm, template.height_mm), side).map((p) => ({
+          label: p.label,
+          center:
+            (template.bleed_mm + p.start + p.size / 2) /
+            ((panelGuidesVertical ? template.width_mm : template.height_mm) + 2 * template.bleed_mm),
+        }))
+      : [];
   const maxFontSizeMm = maxTextSizeMmForTemplate(template);
   const selectedVisual = visuals.find((v) => v.id === visualId) ?? null;
   const rawBackgroundUrl =
@@ -1498,7 +1512,44 @@ export default function ImageSourcePicker({
         {hasTemplate ? (
           // Cadre gris autour de la page : seulement dans l'admin. Dans l'Outil
           // Shopify, sa marge prendrait sur la place de la page (voir fitBox).
-          <div className={previewSize === "lg" ? "" : "mt-2 rounded-lg border border-neutral-200 bg-neutral-50 p-3"}>
+          <div className={`relative ${previewSize === "lg" ? "" : "mt-2 rounded-lg border border-neutral-200 bg-neutral-50 p-3"}`}>
+            {/* Nom des volets d'un produit plié, HORS du visuel (au-dessus pour
+                des volets côte à côte, à gauche pour des volets empilés), en
+                petit : un repère, jamais sur le produit. */}
+            {panelGuides.length > 0 && panelGuidesVertical && boxSize.width > 0 && (
+              <div aria-hidden="true" className="relative mx-auto mb-1.5 h-5" style={{ width: boxSize.width }}>
+                {panelGuides.map((p, i) => (
+                  <span
+                    key={i}
+                    className="absolute top-0 -translate-x-1/2 whitespace-nowrap text-[14px] font-medium leading-none text-neutral-600"
+                    style={{ left: `${p.center * 100}%` }}
+                  >
+                    {p.label}
+                  </span>
+                ))}
+              </div>
+            )}
+            {panelGuides.length > 0 && !panelGuidesVertical && boxSize.height > 0 && (
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute w-5"
+                style={{
+                  top: previewBoxRef.current?.offsetTop ?? 0,
+                  height: boxSize.height,
+                  left: `calc(50% - ${boxSize.width / 2}px - 26px)`,
+                }}
+              >
+                {panelGuides.map((p, i) => (
+                  <span
+                    key={i}
+                    className="absolute left-1/2 whitespace-nowrap text-[14px] font-medium leading-none text-neutral-600"
+                    style={{ top: `${p.center * 100}%`, transform: "translate(-50%, -50%) rotate(-90deg)" }}
+                  >
+                    {p.label}
+                  </span>
+                ))}
+              </div>
+            )}
             <div
               ref={previewBoxRef}
               onPointerDown={handlePointerDown}
@@ -1518,7 +1569,14 @@ export default function ImageSourcePicker({
                     // contrainte la plus serrée entre sa largeur et sa hauteur.
                     {
                       aspectRatio: String(pageAspectRatio),
-                      width: Math.floor(Math.min(fitBox.width, fitBox.height * pageAspectRatio)),
+                      // Moins la place des noms de volets (produit plié),
+                      // posés hors du visuel : au-dessus, ou à gauche.
+                      width: Math.floor(
+                        Math.min(
+                          fitBox.width - (panelGuides.length > 0 && !panelGuidesVertical ? 52 : 0),
+                          (fitBox.height - (panelGuides.length > 0 && panelGuidesVertical ? 26 : 0)) * pageAspectRatio
+                        )
+                      ),
                     }
                   : previewSize === "lg"
                   ? // Bornée en largeur ET en hauteur en gardant le ratio de la
@@ -1908,6 +1966,9 @@ export default function ImageSourcePicker({
                 </span>
               )}
             </div>
+            {/* Dans l'Outil Shopify (lg), les pastilles de légende sous
+                l'aperçu disent déjà tout : la place va au visuel. */}
+            {previewSize !== "lg" && (
             <p className="mt-2 text-center text-xs text-neutral-500">
               {isMosaic || isTheme
                 ? showGuides
@@ -1919,6 +1980,7 @@ export default function ImageSourcePicker({
                 ? "Ligne magenta = coupe (fond perdu) · pointillés bleus = marge de protection · glisse l'image pour la repositionner."
                 : "Glisse l'image pour la repositionner."}
             </p>
+            )}
           </div>
         ) : (
           // N'arrive plus qu'ici sans modèle du tout — avec un modèle mais

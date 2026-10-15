@@ -32,6 +32,8 @@ import {
   RefreshCcwIcon,
   RotateCwIcon,
   TrashIcon,
+  PanelLeftRightDashedIcon,
+  SquareSplitHorizontalIcon,
 } from "@/components/icons";
 import Switch from "@/components/ui/Switch";
 import { rangeFillStyle } from "@/components/ui/rangeFill";
@@ -703,7 +705,7 @@ export default function DesignEditor({
                         : "text-text-muted hover:text-text"
                     }`}
                   >
-                    <LayoutGridIcon className="h-3.5 w-3.5 shrink-0" /> Par volet
+                    <SquareSplitHorizontalIcon className="h-3.5 w-3.5 shrink-0" /> Par volet
                   </button>
                 )}
                 {allowsSheet(fold) && (
@@ -719,7 +721,15 @@ export default function DesignEditor({
                       : "text-text-muted hover:text-text"
                   }`}
                 >
-                  <ImageIcon className="h-3.5 w-3.5 shrink-0" /> {fold ? "Feuille" : "Image"}
+                  {fold ? (
+                    <>
+                      <PanelLeftRightDashedIcon className="h-3.5 w-3.5 shrink-0" /> Par planche
+                    </>
+                  ) : (
+                    <>
+                      <ImageIcon className="h-3.5 w-3.5 shrink-0" /> Image
+                    </>
+                  )}
                 </button>
                 )}
                 {allowsSheet(fold) && !fold && (
@@ -1297,13 +1307,9 @@ export default function DesignEditor({
           >
             <div style={{ zoom: viewZoom }}>
               <ImageSourcePicker
-                // Place libre, moins l'aide que l'aperçu affiche sous la page
-                // (jusqu'à deux lignes quand la zone est étroite).
-                fitBox={
-                  stageSize
-                    ? { width: stageSize.width, height: Math.max(0, stageSize.height - 44) }
-                    : null
-                }
+                // Toute la place libre de la scène : l'aperçu n'affiche plus
+                // d'aide sous la page ici (les pastilles de légende suffisent).
+                fitBox={stageSize ? { width: stageSize.width, height: stageSize.height } : null}
                 key={side}
                 side={side}
                 template={template}

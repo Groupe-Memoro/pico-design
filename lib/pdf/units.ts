@@ -20,6 +20,8 @@ export function inToMm(inches: number): number {
 }
 
 // Formatte une dimension en mm vers un affichage en pouces (ex. "3.54"").
+// Trois décimales au plus : 1/8 po s'affiche 0.125, pas 0.13 (les zéros
+// inutiles disparaissent : 3.5, pas 3.500).
 export function formatIn(mm: number): string {
-  return `${Math.round(mmToIn(mm) * 100) / 100}"`;
+  return `${Math.round(mmToIn(mm) * 1000) / 1000}"`;
 }

@@ -723,7 +723,7 @@ function FoldSection({
           </label>
           <p className="mt-1 text-xs text-neutral-500">
             Par volet : une photo ou un fichier par volet, dans l&apos;outil de design comme pour les produits. Le texte se
-            place sur la feuille, avec les guides des volets.
+            place sur la planche, avec les guides des volets.
           </p>
           <label className="mt-3 flex items-center gap-2 text-sm">
             Zone de sécurité de chaque côté d&apos;un pli :

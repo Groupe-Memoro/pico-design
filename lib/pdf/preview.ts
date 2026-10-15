@@ -1,6 +1,5 @@
 import sharp from "sharp";
 import { foldAxisLength, foldPanels, parseFold } from "../folds";
-import { svgCenteredText } from "./svgText";
 import { mmToPx } from "./units";
 import { rasterizeLogoToPng, isSvg } from "./logo";
 import { logoOverlay } from "./logoShadow";
@@ -98,8 +97,9 @@ export async function generateTemplatePreviewPng(
         }),
       ].join("\n");
 
-  // Produit plié : chaque pli, une zone de sécurité de part et d'autre, et le
-  // nom de chaque volet de ce côté (voir lib/folds.ts). Écran seulement.
+  // Produit plié : chaque pli et une zone de sécurité de part et d'autre (voir
+  // lib/folds.ts). Écran seulement ; le nom des volets s'affiche hors du
+  // visuel, dans l'aperçu (ImageSourcePicker).
   const fold = parseFold(template.fold);
   let foldSvg = "";
   if (fold && !hasOverlay) {
@@ -107,11 +107,9 @@ export async function generateTemplatePreviewPng(
     const length = foldAxisLength(fold, template.width_mm, template.height_mm);
     const panels = foldPanels(fold, length, side);
     const safetyPx = mmToPx(fold.safetyMm, previewDpi);
-    const labelPx = Math.max(11, Math.min(trimW, trimH) * 0.035);
     foldSvg = panels
       .map((panel, i) => {
         const start = mmToPx(panel.start, previewDpi);
-        const size = mmToPx(panel.size, previewDpi);
         const parts: string[] = [];
         if (i > 0) {
           if (vertical) {
@@ -128,9 +126,6 @@ export async function generateTemplatePreviewPng(
             );
           }
         }
-        const cx = vertical ? trimX + start + size / 2 : trimX + trimW / 2;
-        const top = (vertical ? trimY : trimY + start) + safetyPx + labelPx * 1.6;
-        parts.push(svgCenteredText(panel.label, cx, top, labelPx, "#16a34a", (vertical ? size : trimW) * 0.9));
         return parts.join("\n");
       })
       .join("\n");
