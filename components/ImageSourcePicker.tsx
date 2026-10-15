@@ -10,6 +10,7 @@ import { mmToIn, inToMm } from "@/lib/pdf/units";
 import { slotClipPath, slotMaskStyle, slotShape, slotSvgShape } from "@/lib/themeShapes";
 import { stageLargeFiles } from "@/lib/design/stageUpload";
 import { filePreviewUrl } from "@/lib/design/filePreview";
+import FabricLayerCanvas from "@/components/FabricLayerCanvas";
 import { SpinnerIcon, UploadIcon } from "@/components/icons";
 import { fontOptionById } from "@/lib/design/fonts";
 import { maxTextSizeMmForTemplate, type DesignLayer, type ImageLayer } from "@/lib/design/layers";
@@ -544,6 +545,8 @@ export default function ImageSourcePicker({
   layers = [],
   onChangeLayers,
   selectedLayerId = null,
+  onSelectLayer,
+  layerEngine = "dom",
   mosaicGrid = { cols: 2, rows: 2 },
   panelCells = null,
   themeId = null,
@@ -605,6 +608,12 @@ export default function ImageSourcePicker({
   // l'aperçu — sans sélection, glisser continue de repositionner le fond,
   // comme avant les calques.
   selectedLayerId?: string | null;
+  // Sélection d'un calque en cliquant dessus dans l'aperçu (éditeur Fabric).
+  onSelectLayer?: (id: string | null) => void;
+  // Qui affiche et manipule les calques : l'aperçu actuel (« dom »), ou
+  // Fabric.js (« fabric », voir FabricLayerCanvas). Les données et le rendu
+  // imprimé sont les mêmes.
+  layerEngine?: "dom" | "fabric";
   // Dimensions de la grille en mode mosaïque (sourceMode "mosaic") — choisies
   // une fois pour tout le design (voir DesignTypePicker), partagées entre
   // recto et verso : ignoré pour les autres modes.
@@ -990,7 +999,12 @@ export default function ImageSourcePicker({
     setDragOffsetPx({ x: 0, y: 0 });
   }
 
+  // Éditeur Fabric : vrai pendant un clic sur un calque (le canevas le
+  // déplace lui-même) — l'aperçu ne doit alors pas déplacer le fond.
+  const fabricHitRef = useRef(false);
+
   function handlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (layerEngine === "fabric" && fabricHitRef.current) return;
     draggingRef.current = true;
     lastPointRef.current = { x: e.clientX, y: e.clientY };
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -1008,7 +1022,8 @@ export default function ImageSourcePicker({
     // Un calque sélectionné capte le glisser à sa place (suit directement le
     // curseur) plutôt que le fond (qui, lui, recadre — glisser à droite
     // révèle la gauche de l'image, l'inverse d'un déplacement direct).
-    const selectedLayer = onChangeLayers ? layers.find((l) => l.id === selectedLayerId) : undefined;
+    const selectedLayer =
+      onChangeLayers && layerEngine === "dom" ? layers.find((l) => l.id === selectedLayerId) : undefined;
     if (selectedLayer && onChangeLayers) {
       onChangeLayers(
         layers.map((l) =>
@@ -1674,7 +1689,22 @@ export default function ImageSourcePicker({
                   restent lisibles par-dessus eux (simple repère, jamais sur
                   le produit fini). Le calque sélectionné (pointillés) est
                   celui que le glisser déplace, voir handlePointerMove. */}
+              {boxSize.width > 0 && layerEngine === "fabric" && onChangeLayers && (
+                <FabricLayerCanvas
+                  layers={layers}
+                  selectedLayerId={selectedLayerId}
+                  onChangeLayers={onChangeLayers}
+                  onSelectLayer={onSelectLayer}
+                  width={boxSize.width}
+                  height={boxSize.height}
+                  pxPerMm={pxPerMm}
+                  imageUrls={layerImageUrls}
+                  maxFontSizeMm={maxFontSizeMm}
+                  hitRef={fabricHitRef}
+                />
+              )}
               {boxSize.width > 0 &&
+                layerEngine === "dom" &&
                 layers.map((designLayer) => {
                   const isSelected = selectedLayerId === designLayer.id;
                   const rotationDeg = designLayer.rotationDeg ?? 0;

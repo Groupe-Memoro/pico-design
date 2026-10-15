@@ -15,6 +15,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.45.4",
+    "fabric": "^6.9.1",
     "fast-xml-parser": "^5.11.1",
     "fontkit": "^2.0.4",
     "next": "14.2.35",
