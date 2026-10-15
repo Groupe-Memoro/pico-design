@@ -99,8 +99,19 @@ export default function FabricLayerCanvas({
         if (layer.type === "text") {
           const text = (obj as unknown as { text: string }).text;
           const fontSizeMm = Math.min(maxMm, Math.max(1, layer.fontSizeMm * (obj.scaleX ?? 1)));
+          // La bordure et l'espacement grandissent avec la police : le texte
+          // agrandi garde ses proportions (comme pendant le geste, où Fabric
+          // agrandit tout l'objet).
+          const factor = fontSizeMm / layer.fontSizeMm;
           obj.set({ scaleX: 1, scaleY: 1, fontSize: fontSizeMm * k } as Partial<FabricObject>);
-          next = { ...layer, ...base, content: text, fontSizeMm };
+          next = {
+            ...layer,
+            ...base,
+            content: text,
+            fontSizeMm,
+            strokeWidthMm: layer.strokeWidthMm * factor,
+            letterSpacingMm: layer.letterSpacingMm * factor,
+          };
         } else if (layer.type === "image") {
           next = { ...layer, ...base, widthRatio: Math.max(0.01, obj.getScaledWidth() / W) };
         } else {

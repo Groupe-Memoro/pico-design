@@ -155,6 +155,10 @@ function LayerHandles({
     halfW: number;
     halfH: number;
     startFontSizeMm: number;
+    // Bordure et espacement du texte au début du geste : ils grandissent
+    // avec la police, pour garder les proportions.
+    startStrokeWidthMm: number;
+    startLetterSpacingMm: number;
     startWidthRatio: number;
     startHeightRatio: number;
   } | null>(null);
@@ -185,6 +189,8 @@ function LayerHandles({
       halfW: Math.max(1, (host?.offsetWidth ?? 2) / 2),
       halfH: Math.max(1, (host?.offsetHeight ?? 2) / 2),
       startFontSizeMm: layer.type === "text" ? layer.fontSizeMm : 0,
+      startStrokeWidthMm: layer.type === "text" ? layer.strokeWidthMm : 0,
+      startLetterSpacingMm: layer.type === "text" ? layer.letterSpacingMm : 0,
       startWidthRatio: layer.type === "image" || layer.type === "shape" ? layer.widthRatio : 0,
       startHeightRatio: layer.type === "shape" ? layer.heightRatio : 0,
     };
@@ -253,7 +259,11 @@ function LayerHandles({
       const size = Math.min(maxFontSizeMm, Math.max(3, d.startFontSizeMm * scaleX));
       scaleX = size / d.startFontSizeMm;
       scaleY = scaleX;
-      patch = { fontSizeMm: size };
+      patch = {
+        fontSizeMm: size,
+        strokeWidthMm: d.startStrokeWidthMm * scaleX,
+        letterSpacingMm: d.startLetterSpacingMm * scaleX,
+      };
     }
 
     // Nouveau centre : celui qui laisse le coin fixe exactement où il est.
