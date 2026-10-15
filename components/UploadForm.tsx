@@ -4,10 +4,11 @@ import { useState } from "react";
 import Link from "next/link";
 import type { Category, Product } from "@/lib/types";
 import { SpinnerIcon } from "@/components/icons";
+import { templateOptionLabel } from "@/lib/templateLabel";
 
 type ProductOption = Product & {
   imageUrl: string | null;
-  template: { name: string; category_id: string; width_mm: number; height_mm: number; dpi: number } | null;
+  template: { name: string; category_id: string; width_mm: number; height_mm: number; dpi: number; two_sided: boolean } | null;
 };
 
 export default function UploadForm({
@@ -79,7 +80,7 @@ export default function UploadForm({
               <optgroup key={category.id} label={category.name}>
                 {items.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.name} — {p.template?.name}
+                    {p.name} — {p.template ? templateOptionLabel(p.template) : ""}
                   </option>
                 ))}
               </optgroup>

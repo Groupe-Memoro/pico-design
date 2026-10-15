@@ -787,13 +787,15 @@ export default function ImpositionTool({
 
             {!isDocument && (
             <div>
-              <label className={labelClass}>Format (fond perdu inclus)</label>
+              <label className={labelClass}>Format</label>
               <select value={formatId} onChange={(e) => setFormatId(e.target.value)} className={selectClass}>
                 {formatGroups.map((group) => (
                   <optgroup key={group.category} label={group.category}>
                     {group.formats.map((f) => (
                       <option key={f.id} value={f.id}>
-                        {f.name} · {sizeLabel(f.widthMm, f.heightMm)}
+                        {/* Format fini à l'affichage ; la page (fond perdu
+                            compris) reste celle du calcul de la feuille. */}
+                        {f.name} · {sizeLabel(f.widthMm - 2 * f.bleedMm, f.heightMm - 2 * f.bleedMm)}
                       </option>
                     ))}
                   </optgroup>

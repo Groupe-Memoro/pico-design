@@ -9,6 +9,7 @@ type ProductWithTemplate = Product & {
     width_mm: number;
     height_mm: number;
     dpi: number;
+    two_sided: boolean;
   } | null;
 };
 
@@ -18,7 +19,7 @@ export default async function GeneratePage() {
   const [{ data: products }, { data: categories }] = await Promise.all([
     supabase
       .from("products")
-      .select("*, template:templates(name, category_id, width_mm, height_mm, dpi)")
+      .select("*, template:templates(name, category_id, width_mm, height_mm, dpi, two_sided)")
       .order("name", { ascending: true }),
     supabase.from("categories").select("*").order("sort_order", { ascending: true }),
   ]);

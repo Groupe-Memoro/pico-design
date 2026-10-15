@@ -13,6 +13,7 @@ import { allowsPanels, allowsSheet, panelCells, parseFold } from "@/lib/folds";
 import { stageLargeFiles } from "@/lib/design/stageUpload";
 import { SpinnerIcon } from "@/components/icons";
 import ColorPickerButton from "@/components/ColorPickerButton";
+import { templateOptionLabel } from "@/lib/templateLabel";
 
 const SHADOW_CONTROLS: { key: keyof LogoShadowSettings; label: string; unit: string }[] = [
   { key: "blur", label: "Flou", unit: "%" },
@@ -485,8 +486,7 @@ export default function ProductForm({
                 <optgroup key={category.id} label={category.name}>
                   {items.map((t) => (
                     <option key={t.id} value={t.id}>
-                      {t.name} — {formatIn(t.width_mm)}×{formatIn(t.height_mm)}
-                      {t.two_sided ? " (recto-verso)" : ""}
+                      {templateOptionLabel(t)}
                     </option>
                   ))}
                 </optgroup>
@@ -536,8 +536,7 @@ export default function ProductForm({
                           checked={selectedTemplateIds.includes(t.id)}
                           onChange={(e) => toggleTemplate(t.id, e.target.checked)}
                         />
-                        {t.name} — {formatIn(t.width_mm)}×{formatIn(t.height_mm)}
-                        {t.two_sided ? " (recto-verso)" : ""}
+                        {templateOptionLabel(t)}
                       </label>
                     ))}
                   </div>

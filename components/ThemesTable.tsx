@@ -7,6 +7,7 @@ import Modal from "@/components/Modal";
 import UpdatingBadge from "@/components/UpdatingBadge";
 import { FilePenIcon, SpinnerIcon, TrashIcon } from "@/components/icons";
 import type { Template, Theme } from "@/lib/types";
+import { templateOptionLabel } from "@/lib/templateLabel";
 
 // URL signées du graphisme et du fond (null sans fond, voir Theme.background_path).
 export type ThemeWithOverlayUrl = Theme & { overlayUrl: string | null; backgroundUrl: string | null };
@@ -136,7 +137,7 @@ export default function ThemesTable({
             <option value="">— Tous —</option>
             {templates.map((t) => (
               <option key={t.id} value={t.id}>
-                {t.name}
+                {templateOptionLabel(t)}
               </option>
             ))}
           </select>

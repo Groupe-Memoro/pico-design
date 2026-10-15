@@ -18,6 +18,7 @@ import {
   maskSvgAspect,
   slotShape,
 } from "@/lib/themeShapes";
+import { templateOptionLabel } from "@/lib/templateLabel";
 
 const MIN_RATIO = 0.05;
 
@@ -420,7 +421,7 @@ export default function ThemeForm({
           >
             {templates.map((t) => (
               <option key={t.id} value={t.id}>
-                {t.name}
+                {templateOptionLabel(t)}
               </option>
             ))}
           </select>
