@@ -84,7 +84,10 @@ export async function generateTemplatePreviewPng(
   // la hauteur). Aperçu écran seulement, jamais dans le PDF imprimé (voir
   // generatePrintReadyPdf, qui n'en tient pas compte) — comme la ligne de
   // coupe/marge de sécurité, masquées avec elles par un gabarit de guidage.
-  const foldMarksLinesSvg = hasOverlay
+  // Un produit plié (template.fold) trace ses propres plis plus bas : les
+  // marques manuelles feraient doublon, souvent décalées d'un millimètre.
+  const fold = parseFold(template.fold);
+  const foldMarksLinesSvg = hasOverlay || fold
     ? ""
     : [
         ...(template.fold_marks_vertical_mm ?? []).map((mm) => {
@@ -100,7 +103,6 @@ export async function generateTemplatePreviewPng(
   // Produit plié : chaque pli et une zone de sécurité de part et d'autre (voir
   // lib/folds.ts). Écran seulement ; le nom des volets s'affiche hors du
   // visuel, dans l'aperçu (ImageSourcePicker).
-  const fold = parseFold(template.fold);
   let foldSvg = "";
   if (fold && !hasOverlay) {
     const vertical = fold.direction === "vertical";

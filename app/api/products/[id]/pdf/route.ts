@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServerSupabaseClient, createAdminSupabaseClient } from "@/lib/supabase/server";
+import { contentDisposition } from "@/lib/contentDisposition";
 
 export const runtime = "nodejs";
 
@@ -50,12 +51,12 @@ export async function GET(_request: Request, { params }: { params: { id: string 
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  const safeName = product.name.replace(/[^a-z0-9-_ ]/gi, "").trim() || "produit";
+  const safeName = product.name.replace(/[\\/:*?"<>|\x00-\x1f]+/g, " ").trim() || "produit";
 
   return new NextResponse(new Uint8Array(buffer), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${safeName}.pdf"`,
+      "Content-Disposition": contentDisposition(`${safeName}.pdf`),
       "Cache-Control": "private, no-store",
     },
   });

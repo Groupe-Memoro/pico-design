@@ -8,6 +8,7 @@ import {
 import { grantAllows } from "@/lib/publicDesign";
 import { publicUploadError } from "@/lib/uploadLimits";
 import { renderPdfFromForm } from "@/lib/design/renderPdf";
+import { contentDisposition } from "@/lib/contentDisposition";
 
 export const runtime = "nodejs"; // sharp/pdf-lib ont besoin du runtime Node, pas Edge.
 export const maxDuration = 60;
@@ -69,7 +70,7 @@ export async function POST(request: Request) {
     return new NextResponse(new Uint8Array(pdf), {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="${filename}"`,
+        "Content-Disposition": contentDisposition(filename),
         "Cache-Control": "private, no-store",
       },
     });

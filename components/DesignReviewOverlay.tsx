@@ -8,9 +8,9 @@ import { formatIn } from "@/lib/pdf/units";
 import { stageLargeFiles } from "@/lib/design/stageUpload";
 import { SpinnerIcon, XIcon } from "@/components/icons";
 import MockupGallery, { type MockupView } from "@/components/MockupGallery";
-import FoldedPreview from "@/components/FoldedPreview";
 import { parseFold } from "@/lib/folds";
 import { layerImageFieldName, type DesignLayer } from "@/lib/design/layers";
+import { filenameFromDisposition } from "@/lib/contentDisposition";
 
 // Ajoute les calques d'un côté au formulaire : un champ JSON (métadonnées
 // seulement — un fichier n'est pas sérialisable en JSON) et, pour chaque
@@ -86,8 +86,6 @@ interface ViewSpec {
   label: string;
   side: "front" | "back";
   mockupId: string | null;
-  // Côté à plat, au format fini : la matière de l'aperçu plié, pas une vue de la galerie.
-  flat?: boolean;
 }
 
 /**
@@ -152,26 +150,32 @@ export default function DesignReviewOverlay({
   const [pdf, setPdf] = useState<GeneratedPdf | null>(null);
   // Une vue par mockup du modèle (plusieurs angles possibles) ; à défaut,
   // une par côté imprimé, comme avant.
+  // Produit plié : ses plis viennent du modèle, déjà orienté par DesignTool
+  // (applyOrientation).
+  const oriented = template;
+  const fold = useMemo(() => (oriented.two_sided ? parseFold(oriented.fold) : null), [oriented]);
+  // Plié avec mockups photo : chaque mockup montre aussi le verso (le
+  // dépliant ouvert, vu de l'intérieur), en vue de plus dans la galerie,
+  // comme le recto/verso de la papeterie.
+  const foldedMockups = Boolean(fold) && mockups.length > 0;
   const viewSpecs: ViewSpec[] = useMemo(() => {
     if (mockups.length > 0) {
-      // Les bundles réalistes n'ont jamais de rendu verso (voir
-      // /api/design/mockup) : chaque mockup montre le recto.
-      return mockups.map((m) => ({ key: m.id, label: m.name, side: "front" as const, mockupId: m.id }));
+      // Les bundles réalistes ne rendent que le recto (voir
+      // /api/design/mockup), sauf ceux d'un produit plié.
+      if (!foldedMockups) {
+        return mockups.map((m) => ({ key: m.id, label: m.name, side: "front" as const, mockupId: m.id }));
+      }
+      // Un seul mockup : « Recto », « Verso » ; plusieurs : précédés de leur nom.
+      const label = (name: string, side: string) => (mockups.length > 1 ? `${name} — ${side}` : side);
+      return mockups.flatMap((m) => [
+        { key: m.id, label: label(m.name, "Recto"), side: "front" as const, mockupId: m.id },
+        { key: `${m.id}:back`, label: label(m.name, "Verso"), side: "back" as const, mockupId: m.id },
+      ]);
     }
     const specs: ViewSpec[] = [{ key: "front", label: "Recto", side: "front", mockupId: null }];
     if (template.two_sided) specs.push({ key: "back", label: "Verso", side: "back", mockupId: null });
     return specs;
-  }, [mockups, template.two_sided]);
-  // Produit plié : ses deux côtés à plat, pour l'aperçu plié. `template` est
-  // déjà orienté par DesignTool (applyOrientation) : ses plis aussi.
-  const oriented = template;
-  const fold = useMemo(() => (oriented.two_sided ? parseFold(oriented.fold) : null), [oriented]);
-  const flatSpecs: ViewSpec[] = fold
-    ? [
-        { key: "flat-front", label: "", side: "front", mockupId: null, flat: true },
-        { key: "flat-back", label: "", side: "back", mockupId: null, flat: true },
-      ]
-    : [];
+  }, [mockups, template.two_sided, foldedMockups]);
 
   const [mockupStates, setMockupStates] = useState<Record<string, MockupState>>(() =>
     Object.fromEntries(viewSpecs.map((v) => [v.key, { loading: true, url: null }]))
@@ -298,8 +302,7 @@ export default function DesignReviewOverlay({
           throw new Error(data.error ?? "Erreur lors de la génération du PDF.");
         }
         const blob = await res.blob();
-        const disposition = res.headers.get("Content-Disposition") ?? "";
-        const filename = disposition.match(/filename="([^"]+)"/)?.[1] ?? `${template.name}.pdf`;
+        const filename = filenameFromDisposition(res.headers.get("Content-Disposition")) ?? `${template.name}.pdf`;
         if (!cancelled) setPdf({ url: URL.createObjectURL(blob), filename });
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : "Erreur lors de la génération du design.");
@@ -342,7 +345,6 @@ export default function DesignReviewOverlay({
         body.append("side", side);
         // Quel mockup rendre, quand le modèle en a plusieurs.
         if (mockupId) body.append("mockupId", mockupId);
-        if (spec.flat) body.append("flat", "1");
         if (isTheme && selectedTheme) {
           appendThemeToForm(body, value, selectedTheme.id);
         } else if (isMosaic) {
@@ -369,7 +371,7 @@ export default function DesignReviewOverlay({
       }
     }
 
-    for (const spec of [...viewSpecs, ...flatSpecs]) {
+    for (const spec of viewSpecs) {
       if (spec.side === "back") fetchMockup(spec, back, backLayers, backFromPdf ?? undefined);
       else fetchMockup(spec, front, frontLayers);
     }
@@ -486,15 +488,6 @@ export default function DesignReviewOverlay({
 
           {hasMockupColumn && (
             <div className="order-1 flex flex-col items-center gap-6 md:order-none">
-              {fold && mockupStates["flat-front"]?.url && mockupStates["flat-back"]?.url && (
-                <FoldedPreview
-                  fold={fold}
-                  widthMm={oriented.width_mm}
-                  heightMm={oriented.height_mm}
-                  frontUrl={mockupStates["flat-front"].url}
-                  backUrl={mockupStates["flat-back"].url}
-                />
-              )}
               <MockupGallery
                 views={views}
                 activeKey={activeMockupKey}

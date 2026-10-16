@@ -31,8 +31,11 @@ export interface StationeryMockupInput {
   // Calques additionnels (texte/image) de ce côté, dans l'ordre d'empilement.
   layers?: ResolvedLayer[];
   // Le côté seul, au format fini, sans ombre ni marge : la matière de
-  // l'aperçu d'un produit plié (components/FoldedPreview), qui le découpe en volets.
+  // le mockup d'un produit plié (foldedMockup.ts), qui le découpe en volets.
   flat?: boolean;
+  // Plus grand côté du rendu, en pixels (1200 par défaut) : le mockup d'un
+  // dépliant (voir foldedMockup.ts) en veut plus, ses volets étant agrandis.
+  maxDimPx?: number;
 }
 
 /**
@@ -57,12 +60,13 @@ export async function generateStationeryMockupPng({
   rotation = 0,
   layers = [],
   flat = false,
+  maxDimPx = MOCKUP_MAX_DIM_PX,
 }: StationeryMockupInput): Promise<Buffer> {
   // Résolution plafonnée (mockup à l'écran, pas un fichier d'impression) —
   // même logique que generateProductMockupPng.
   const fullWidthPx = mmToPx(template.width_mm, template.dpi);
   const fullHeightPx = mmToPx(template.height_mm, template.dpi);
-  const scale = Math.min(1, MOCKUP_MAX_DIM_PX / Math.max(fullWidthPx, fullHeightPx, 1));
+  const scale = Math.min(1, maxDimPx / Math.max(fullWidthPx, fullHeightPx, 1));
   const dpi = template.dpi * scale;
   const cardWidthPx = Math.max(1, Math.round(mmToPx(template.width_mm, dpi)));
   const cardHeightPx = Math.max(1, Math.round(mmToPx(template.height_mm, dpi)));

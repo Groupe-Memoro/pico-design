@@ -2,7 +2,7 @@
  * Produits pliés (dépliants, cartes de souhait) : le pli d'un modèle
  * (templates.fold) et les volets qui en découlent, au recto et au verso.
  * Sans dépendance serveur : utilisé par le formulaire du modèle, les guides
- * de l'outil (lib/pdf/preview.ts) et l'aperçu plié (components/FoldedPreview).
+ * de l'outil (lib/pdf/preview.ts) et les mockups générés (lib/pdf/foldedMockup.ts).
  *
  * Repère : distances en mm depuis le bord de coupe (fond perdu exclu), le long
  * de la largeur pour des plis verticaux (volets côte à côte), de la hauteur

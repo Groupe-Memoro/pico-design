@@ -170,10 +170,11 @@ h4 {
 /* Toute icône qui déclenche une action (bouton, lien) joue la secousse « jello »
    au survol, comme celles du menu. Le bouton désactivé et l'icône de chargement
    (animate-spin) restent immobiles ; `motion-safe` respecte le réglage « réduire
-   les animations » du système. */
+   les animations » du système. Les icônes Animate UI (data-animate-icon) ont
+   leur propre animation, voir components/animatedIcons.tsx. */
 @layer components {
-  button:not(:disabled):hover svg:not(.animate-spin),
-  a[href]:hover svg:not(.animate-spin) {
+  button:not(:disabled):hover svg:not(.animate-spin):not([data-animate-icon]),
+  a[href]:hover svg:not(.animate-spin):not([data-animate-icon]) {
     @apply motion-safe:animate-jello;
   }
 

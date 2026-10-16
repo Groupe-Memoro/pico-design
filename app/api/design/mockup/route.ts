@@ -9,6 +9,8 @@ import { resolveProductImage } from "@/lib/pdf/productSource";
 import { generateProductMockupPng } from "@/lib/pdf/mockup";
 import { generateBeautyShotMockupPng } from "@/lib/pdf/beautyShot";
 import { loadBeautyShotBundle } from "@/lib/pdf/beautyShotBundle";
+import { parseFold } from "@/lib/folds";
+import { generateFoldedMockupPng } from "@/lib/pdf/foldedMockup";
 import { resolveMockupBundle } from "@/lib/templateMockups";
 import { grantAllows } from "@/lib/publicDesign";
 import { publicUploadError } from "@/lib/uploadLimits";
@@ -52,10 +54,12 @@ function rotationValue(raw: FormDataEntryValue | null): number {
  * - Beauty shot XML, ou masque + ombrage : mockup réaliste sur le produit
  *   physique — même rendu que `/api/products/[id]/mockup`. Toujours un
  *   recto (les modèles avec ce bundle, ex. étuis de téléphone, sont à
- *   recto seul) : `side=back` y répond 204.
+ *   recto seul) : `side=back` y répond 204 — sauf pour un produit plié,
+ *   dont le dépliant ouvert montre aussi son intérieur.
  * - Aucun des deux (typiquement la papeterie) : repli générique — le
  *   visuel de ce côté à sa dimension finale avec une ombre portée, voir
- *   generateStationeryMockupPng. Avant, ces modèles n'avaient simplement
+ *   generateStationeryMockupPng ; un produit plié y est montré entrouvert,
+ *   d'après ses volets (generateFoldedMockupPng). Avant, ces modèles n'avaient simplement
  *   aucun mockup (204) ; ils en ont maintenant un.
  */
 export async function POST(request: Request) {
@@ -96,9 +100,6 @@ export async function POST(request: Request) {
   const db = user ? supabase : createAdminSupabaseClient();
   const rotated = formData.get("rotated") === "true";
   const side = formData.get("side") === "back" ? "back" : "front";
-  // Le côté à plat, au format fini (aperçu d'un produit plié) : toujours le
-  // rendu générique, même pour un modèle à mockup réaliste.
-  const flat = formData.get("flat") === "1";
   // Quel mockup rendre, quand le modèle en a plusieurs (voir
   // resolveMockupBundle) — absent = le premier.
   const mockupIdField = formData.get("mockupId");
@@ -178,7 +179,9 @@ export async function POST(request: Request) {
   // Les modèles à bundle réaliste sont toujours à recto seul (aucun n'a de
   // second rendu "verso") — un appel side=back pour l'un d'eux n'a rien à
   // montrer, comme un modèle générique sans verso.
-  if (side === "back" && ((hasRealisticBundle && !flat) || !rawTemplate.two_sided)) {
+  // Exception : un produit plié, dont le mockup ouvert montre aussi l'intérieur.
+  const folded = Boolean(parseFold(rawTemplate.fold));
+  if (side === "back" && ((hasRealisticBundle && !folded) || !rawTemplate.two_sided)) {
     return new NextResponse(null, { status: 204 });
   }
 
@@ -250,9 +253,12 @@ export async function POST(request: Request) {
     }
   }
 
-  if (!hasRealisticBundle || flat) {
+  if (!hasRealisticBundle) {
     try {
-      const png = await generateStationeryMockupPng({
+      // Produit plié sans mockup photo : le dépliant entrouvert, généré
+      // d'après ses volets (voir foldedMockup.ts), à partir du côté à plat.
+      const foldConfig = parseFold(template.fold);
+      const sideImage = await generateStationeryMockupPng({
         template,
         image: resolvedBuffer,
         positionX,
@@ -260,11 +266,21 @@ export async function POST(request: Request) {
         zoom,
         rotation: imageRotation,
         layers,
-        flat,
+        flat: Boolean(foldConfig),
+        maxDimPx: foldConfig ? 2000 : undefined,
       });
+      const png = foldConfig
+        ? await generateFoldedMockupPng({
+            print: sideImage,
+            fold: foldConfig,
+            widthMm: template.width_mm,
+            heightMm: template.height_mm,
+            side,
+          })
+        : sideImage;
       return new NextResponse(new Uint8Array(png), {
         headers: {
-          "Content-Type": flat ? "image/jpeg" : "image/png",
+          "Content-Type": "image/png",
           "Cache-Control": "private, no-store",
         },
       });
@@ -310,6 +326,7 @@ export async function POST(request: Request) {
         bundle.positionX ?? 0.5,
         bundle.positionY ?? 0.5,
         bundle.zoom ?? 1,
+        side,
       );
       return new NextResponse(new Uint8Array(png), {
         headers: {

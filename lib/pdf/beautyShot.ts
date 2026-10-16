@@ -518,7 +518,10 @@ export async function generateBeautyShotMockupPng(
   viewPositionX = 0.5,
   viewPositionY = 0.5,
   // Resserre la prise de vue sur l'imprimé (1 = la tranche entière).
-  viewZoom = 1
+  viewZoom = 1,
+  // Côté montré par un produit plié ouvert (zones en perspective) : le
+  // verso a ses volets dans l'ordre inverse (voir foldPanels).
+  side: "front" | "back" = "front"
 ): Promise<Buffer> {
   const canvasWidth = Math.max(1, config.width);
   const canvasHeight = Math.max(1, config.height);
@@ -551,7 +554,7 @@ export async function generateBeautyShotMockupPng(
   const quadZones = config.zones.filter((z) => z.quad);
   let designComposites: sharp.OverlayOptions[];
   if (quadZones.length > 0) {
-    designComposites = await renderQuadZones(template, quadZones, canvasWidth, canvasHeight, (w, h) =>
+    designComposites = await renderQuadZones(template, quadZones, canvasWidth, canvasHeight, side, (w, h) =>
       buildDesignForZone(template, sourceImage, logoImage, w, h, positionX, positionY, logoShadow, zoom, imageRotation, layers, 0.5, 0.5, 1)
     );
   } else {
@@ -706,6 +709,7 @@ async function renderQuadZones(
   zones: BeautyShotZone[],
   canvasWidth: number,
   canvasHeight: number,
+  side: "front" | "back",
   printAt: (widthPx: number, heightPx: number) => Promise<Buffer>
 ): Promise<sharp.OverlayOptions[]> {
   const ordered = [...zones].sort(
@@ -721,7 +725,7 @@ async function renderQuadZones(
   const n = ordered.length;
   const ranges =
     fold && fold.direction === "vertical" && fold.panels === n
-      ? foldPanels(fold, template.width_mm, "front").map((p) => [p.start / template.width_mm, (p.start + p.size) / template.width_mm])
+      ? foldPanels(fold, template.width_mm, side).map((p) => [p.start / template.width_mm, (p.start + p.size) / template.width_mm])
       : Array.from({ length: n }, (_, i) => [i / n, (i + 1) / n]);
 
   return Promise.all(

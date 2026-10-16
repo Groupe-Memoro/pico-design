@@ -3,6 +3,7 @@ import { createAdminSupabaseClient, createServerSupabaseClient } from "@/lib/sup
 import { formDataFromSubmission, type DesignSubmission } from "@/lib/design/submission";
 import { renderPdfFromForm } from "@/lib/design/renderPdf";
 import { pdfDownloadName } from "@/lib/imposition/saved";
+import { contentDisposition } from "@/lib/contentDisposition";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -47,7 +48,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     return new NextResponse(new Uint8Array(pdf), {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="${filename}"`,
+        "Content-Disposition": contentDisposition(filename),
         "Cache-Control": "private, no-store",
       },
     });

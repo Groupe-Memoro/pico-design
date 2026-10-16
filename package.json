@@ -18,6 +18,7 @@
     "fabric": "^6.9.1",
     "fast-xml-parser": "^5.11.1",
     "fontkit": "^2.0.4",
+    "motion": "^14.3.0",
     "next": "14.2.35",
     "pdf-lib": "^1.17.1",
     "pdf-to-png-converter": "^4.2.1",
