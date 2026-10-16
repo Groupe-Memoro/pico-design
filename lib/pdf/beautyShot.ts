@@ -9,6 +9,10 @@ import type { Template } from "../types";
 import { warpIntoQuad, type Quad } from "./quadWarp";
 import { foldPanels, parseFold } from "../folds";
 
+// Images intermédiaires du rendu : jamais gardées ni envoyées, donc sans
+// compression (l'encodage PNG compressé était l'essentiel du temps de rendu).
+const FAST_PNG = { compressionLevel: 0 } as const;
+
 /**
  * Format "beauty shot" (repris du schéma Mediaclip gifting:beautyShot) :
  * un XML qui décrit un fond, un masque, la zone où vient se placer le
@@ -366,7 +370,7 @@ async function extractCentered(
       width: Math.min(toWidth, fromWidth),
       height: Math.min(toHeight, fromHeight),
     })
-    .png()
+    .png(FAST_PNG)
     .toBuffer();
 }
 
@@ -444,7 +448,7 @@ async function buildDesignForZone(
     const nativeW = meta.width ?? logoWidthPx;
     const nativeH = meta.height ?? logoWidthPx;
     const logoHeightPx = Math.max(1, Math.round(nativeH * (logoWidthPx / nativeW)));
-    const logoPng = await sharp(rawLogoPng).resize(logoWidthPx, logoHeightPx).png().toBuffer();
+    const logoPng = await sharp(rawLogoPng).resize(logoWidthPx, logoHeightPx).png(FAST_PNG).toBuffer();
 
     const marginXPx = mmToPx(template.logo_margin_x_mm);
     const marginYPx = mmToPx(template.logo_margin_y_mm);
@@ -476,7 +480,7 @@ async function buildDesignForZone(
     .flatten({ background: "#ffffff" })
     .composite(composites)
     .ensureAlpha()
-    .png()
+    .png(FAST_PNG)
     .toBuffer();
 
   return coverCropToBuffer(printed, zoneWidthPx, zoneHeightPx, viewPositionX, viewPositionY, viewZoom, 0);
@@ -521,7 +525,9 @@ export async function generateBeautyShotMockupPng(
   viewZoom = 1,
   // Côté montré par un produit plié ouvert (zones en perspective) : le
   // verso a ses volets dans l'ordre inverse (voir foldPanels).
-  side: "front" | "back" = "front"
+  side: "front" | "back" = "front",
+  // Format du rendu : PNG (par défaut) ou WebP, pour l'affichage à l'écran.
+  format: "png" | "webp" = "png"
 ): Promise<Buffer> {
   const canvasWidth = Math.max(1, config.width);
   const canvasHeight = Math.max(1, config.height);
@@ -551,7 +557,12 @@ export async function generateBeautyShotMockupPng(
   // Zones en perspective (maillage de 4 points, ex. un dépliant ouvert) :
   // chaque zone reçoit un volet de l'imprimé, déformé dans son quadrilatère.
   // Sinon, la zone rectangulaire d'origine, avec marges et masque.
-  const quadZones = config.zones.filter((z) => z.quad);
+  // Seulement pour plusieurs zones (les volets d'un dépliant) ou une zone
+  // vraiment déformée : la zone unique d'une tasse ou d'un étui est aussi un
+  // maillage de 4 points, mais rectangulaire, et doit garder ses marges et
+  // son masque.
+  const perspective = config.zones.length > 1 || config.zones.some((z) => z.quad && !isAxisAligned(z.quad));
+  const quadZones = perspective ? config.zones.filter((z) => z.quad) : [];
   let designComposites: sharp.OverlayOptions[];
   if (quadZones.length > 0) {
     designComposites = await renderQuadZones(template, quadZones, canvasWidth, canvasHeight, side, (w, h) =>
@@ -599,7 +610,7 @@ export async function generateBeautyShotMockupPng(
             create: { width: zoneWidth, height: zoneHeight, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
           })
             .composite([{ input: designInner, left: marginLeftPx, top: marginTopPx }])
-            .png()
+            .png(FAST_PNG)
             .toBuffer()
         : designInner;
 
@@ -611,12 +622,12 @@ export async function generateBeautyShotMockupPng(
               input: await sharp(maskBuffer)
                 .resize(zoneWidth, zoneHeight, { fit: "fill" })
                 .ensureAlpha()
-                .png()
+                .png(FAST_PNG)
                 .toBuffer(),
               blend: "dest-in",
             },
           ])
-          .png()
+          .png(FAST_PNG)
           .toBuffer()
       : design;
     designComposites = [{ input: maskedDesign, left: Math.round(zone.left), top: Math.round(zone.top) }];
@@ -625,78 +636,57 @@ export async function generateBeautyShotMockupPng(
   // La scène se monte du bas vers le haut : couches du dessous (une ombre
   // portée, typiquement), puis le fond, puis le design découpé, puis les
   // surcouches. Le fond n'est donc plus forcément la couche la plus basse.
-  let composed = await sharp({
-    create: { width: canvasWidth, height: canvasHeight, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 0 } },
-  })
-    .png()
-    .toBuffer();
-
+  // Une seule composition (sharp les applique dans l'ordre, chacune avec son
+  // mode de fusion) plutôt qu'un encodage complet de la scène par couche.
+  const fitted = async (assetName: string, fit: "cover" | "fill") => {
+    const buffer = assets.get(assetName);
+    if (!buffer) return null;
+    const { data, info } = await sharp(buffer)
+      .resize(canvasWidth, canvasHeight, { fit })
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    return { data, raw: { width: info.width, height: info.height, channels: info.channels } };
+  };
+  const scene: sharp.OverlayOptions[] = [];
   for (const underlay of config.underlays) {
-    const buffer = assets.get(underlay.assetName);
-    if (!buffer) continue;
-    composed = await sharp(composed)
-      .composite([
-        {
-          input: await sharp(buffer)
-            .resize(canvasWidth, canvasHeight, { fit: "cover" })
-            .ensureAlpha()
-            .png()
-            .toBuffer(),
-          blend: underlay.blendMode as sharp.Blend,
-        },
-      ])
-      .png()
-      .toBuffer();
+    const layer = await fitted(underlay.assetName, "cover");
+    if (layer) scene.push({ input: layer.data, raw: layer.raw, blend: underlay.blendMode as sharp.Blend });
   }
-
-  const backgroundBuffer = config.backgroundAssetName ? assets.get(config.backgroundAssetName) : null;
-  if (backgroundBuffer) {
-    composed = await sharp(composed)
-      .composite([
-        {
-          input: await sharp(backgroundBuffer)
-            .resize(canvasWidth, canvasHeight, { fit: "cover" })
-            .ensureAlpha()
-            .png()
-            .toBuffer(),
-        },
-      ])
-      .png()
-      .toBuffer();
+  if (config.backgroundAssetName) {
+    const layer = await fitted(config.backgroundAssetName, "cover");
+    if (layer) scene.push({ input: layer.data, raw: layer.raw });
   }
-
-  composed = await sharp(composed).composite(designComposites).png().toBuffer();
-
+  scene.push(...designComposites);
   for (let index = 0; index < config.overlays.length; index++) {
     const overlay = config.overlays[index];
-    const overlayBuffer = assets.get(overlay.assetName);
-    if (!overlayBuffer) continue;
+    const layer = await fitted(overlay.assetName, "fill");
+    if (!layer) continue;
     const rawOpacity = overlayOpacities?.[index];
     const opacity = typeof rawOpacity === "number" && rawOpacity >= 0 && rawOpacity <= 100 ? rawOpacity : 100;
-    let overlayResized = await sharp(overlayBuffer)
-      .resize(canvasWidth, canvasHeight, { fit: "fill" })
-      .ensureAlpha()
-      .png()
-      .toBuffer();
+    let data = layer.data;
     if (opacity < 100) {
       // Ne touche qu'au canal alpha (RGB inchangés) : réduit la présence de
       // la couche sans en délaver les teintes.
-      overlayResized = await sharp(overlayResized)
+      data = await sharp(data, { raw: layer.raw })
         .linear([1, 1, 1, opacity / 100], [0, 0, 0, 0])
-        .png()
+        .raw()
         .toBuffer();
     }
-    composed = await sharp(composed)
-      .composite([{ input: overlayResized, blend: overlay.blendMode as sharp.Blend }])
-      .png()
-      .toBuffer();
+    scene.push({ input: data, raw: layer.raw, blend: overlay.blendMode as sharp.Blend });
   }
 
-  if (!config.transparency) {
-    composed = await sharp(composed).flatten({ background: "#ffffff" }).png().toBuffer();
-  }
-
-  return composed;
+  const { data: composed, info } = await sharp({
+    create: { width: canvasWidth, height: canvasHeight, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 0 } },
+  })
+    .composite(scene)
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  let out = sharp(composed, { raw: { width: info.width, height: info.height, channels: info.channels } });
+  if (!config.transparency) out = out.flatten({ background: "#ffffff" });
+  // WebP : bien plus rapide à encoder et ~10 fois plus léger qu'un PNG de
+  // cette taille, pour l'affichage. Le PNG reste là où un fichier est gardé.
+  return format === "webp" ? out.webp({ quality: 88 }).toBuffer() : out.png().toBuffer();
 }
 
 /**
@@ -704,6 +694,13 @@ export async function generateBeautyShotMockupPng(
  * à droite (centre des zones) : les volets du recto selon le pli du modèle
  * (voir lib/folds.ts), à défaut des parts égales de sa largeur.
  */
+// Rectangle droit (à un demi-pixel près) : haut-gauche/haut-droite à la même
+// hauteur, haut-gauche/bas-gauche à la même abscisse, etc.
+function isAxisAligned([tl, tr, br, bl]: Quad): boolean {
+  const near = (a: number, b: number) => Math.abs(a - b) <= 0.5;
+  return near(tl.y, tr.y) && near(bl.y, br.y) && near(tl.x, bl.x) && near(tr.x, br.x);
+}
+
 async function renderQuadZones(
   template: Template,
   zones: BeautyShotZone[],
@@ -733,7 +730,7 @@ async function renderQuadZones(
       const [from, to] = ranges[i];
       const left = Math.round(from * printWidth);
       const width = Math.max(1, Math.min(printWidth - left, Math.round((to - from) * printWidth)));
-      const panel = await sharp(print).extract({ left, top: 0, width, height: printHeight }).png().toBuffer();
+      const panel = await sharp(print).extract({ left, top: 0, width, height: printHeight }).png(FAST_PNG).toBuffer();
       return { input: await warpIntoQuad(panel, zone.quad!, canvasWidth, canvasHeight), left: 0, top: 0 };
     })
   );

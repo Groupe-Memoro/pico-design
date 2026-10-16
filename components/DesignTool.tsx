@@ -14,6 +14,7 @@ import { pdfPageCount, planPdfPages } from "@/lib/pdf/pdfPages";
 import { parseFold } from "@/lib/folds";
 import { applyOrientation } from "@/lib/pdf/orientation";
 import type { DesignLayer } from "@/lib/design/layers";
+import { prestageFiles } from "@/lib/design/stageUpload";
 
 const DEFAULT_MOSAIC_GRID = { cols: 2, rows: 2 };
 
@@ -253,6 +254,19 @@ export default function DesignTool({
     setReviewOpen(false);
     setPhase("pick");
   }
+
+  // Les fichiers choisis partent vers le serveur dès maintenant, pendant que
+  // le client travaille : « Ton design » n'a plus à attendre l'envoi.
+  const templateId = template?.id;
+  useEffect(() => {
+    if (!templateId) return;
+    const layerFiles = [...frontLayers, ...backLayers].map((l) => (l.type === "image" ? l.file : null));
+    prestageFiles(
+      [front.file, back.file, ...(front.mosaicFiles ?? []), ...(back.mosaicFiles ?? []), ...(front.themeSlotFiles ?? []), ...layerFiles],
+      templateId,
+      grant
+    );
+  }, [templateId, grant, front.file, back.file, front.mosaicFiles, back.mosaicFiles, front.themeSlotFiles, frontLayers, backLayers]);
 
   // Un PDF de deux pages téléversé pour le recto fournit aussi le verso d'un
   // modèle recto-verso (page 2) — même règle partagée que ProductForm (voir

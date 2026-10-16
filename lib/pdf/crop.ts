@@ -62,18 +62,22 @@ export async function coverCropToBuffer(
   const scaledW = Math.max(1, Math.round(origW * scale));
   const scaledH = Math.max(1, Math.round(origH * scale));
 
-  const resized = await sharp(source).resize(scaledW, scaledH).toBuffer();
   const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
 
   if (scaledW >= targetWidthPx && scaledH >= targetHeightPx) {
     // Comportement d'origine : l'image dépasse (ou remplit tout juste) la
-    // cible dans les deux sens, on découpe l'excédent.
+    // cible dans les deux sens, on découpe l'excédent. Redimensionnement et
+    // découpe en un seul passage (extract après resize) : un encodage de
+    // moins, donc plus rapide et sans perte JPEG intermédiaire.
     const left = Math.round((scaledW - targetWidthPx) * clamp01(positionX));
     const top = Math.round((scaledH - targetHeightPx) * clamp01(positionY));
-    return sharp(resized)
+    return sharp(source)
+      .resize(scaledW, scaledH)
       .extract({ left, top, width: targetWidthPx, height: targetHeightPx })
       .toBuffer();
   }
+
+  const resized = await sharp(source).resize(scaledW, scaledH).toBuffer();
 
   // Dézoomé : l'image est plus petite que la cible dans au moins un sens —
   // la composer sur un fond blanc à la taille cible plutôt que d'extraire

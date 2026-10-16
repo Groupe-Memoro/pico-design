@@ -50,12 +50,15 @@ export async function generateFoldedMockupPng({
   widthMm,
   heightMm,
   side,
+  format = "png",
 }: {
   print: Buffer;
   fold: FoldConfig;
   widthMm: number;
   heightMm: number;
   side: "front" | "back";
+  // PNG par défaut ; WebP pour l'affichage à l'écran (plus rapide, plus léger).
+  format?: "png" | "webp";
 }): Promise<Buffer> {
   const vertical = fold.direction === "vertical";
   // Scène toujours en plis verticaux : un quart de tour anti-horaire met le
@@ -128,7 +131,7 @@ export async function generateFoldedMockupPng({
         .extract({ left, top: 0, width, height: sheetH })
         .composite([{ input: shade }])
         .linear(brightness, 0)
-        .png()
+        .png({ compressionLevel: 0 })
         .toBuffer();
       return { input: await warpIntoQuad(panel, quads[i], sceneW, sceneH), left: 0, top: 0 };
     })
@@ -145,7 +148,7 @@ export async function generateFoldedMockupPng({
     )
   )
     .blur(Math.max(1, sceneH * 0.014))
-    .png()
+    .png({ compressionLevel: 0 })
     .toBuffer();
   // Arêtes du papier : un trait fin autour de chaque volet.
   const outline = Buffer.from(
@@ -155,11 +158,11 @@ export async function generateFoldedMockupPng({
     `<svg xmlns="http://www.w3.org/2000/svg" width="${sceneW}" height="${sceneH}"><defs><radialGradient id="g" cx="50%" cy="42%" r="75%"><stop offset="0" stop-color="#f6f5f3"/><stop offset="1" stop-color="#dedbd7"/></radialGradient></defs><rect width="100%" height="100%" fill="url(#g)"/></svg>`
   );
 
-  const scene = await sharp(background)
-    .composite([{ input: shadow }, ...layers, { input: outline }])
-    .png()
-    .toBuffer();
-  return vertical ? scene : sharp(scene).rotate(90).png().toBuffer();
+  const scene = sharp(background).composite([{ input: shadow }, ...layers, { input: outline }]);
+  // La rotation s'applique avant la composition dans un même pipeline sharp :
+  // d'où une étape à part pour les plis horizontaux.
+  const out = vertical ? scene : sharp(await scene.png({ compressionLevel: 0 }).toBuffer()).rotate(90);
+  return format === "webp" ? out.webp({ quality: 88 }).toBuffer() : out.png().toBuffer();
 }
 
 // Un pli entre deux volets (orientations de gauche et de droite) est creux

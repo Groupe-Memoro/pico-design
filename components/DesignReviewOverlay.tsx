@@ -145,7 +145,8 @@ export default function DesignReviewOverlay({
   onClose: () => void;
   onRestart: () => void;
 }) {
-  const [loading, setLoading] = useState(true);
+  // Le PDF ne se prépare qu'en usage interne (voir l'effet plus bas).
+  const [loading, setLoading] = useState(!shopify);
   const [error, setError] = useState<string | null>(null);
   const [pdf, setPdf] = useState<GeneratedPdf | null>(null);
   // Une vue par mockup du modèle (plusieurs angles possibles) ; à défaut,
@@ -290,6 +291,10 @@ export default function DesignReviewOverlay({
   }
 
   useEffect(() => {
+    // Client Shopify : son design part au panier, pas en PDF (l'enregistrement
+    // n'en a pas besoin). Le préparer quand même lui ferait attendre le bouton
+    // « Ajouter au panier » et ralentirait les mockups qu'il est venu voir.
+    if (shopify) return;
     let cancelled = false;
     setLoading(true);
     setError(null);
@@ -371,10 +376,18 @@ export default function DesignReviewOverlay({
       }
     }
 
-    for (const spec of viewSpecs) {
-      if (spec.side === "back") fetchMockup(spec, back, backLayers, backFromPdf ?? undefined);
-      else fetchMockup(spec, front, frontLayers);
-    }
+    const render = (spec: ViewSpec) =>
+      spec.side === "back"
+        ? fetchMockup(spec, back, backLayers, backFromPdf ?? undefined)
+        : fetchMockup(spec, front, frontLayers);
+    // La vue affichée d'abord passe seule : rendues ensemble, les vues se
+    // partagent le serveur et aucune n'arrive avant la dernière. Les autres
+    // suivent, pendant qu'on regarde la première.
+    const [first, ...rest] = viewSpecs;
+    (async () => {
+      if (first) await render(first);
+      await Promise.all(rest.map(render));
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

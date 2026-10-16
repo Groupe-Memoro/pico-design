@@ -92,5 +92,6 @@ export async function warpIntoQuad(source: Buffer, quad: Quad, width: number, he
       out[o + 3] = (a / hits) * (hits / 4);
     }
   }
-  return sharp(out, { raw: { width, height, channels: 4 } }).png().toBuffer();
+  // Image intermédiaire : sans compression, l'encoder serait plus long que la déformer.
+  return sharp(out, { raw: { width, height, channels: 4 } }).png({ compressionLevel: 0 }).toBuffer();
 }

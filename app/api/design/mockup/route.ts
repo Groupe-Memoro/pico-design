@@ -268,6 +268,7 @@ export async function POST(request: Request) {
         layers,
         flat: Boolean(foldConfig),
         maxDimPx: foldConfig ? 2000 : undefined,
+        format: "webp",
       });
       const png = foldConfig
         ? await generateFoldedMockupPng({
@@ -276,11 +277,12 @@ export async function POST(request: Request) {
             widthMm: template.width_mm,
             heightMm: template.height_mm,
             side,
+            format: "webp",
           })
         : sideImage;
       return new NextResponse(new Uint8Array(png), {
         headers: {
-          "Content-Type": "image/png",
+          "Content-Type": "image/webp",
           "Cache-Control": "private, no-store",
         },
       });
@@ -327,10 +329,11 @@ export async function POST(request: Request) {
         bundle.positionY ?? 0.5,
         bundle.zoom ?? 1,
         side,
+        "webp",
       );
       return new NextResponse(new Uint8Array(png), {
         headers: {
-          "Content-Type": "image/png",
+          "Content-Type": "image/webp",
           "Cache-Control": "private, no-store",
         },
       });

@@ -26,10 +26,30 @@ type Storage = ReturnType<typeof createServerSupabaseClient>["storage"];
  * Lève une erreur nommant les assets introuvables plutôt que de laisser le
  * rendu échouer plus loin sur un Buffer manquant.
  */
-export async function loadBeautyShotBundle(
-  storage: Storage,
-  xmlPath: string
-): Promise<{ config: BeautyShotConfig; assets: Map<string, Buffer> }> {
+type LoadedBundle = { config: BeautyShotConfig; assets: Map<string, Buffer> };
+
+// Bundles déjà chargés, gardés en mémoire tant que l'instance du serveur vit :
+// les vues d'un même produit (et les clients suivants) ne retéléchargent pas
+// les mêmes images. Durée courte, pour qu'un mockup remplacé par l'équipe
+// apparaisse vite ; taille bornée (quelques Mo par bundle).
+const BUNDLE_TTL_MS = 2 * 60 * 1000;
+const BUNDLE_CACHE_MAX = 40;
+const bundleCache = new Map<string, { at: number; bundle: Promise<LoadedBundle> }>();
+
+export function loadBeautyShotBundle(storage: Storage, xmlPath: string): Promise<LoadedBundle> {
+  const hit = bundleCache.get(xmlPath);
+  if (hit && Date.now() - hit.at < BUNDLE_TTL_MS) return hit.bundle;
+  const bundle = fetchBeautyShotBundle(storage, xmlPath);
+  bundleCache.delete(xmlPath);
+  bundleCache.set(xmlPath, { at: Date.now(), bundle });
+  // Un échec ne reste pas en cache.
+  bundle.catch(() => bundleCache.get(xmlPath)?.bundle === bundle && bundleCache.delete(xmlPath));
+  // Le plus ancien sort en premier (une Map garde l'ordre d'insertion).
+  while (bundleCache.size > BUNDLE_CACHE_MAX) bundleCache.delete(bundleCache.keys().next().value as string);
+  return bundle;
+}
+
+async function fetchBeautyShotBundle(storage: Storage, xmlPath: string): Promise<LoadedBundle> {
   const xmlRes = await storage.from("overlays").download(xmlPath);
   if (!xmlRes.data) throw new Error("Impossible de charger le XML du mockup.");
   const config = parseBeautyShotXml(await xmlRes.data.text());

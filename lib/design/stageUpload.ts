@@ -67,6 +67,23 @@ export async function stageLargeFiles(formData: FormData): Promise<FormData> {
   return result;
 }
 
+/**
+ * Dépose d'avance, en arrière-plan, les fichiers que le client vient de
+ * choisir dans l'éditeur : quand il ouvre « Ton design », la photo est déjà
+ * sur le serveur au lieu de partir à ce moment-là (plusieurs secondes pour une
+ * photo de téléphone). Même cache que stageLargeFiles, donc aucun double
+ * envoi ; un échec est oublié et l'envoi sera retenté au rendu.
+ */
+export function prestageFiles(files: (File | null | undefined)[], templateId: string, grant?: string): void {
+  const formData = new FormData();
+  formData.append("templateId", templateId);
+  if (grant) formData.append("grant", grant);
+  files.forEach((file, i) => {
+    if (file) formData.append(`file${i}`, file);
+  });
+  stageLargeFiles(formData).catch(() => {});
+}
+
 async function requestUploads(formData: FormData, files: File[]): Promise<{ path: string; token: string }[]> {
   const res = await fetch("/api/design/stage", {
     method: "POST",

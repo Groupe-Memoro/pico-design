@@ -36,6 +36,8 @@ export interface StationeryMockupInput {
   // Plus grand côté du rendu, en pixels (1200 par défaut) : le mockup d'un
   // dépliant (voir foldedMockup.ts) en veut plus, ses volets étant agrandis.
   maxDimPx?: number;
+  // Format du rendu : PNG par défaut, WebP pour l'affichage à l'écran.
+  format?: "png" | "webp";
 }
 
 /**
@@ -61,6 +63,7 @@ export async function generateStationeryMockupPng({
   layers = [],
   flat = false,
   maxDimPx = MOCKUP_MAX_DIM_PX,
+  format = "png",
 }: StationeryMockupInput): Promise<Buffer> {
   // Résolution plafonnée (mockup à l'écran, pas un fichier d'impression) —
   // même logique que generateProductMockupPng.
@@ -86,10 +89,8 @@ export async function generateStationeryMockupPng({
   const canvasHeight = cardHeightPx + marginPx * 2;
   const overlay = await logoOverlay(card, CARD_SHADOW, marginPx, marginPx, canvasWidth, canvasHeight);
 
-  return sharp({
+  const scene = sharp({
     create: { width: canvasWidth, height: canvasHeight, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 0 } },
-  })
-    .composite([overlay])
-    .png()
-    .toBuffer();
+  }).composite([overlay]);
+  return (format === "webp" ? scene.webp({ quality: 88 }) : scene.png()).toBuffer();
 }
