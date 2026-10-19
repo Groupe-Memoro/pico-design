@@ -8,6 +8,7 @@ import { formatIn } from "@/lib/pdf/units";
 import { stageLargeFiles } from "@/lib/design/stageUpload";
 import { imagesFromZip } from "@/lib/zip";
 import type { Template } from "@/lib/types";
+import { rangeFillStyle } from "@/components/ui/rangeFill";
 
 /**
  * Outil Shopify, module « Impression de photos » (templates.tool_module =
@@ -213,6 +214,7 @@ function CropEditor({
           value={photo.zoom}
           onChange={(e) => onChange({ zoom: Number(e.target.value) })}
           className="pico-range flex-1"
+          style={rangeFillStyle(photo.zoom, 1, MAX_ZOOM)}
           aria-label="Zoom"
         />
         <button type="button" onClick={() => onChange({ zoom: 1, positionX: 0.5, positionY: 0.5 })} className="text-xs text-text-muted underline hover:text-text">
@@ -561,7 +563,9 @@ export default function PhotoPrintTool({
               </div>
             </div>
             <CropEditor photo={current} template={template} onChange={(patch) => update(editing, patch)} />
-            <div className="mt-4 flex items-center justify-between gap-2">
+            {/* Sur téléphone, « Valider » prend toute la largeur au-dessus des
+                flèches (trois boutons de front n'y tiennent pas). */}
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
               <button
                 type="button"
                 onClick={() => setEditing(Math.max(0, editing - 1))}
@@ -578,7 +582,7 @@ export default function PhotoPrintTool({
                   const nextIndex = photos.findIndex((p, i) => i > editing && !p.reviewed);
                   setEditing(nextIndex >= 0 ? nextIndex : null);
                 }}
-                className="flex items-center gap-1 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-text-on-brand hover:bg-primary-hover"
+                className="order-first flex w-full items-center justify-center gap-1 whitespace-nowrap rounded-lg bg-primary px-4 py-2 text-sm font-medium text-text-on-brand hover:bg-primary-hover sm:order-none sm:w-auto"
               >
                 <CheckIcon className="h-4 w-4" /> Valider le cadrage
               </button>

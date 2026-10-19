@@ -393,6 +393,16 @@ export default function DesignEditor({
   // s'y inscrit au plus grand (voir `fitBox` d'ImageSourcePicker), et suit
   // l'ouverture de la barre de texte, le redimensionnement de la fenêtre…
   const stageRef = useRef<HTMLDivElement>(null);
+  // Sur mobile, la scène prend la hauteur du produit à pleine largeur (au plus
+  // 65 % de l'écran) : une hauteur fixe laissait un grand vide autour d'un
+  // produit large et bas (tasse, dépliant). 32 px : la marge de la colonne ;
+  // les noms des volets prennent une rangée au-dessus (plis verticaux) ou une
+  // colonne à gauche (plis horizontaux).
+  const stageRatio =
+    (template.height_mm + 2 * template.bleed_mm) / Math.max(1, template.width_mm + 2 * template.bleed_mm);
+  const mobileStageHeight = `min(65vh, calc((100vw - ${32 + (fold?.direction === "horizontal" ? 52 : 0)}px) * ${stageRatio.toFixed(4)} + ${
+    fold?.direction === "vertical" ? 40 : 16
+  }px))`;
   const [stageSize, setStageSize] = useState<{ width: number; height: number } | null>(null);
   useEffect(() => {
     const el = stageRef.current;
@@ -641,9 +651,11 @@ export default function DesignEditor({
               type="button"
               onClick={handleReviewClick}
               disabled={!frontReady || !backReady}
-              className="rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-text-on-brand hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
+              className="whitespace-nowrap rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-text-on-brand hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Vérifier et commander
+              {/* Sur téléphone, le libellé court laisse lire le nom du produit. */}
+              <span className="sm:hidden">Vérifier</span>
+              <span className="hidden sm:inline">Vérifier et commander</span>
             </button>
           )}
           </>
@@ -1303,7 +1315,8 @@ export default function DesignEditor({
               page la dépasse et la scène défile. */}
           <div
             ref={stageRef}
-            className="flex h-[65vh] min-h-0 w-full items-center justify-center overflow-auto lg:h-auto lg:flex-1"
+            className="flex h-[var(--stage-h)] min-h-0 w-full items-center justify-center overflow-auto lg:h-auto lg:flex-1"
+            style={{ "--stage-h": mobileStageHeight } as React.CSSProperties}
           >
             <div style={{ zoom: viewZoom }}>
               <ImageSourcePicker
