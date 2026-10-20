@@ -20,8 +20,10 @@ export async function prepareUploadedFile(file: File, pdfPage = 1): Promise<Prep
   const rawBuffer = Buffer.from(await file.arrayBuffer());
   if (file.type === "application/pdf" || isPdfBuffer(rawBuffer)) {
     const buffer = await rasterizePdfPage(rawBuffer, pdfPage);
-    const filename = `${file.name.replace(/\.pdf$/i, "")}.png`;
-    return { buffer, contentType: "image/png", filename };
+    // JPEG quand la page n'était qu'une photo (reprise telle quelle), PNG sinon.
+    const jpeg = buffer[0] === 0xff && buffer[1] === 0xd8;
+    const filename = `${file.name.replace(/\.pdf$/i, "")}.${jpeg ? "jpg" : "png"}`;
+    return { buffer, contentType: jpeg ? "image/jpeg" : "image/png", filename };
   }
   // Photo de téléphone : l'orientation est souvent une simple étiquette EXIF,
   // que le navigateur respecte à l'écran. Sans la redresser ici, le recadrage
