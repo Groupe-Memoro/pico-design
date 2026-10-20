@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
-import { STAGING_BUCKET, encodeStaged } from "@/lib/design/staging";
+import { STAGING_BUCKET, encodeStaged, type StagingBucket } from "@/lib/design/staging";
 
 /**
  * Côté navigateur : avant d'appeler une route de rendu de l'outil de design,
@@ -37,12 +37,13 @@ export async function stageLargeFiles(formData: FormData): Promise<FormData> {
       staged.set(
         file,
         batch.then(async (uploads) => {
-          const { path, token } = uploads[i];
+          // Le serveur choisit le bucket : celui de l'équipe avec une session.
+          const { path, token, bucket = STAGING_BUCKET } = uploads[i];
           const { error } = await createClient()
-            .storage.from(STAGING_BUCKET)
+            .storage.from(bucket)
             .uploadToSignedUrl(path, token, file, { contentType: file.type || "application/octet-stream" });
           if (error) throw new Error(`Envoi de « ${file.name} » impossible : ${error.message}`);
-          return encodeStaged({ path, name: file.name, type: file.type });
+          return encodeStaged({ path, name: file.name, type: file.type, bucket });
         }),
       );
     });
@@ -84,7 +85,10 @@ export function prestageFiles(files: (File | null | undefined)[], templateId: st
   stageLargeFiles(formData).catch(() => {});
 }
 
-async function requestUploads(formData: FormData, files: File[]): Promise<{ path: string; token: string }[]> {
+async function requestUploads(
+  formData: FormData,
+  files: File[],
+): Promise<{ path: string; token: string; bucket?: StagingBucket }[]> {
   const res = await fetch("/api/design/stage", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

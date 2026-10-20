@@ -4,7 +4,7 @@ import { checkRateLimit, tooManyRequests } from "@/lib/rateLimit";
 import { createAdminSupabaseClient, createServerSupabaseClient } from "@/lib/supabase/server";
 import { grantAllows } from "@/lib/publicDesign";
 import { MAX_FILE_BYTES, MAX_TOTAL_BYTES } from "@/lib/uploadLimits";
-import { STAGING_BUCKET } from "@/lib/design/staging";
+import { STAGING_BUCKET, TEAM_STAGING_BUCKET } from "@/lib/design/staging";
 
 export const runtime = "nodejs";
 
@@ -63,13 +63,16 @@ export async function POST(request: Request) {
   }
 
   const day = new Date().toISOString().slice(0, 10);
-  const storage = createAdminSupabaseClient().storage.from(STAGING_BUCKET);
+  // L'équipe dépose ses fichiers d'impression (souvent bien plus de 40 Mo)
+  // dans son propre bucket ; l'outil public garde sa limite.
+  const bucket = user ? TEAM_STAGING_BUCKET : STAGING_BUCKET;
+  const storage = createAdminSupabaseClient().storage.from(bucket);
   const uploads = [];
   for (let i = 0; i < files.length; i++) {
     const path = `${day}/${randomUUID()}`;
     const { data, error } = await storage.createSignedUploadUrl(path);
     if (error || !data) return errorResponse(error?.message ?? "Préparation de l'envoi impossible.", 500);
-    uploads.push({ path, token: data.token });
+    uploads.push({ path, token: data.token, bucket });
   }
   return NextResponse.json({ uploads });
 }

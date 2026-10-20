@@ -14,12 +14,12 @@ export async function hydrateStagedFiles(formData: FormData): Promise<FormData> 
   const entries = Array.from(formData.entries());
   if (!entries.some(([, value]) => decodeStaged(value))) return formData;
 
-  const storage = createAdminSupabaseClient().storage.from(STAGING_BUCKET);
+  const storage = createAdminSupabaseClient().storage;
   const resolved = await Promise.all(
     entries.map(async ([key, value]): Promise<[string, FormDataEntryValue]> => {
       const ref = decodeStaged(value);
       if (!ref) return [key, value];
-      const { data, error } = await storage.download(ref.path);
+      const { data, error } = await storage.from(ref.bucket ?? STAGING_BUCKET).download(ref.path);
       if (error || !data) throw new Error("Un fichier envoyé est introuvable. Réessaie.");
       return [key, new File([await data.arrayBuffer()], ref.name, { type: ref.type || data.type })];
     }),

@@ -6,6 +6,11 @@
  */
 
 export const STAGING_BUCKET = "design-staging";
+// Fichiers de l'équipe (session ouverte), sans la limite de 40 Mo de l'outil
+// public : voir supabase/migrations/0075_design_staging_team.sql.
+export const TEAM_STAGING_BUCKET = "design-staging-team";
+
+export type StagingBucket = typeof STAGING_BUCKET | typeof TEAM_STAGING_BUCKET;
 
 // <AAAA-MM-JJ>/<uuid> : rien d'autre n'est relu, ce qui interdit de faire
 // lire au serveur un fichier qui n'a pas été déposé par ce mécanisme.
@@ -19,6 +24,8 @@ export interface StagedRef {
   path: string;
   name: string;
   type: string;
+  // Absent : le bucket public (les références d'avant ce champ).
+  bucket?: StagingBucket;
 }
 
 export function encodeStaged(ref: StagedRef): string {
@@ -34,6 +41,7 @@ export function decodeStaged(value: unknown): StagedRef | null {
       path: ref.path,
       name: typeof ref.name === "string" ? ref.name : "fichier",
       type: typeof ref.type === "string" ? ref.type : "",
+      bucket: ref.bucket === TEAM_STAGING_BUCKET ? TEAM_STAGING_BUCKET : STAGING_BUCKET,
     };
   } catch {
     return null;
