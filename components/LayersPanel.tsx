@@ -16,7 +16,6 @@ import {
   TrashIcon,
   TypeIcon,
 } from "@/components/icons";
-import { FONT_OPTIONS } from "@/lib/design/fonts";
 import {
   BLEND_MODES,
   STROKE_JOINS,
@@ -29,6 +28,7 @@ import {
 } from "@/lib/design/layers";
 import { rangeFillStyle } from "@/components/ui/rangeFill";
 import type { IllustrationWithUrl } from "@/lib/types";
+import FontSelectOptions from "@/components/FontSelectOptions";
 
 const SHAPE_OPTIONS: { value: ShapeKind; icon: (props: { className?: string }) => JSX.Element; label: string }[] = [
   { value: "rectangle", icon: SquareIcon, label: "Rectangle" },
@@ -340,11 +340,7 @@ export default function LayersPanel({
             onChange={(e) => updateLayer(selectedLayer.id, { fontId: e.target.value })}
             className="w-full rounded-lg border border-border px-2 py-1.5 text-sm"
           >
-            {FONT_OPTIONS.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.label}
-              </option>
-            ))}
+            <FontSelectOptions />
           </select>
 
           <div className="flex items-center gap-3">

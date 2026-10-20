@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { SpinnerIcon } from "@/components/icons";
-import { FONT_OPTIONS } from "@/lib/design/fonts";
 import { ALBUM_FORMATS, type Album, type AlbumSettings } from "@/lib/albums/types";
+import FontSelectOptions from "@/components/FontSelectOptions";
 
 const inputClass = "mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm";
 const labelClass = "block text-sm font-medium";
@@ -56,11 +56,7 @@ export default function AlbumSettingsForm({ album, onSaved }: { album: Album; on
 
   const fontSelect = (value: string, onChange: (v: string) => void) => (
     <select value={value} onChange={(e) => onChange(e.target.value)} className={inputClass}>
-      {FONT_OPTIONS.map((f) => (
-        <option key={f.id} value={f.id}>
-          {f.label}
-        </option>
-      ))}
+      <FontSelectOptions />
     </select>
   );
   const colorField = (label: string, value: string, onChange: (v: string) => void) => (

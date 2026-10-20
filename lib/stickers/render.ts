@@ -4,7 +4,7 @@
 
 import { PDFDocument, rgb, type PDFEmbeddedPage, type PDFImage, type PDFPage } from "pdf-lib";
 import { mmToPt } from "@/lib/pdf/units";
-import { loadInstance } from "@/lib/pdf/textLayer";
+import { loadInstance, preloadFonts } from "@/lib/pdf/textLayer";
 import { fontOptionById } from "@/lib/design/fonts";
 import { detectMarksKind } from "@/lib/imposition/marks";
 import { displayText, fitFontMm, type StickerTemplate, type StickerZone } from "./types";
@@ -105,6 +105,8 @@ export async function renderStickerSheets(
   names: string[],
   layout: StickerSheetLayout
 ): Promise<Buffer> {
+  // Polices Google Fonts des zones, téléchargées avant le rendu.
+  await preloadFonts(template.zones.map((z) => ({ fontId: z.fontId, bold: z.bold })));
   const out = await PDFDocument.create();
   const widthPt = mmToPt(layout.sheetWidth);
   const heightPt = mmToPt(layout.sheetHeight);

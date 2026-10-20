@@ -1,7 +1,7 @@
 // Module Autocollants : modèles de planches et zones de texte. Types et règles
 // pures, partagés entre l'éditeur de modèle (écran) et le rendu PDF (serveur).
 
-import { FONT_OPTIONS } from "@/lib/design/fonts";
+import { FONT_OPTIONS, isKnownFontId } from "@/lib/design/fonts";
 
 export const STICKER_ASSETS = ["artwork", "marks", "guide"] as const;
 export type StickerAsset = (typeof STICKER_ASSETS)[number];
@@ -113,7 +113,6 @@ export function newZone(partial: Partial<StickerZone> = {}): StickerZone {
 export function parseZones(raw: unknown, sheetW: number, sheetH: number): StickerZone[] | null {
   if (!Array.isArray(raw) || raw.length > 500) return null;
   const zones: StickerZone[] = [];
-  const fontIds = new Set(FONT_OPTIONS.map((f) => f.id));
   for (const z of raw as Record<string, unknown>[]) {
     const n = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : NaN);
     const x = n(z.x), y = n(z.y), w = n(z.width), h = n(z.height), max = n(z.maxFontMm);
@@ -123,7 +122,7 @@ export function parseZones(raw: unknown, sheetW: number, sheetH: number): Sticke
     zones.push({
       id: typeof z.id === "string" && z.id.length <= 64 ? z.id : `zone-${zones.length + 1}`,
       x, y, width: w, height: h,
-      fontId: typeof z.fontId === "string" && fontIds.has(z.fontId) ? z.fontId : FONT_OPTIONS[0].id,
+      fontId: isKnownFontId(z.fontId) ? z.fontId : FONT_OPTIONS[0].id,
       bold: z.bold === true,
       uppercase: z.uppercase === true,
       color: typeof z.color === "string" && /^#[0-9a-f]{6}$/i.test(z.color) ? z.color : "#1a1613",

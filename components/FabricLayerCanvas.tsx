@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Canvas, FabricObject } from "fabric";
 import { fontOptionById } from "@/lib/design/fonts";
 import type { DesignLayer } from "@/lib/design/layers";
+import { loadFont } from "@/lib/design/fontLoader";
 
 /**
  * Calques de l'Outil Shopify (texte, image, forme) édités avec Fabric.js —
@@ -162,7 +163,11 @@ export default function FabricLayerCanvas({
   useEffect(() => {
     const loads = layers
       .filter((l): l is Extract<DesignLayer, { type: "text" }> => l.type === "text")
-      .map((l) => document.fonts.load(`${l.italic ? "italic " : ""}${l.bold ? 700 : 400} 32px "${fontOptionById(l.fontId).family}"`));
+      .map((l) => {
+        const f = fontOptionById(l.fontId);
+        // Police Google : sa feuille de style d'abord (voir fontLoader).
+        return loadFont(l.fontId, `${l.italic ? "italic " : ""}${l.bold ? f.weightBold : f.weightRegular} 32px "${f.family}"`);
+      });
     Promise.all(loads).then(() => setFontsTick((t) => t + 1)).catch(() => undefined);
   }, [fontsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -205,7 +210,7 @@ export default function FabricLayerCanvas({
           ...common,
           fontFamily: font.family,
           fontSize,
-          fontWeight: layer.bold ? 700 : 400,
+          fontWeight: layer.bold ? font.weightBold : font.weightRegular,
           fontStyle: layer.italic ? ("italic" as const) : ("normal" as const),
           fill: layer.color,
           lineHeight: 1.25,

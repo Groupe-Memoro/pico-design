@@ -16,6 +16,7 @@ import { foldAxisLength, foldPanels, parseFold } from "@/lib/folds";
 import { SpinnerIcon, UploadIcon } from "@/components/icons";
 import { fontOptionById } from "@/lib/design/fonts";
 import { maxTextSizeMmForTemplate, type DesignLayer, type ImageLayer } from "@/lib/design/layers";
+import { ensureFontCss } from "@/lib/design/fontLoader";
 
 // "mosaic" : mosaïque de plusieurs photos distinctes uploadées (étape « Type
 // de design » de Design Shopify) — à ne pas confondre avec le "tile" de
@@ -1804,6 +1805,9 @@ export default function ImageSourcePicker({
                   // doivent être sur le même élément que la rotation.
                   if (designLayer.type === "text") {
                     const font = fontOptionById(designLayer.fontId);
+                    // Police Google : sa feuille de style (une seule fois) ; le
+                    // navigateur redessine le texte quand elle arrive.
+                    void ensureFontCss(designLayer.fontId);
                     const fontSizePx = designLayer.fontSizeMm * pxPerMm;
                     const strokeWidthPx = designLayer.strokeWidthMm ? designLayer.strokeWidthMm * pxPerMm : 0;
                     const letterSpacingPx = designLayer.letterSpacingMm ? designLayer.letterSpacingMm * pxPerMm : 0;
@@ -1825,7 +1829,7 @@ export default function ImageSourcePicker({
                             fontFamily: font.family,
                             fontSize: fontSizePx,
                             lineHeight: 1.25,
-                            fontWeight: designLayer.bold ? 700 : 400,
+                            fontWeight: designLayer.bold ? font.weightBold : font.weightRegular,
                             fontStyle: designLayer.italic ? "italic" : "normal",
                             color: designLayer.color,
                             textAlign: "center",

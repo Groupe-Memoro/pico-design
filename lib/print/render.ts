@@ -3,6 +3,7 @@ import { PDFDocument, type PDFEmbeddedPage, type PDFImage } from "pdf-lib";
 import { mmToPx } from "../pdf/units";
 import type { LaidOutPage, LayoutElement, PrintGeometry } from "./elements";
 import { drawText, hexToRgb } from "./text";
+import { preloadFonts } from "../pdf/textLayer";
 
 /**
  * PDF d'impression d'un document multipage (album, agenda), à partir de sa
@@ -37,6 +38,10 @@ export async function renderPrintPdf(
   loadFile: (path: string) => Promise<Buffer | null>,
   title: string
 ): Promise<Uint8Array> {
+  // Polices Google Fonts des textes, téléchargées avant le rendu.
+  await preloadFonts(
+    pages.flatMap((p) => p.elements).flatMap((e) => (e.type === "text" ? [{ fontId: e.font, bold: e.bold }] : []))
+  );
   const doc = await PDFDocument.create();
   doc.setTitle(title);
   doc.setCreator("Pico Design");

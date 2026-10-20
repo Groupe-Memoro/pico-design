@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { Template, ThemeSlot, ThemeSlotShape, ThemeTextZone } from "@/lib/types";
 import ThemeTextOverlay from "@/components/ThemeTextOverlay";
-import { FONT_OPTIONS } from "@/lib/design/fonts";
 import { MAX_THEME_TEXT_ZONES, THEME_TEXT_ALIGNS, newThemeTextZone } from "@/lib/themeText";
 import type { ThemeWithOverlayUrl } from "@/components/ThemesTable";
 import { CopyIcon, SpinnerIcon } from "@/components/icons";
@@ -22,6 +21,7 @@ import {
   slotShape,
 } from "@/lib/themeShapes";
 import { templateOptionLabel } from "@/lib/templateLabel";
+import FontSelectOptions from "@/components/FontSelectOptions";
 
 const MIN_RATIO = 0.05;
 
@@ -699,11 +699,7 @@ export default function ThemeForm({
                             onChange={(e) => updateZone(i, { fontId: e.target.value })}
                             className="mt-1 w-full rounded border border-neutral-300 px-2 py-1"
                           >
-                            {FONT_OPTIONS.map((f) => (
-                              <option key={f.id} value={f.id}>
-                                {f.label}
-                              </option>
-                            ))}
+                            <FontSelectOptions />
                           </select>
                         </label>
                         <label className="block">

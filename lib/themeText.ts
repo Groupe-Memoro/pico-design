@@ -1,4 +1,4 @@
-import { FONT_OPTIONS } from "@/lib/design/fonts";
+import { isKnownFontId } from "@/lib/design/fonts";
 import type { ThemeTextAlign, ThemeTextZone } from "@/lib/types";
 
 /**
@@ -53,7 +53,7 @@ export function sanitizeTextZone(raw: unknown, index: number): ThemeTextZone | n
   const heightRatio = clamp(num(r.heightRatio, 0.1), 0.02, 1);
   const color = typeof r.color === "string" && /^#[0-9a-f]{6}$/i.test(r.color) ? r.color : "#000000";
   const align: ThemeTextAlign = r.align === "left" || r.align === "right" ? r.align : "center";
-  const fontId = FONT_OPTIONS.some((f) => f.id === r.fontId) ? (r.fontId as string) : "inter";
+  const fontId = isKnownFontId(r.fontId) ? r.fontId : "inter";
   const text = (v: unknown, max: number) => (typeof v === "string" ? v.slice(0, max) : "");
   return {
     id: text(r.id, 60) || `texte-${index + 1}`,

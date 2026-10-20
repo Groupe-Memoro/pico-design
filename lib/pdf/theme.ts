@@ -2,7 +2,7 @@ import sharp from "sharp";
 import { coverCropToBuffer } from "./crop";
 import type { ThemeSlot, ThemeSlotAdjust, ThemeTextZone } from "../types";
 import { themeZoneText } from "../themeText";
-import { themeTextToSvgGroup } from "./textLayer";
+import { preloadFonts, themeTextToSvgGroup } from "./textLayer";
 import { MAX_THEME_SLOTS, maskSvgSized, sanitizeSlotShape, slotShape, slotSvgShape } from "../themeShapes";
 
 const DEFAULT_ADJUST: ThemeSlotAdjust = { positionX: 0.5, positionY: 0.5, scale: 1 };
@@ -74,6 +74,7 @@ export async function composeThemeImage(
   composites.push({ input: overlayResized, left: 0, top: 0 });
 
   if (text && text.zones.length > 0) {
+    await preloadFonts(text.zones.map((z) => ({ fontId: z.fontId, italic: z.italic, bold: z.bold })));
     const groups = text.zones
       .map((zone, i) => themeTextToSvgGroup(zone, themeZoneText(zone, text.texts[i]), targetWidthPx, targetHeightPx, text.dpi))
       .join("");

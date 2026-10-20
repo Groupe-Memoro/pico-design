@@ -40,7 +40,6 @@ import { rangeFillStyle } from "@/components/ui/rangeFill";
 import FileVisualCard from "@/components/ui/FileVisualCard";
 import LayersPanel from "@/components/LayersPanel";
 import ColorPickerButton from "@/components/ColorPickerButton";
-import { FONT_OPTIONS } from "@/lib/design/fonts";
 import {
   layersFullyCoverCanvas,
   maxTextSizeMmForTemplate,
@@ -49,6 +48,7 @@ import {
   type TextLayer,
 } from "@/lib/design/layers";
 import type { PdfPagePlan } from "@/lib/pdf/pdfPages";
+import FontSelectOptions from "@/components/FontSelectOptions";
 
 // En dessous de ce zoom (voir ImageSourcePicker : 1 = cadrage "cover", pile
 // à la limite), une marge blanche apparaît autour du visuel — il ne couvre
@@ -1285,11 +1285,7 @@ export default function DesignEditor({
                 aria-label="Police"
                 className="rounded-lg border border-border bg-surface px-2 py-1.5 text-sm"
               >
-                {FONT_OPTIONS.map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.label}
-                  </option>
-                ))}
+                <FontSelectOptions />
               </select>
               <input
                 type="number"

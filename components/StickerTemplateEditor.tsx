@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Modal from "@/components/Modal";
 import { CopyIcon, DownloadIcon, SpinnerIcon, TrashIcon } from "@/components/icons";
-import { FONT_OPTIONS, fontOptionById } from "@/lib/design/fonts";
+import { fontOptionById } from "@/lib/design/fonts";
 import { sheetLabel } from "@/lib/imposition/presets";
 import { stickerSheetLayout } from "@/lib/stickers/layout";
 import type { ImpositionCutter, ImpositionSheet } from "@/lib/types";
@@ -21,6 +21,8 @@ import {
   type StickerZone,
   type ZoneRotation,
 } from "@/lib/stickers/types";
+import FontSelectOptions from "@/components/FontSelectOptions";
+import { loadFont } from "@/lib/design/fontLoader";
 
 const ASSET_HELP: Record<StickerAsset, string> = {
   artwork: "La planche du graphiste, sans le nom. Imprimée sous le texte.",
@@ -112,7 +114,7 @@ export default function StickerTemplateEditor({
   useEffect(() => {
     const loads = zones.map((z) => {
       const f = fontOptionById(z.fontId);
-      return document.fonts.load(`${z.bold ? f.weightBold : f.weightRegular} 20px "${f.family}"`);
+      return loadFont(z.fontId, `${z.bold ? f.weightBold : f.weightRegular} 20px "${f.family}"`);
     });
     Promise.all(loads)
       .then(() => setFontsVersion((v) => v + 1))
@@ -672,11 +674,7 @@ export default function StickerTemplateEditor({
                     onChange={(e) => updateZone(selected.id, { fontId: e.target.value })}
                     className={inputClass}
                   >
-                    {FONT_OPTIONS.map((f) => (
-                      <option key={f.id} value={f.id}>
-                        {f.label}
-                      </option>
-                    ))}
+                    <FontSelectOptions />
                   </select>
                 </Field>
                 <div className="grid grid-cols-3 gap-2">

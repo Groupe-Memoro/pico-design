@@ -1,3 +1,5 @@
+import { GOOGLE_FONTS, type GoogleFontEntry } from "./googleFonts";
+
 // Polices proposées par l'outil de calques (texte) de Design Shopify — les
 // 25 polices Google Fonts les plus populaires, libres (SIL Open Font
 // License), fournies avec l'outil (public/fonts/) plutôt que les polices de
@@ -13,6 +15,12 @@
 export interface FontOption {
   id: string;
   label: string;
+  // Police du catalogue Google Fonts (identifiant « g:<famille> ») : pas de
+  // fichier dans public/fonts, elle se charge chez Google — à l'écran par
+  // leur feuille de style, au serveur par téléchargement (lib/pdf/textLayer.ts).
+  google?: boolean;
+  // Graisses disponibles en italique (polices Google) ; vide = pas d'italique.
+  italicWeights?: number[];
   // Nom CSS (@font-face) pour l'aperçu écran.
   family: string;
   // Chemins publics (servis tels quels, et relus depuis le disque côté
@@ -258,8 +266,76 @@ export const FONT_OPTIONS: FontOption[] = [
 
 export const DEFAULT_FONT_ID = "inter";
 
+const CATEGORY_LABELS: Record<string, string> = {
+  s: "Sans-serif",
+  r: "Serif",
+  d: "Décorative",
+  h: "Manuscrite",
+  m: "Chasse fixe",
+};
+
+const GOOGLE_PREFIX = "g:";
+const nearest = (list: number[], target: number) =>
+  list.reduce((best, w) => (Math.abs(w - target) < Math.abs(best - target) ? w : best), list[0]);
+
+function googleOption([family, category, weights, italicWeights]: GoogleFontEntry): FontOption {
+  const list = weights.split(",").map(Number);
+  const regular = nearest(list, 400);
+  const heavier = list.filter((w) => w > regular);
+  return {
+    id: GOOGLE_PREFIX + family,
+    label: `${family} (${CATEGORY_LABELS[category] ?? "Sans-serif"})`,
+    family,
+    regularFile: "",
+    italicFile: null,
+    weightRegular: regular,
+    // Gras : la graisse la plus proche de 700 au-dessus de la normale, sinon
+    // la normale (police à une seule graisse : pas de faux gras).
+    weightBold: heavier.length ? nearest(heavier, 700) : regular,
+    google: true,
+    italicWeights: italicWeights ? italicWeights.split(",").map(Number) : [],
+  };
+}
+
+let googleByFamily: Map<string, GoogleFontEntry> | null = null;
+function googleEntry(family: string): GoogleFontEntry | undefined {
+  googleByFamily ??= new Map(GOOGLE_FONTS.map((e) => [e[0], e]));
+  return googleByFamily.get(family);
+}
+
 export function fontOptionById(id: string): FontOption {
-  return FONT_OPTIONS.find((f) => f.id === id) ?? FONT_OPTIONS[0];
+  const local = FONT_OPTIONS.find((f) => f.id === id);
+  if (local) return local;
+  if (id?.startsWith(GOOGLE_PREFIX)) {
+    const entry = googleEntry(id.slice(GOOGLE_PREFIX.length));
+    if (entry) return googleOption(entry);
+  }
+  return FONT_OPTIONS[0];
+}
+
+// Identifiant reconnu (police fournie ou du catalogue Google).
+export function isKnownFontId(id: unknown): id is string {
+  return typeof id === "string" && fontOptionById(id).id === id;
+}
+
+/**
+ * Choix du sélecteur de police : les 25 polices les plus populaires de
+ * Google Fonts (dans l'ordre de popularité), puis toutes les autres par ordre
+ * alphabétique. Une police déjà fournie (public/fonts) garde son identifiant
+ * d'origine, pour ne rien changer aux designs enregistrés.
+ */
+export function fontPickerGroups(): { label: string; options: FontOption[] }[] {
+  const localByFamily = new Map(FONT_OPTIONS.map((f) => [f.family, f]));
+  const toOption = (entry: GoogleFontEntry) => localByFamily.get(entry[0]) ?? googleOption(entry);
+  const popular = GOOGLE_FONTS.slice(0, 25).map(toOption);
+  const taken = new Set(popular.map((f) => f.id));
+  const others = [...FONT_OPTIONS.filter((f) => !taken.has(f.id)), ...GOOGLE_FONTS.slice(25).filter((e) => !localByFamily.has(e[0])).map(googleOption)]
+    .filter((f) => !taken.has(f.id))
+    .sort((a, b) => a.family.localeCompare(b.family, "fr"));
+  return [
+    { label: "Les plus populaires", options: popular },
+    { label: "Autres polices", options: others },
+  ];
 }
 
 // Fichier à charger pour un style donné : l'italique retombe sur le fichier

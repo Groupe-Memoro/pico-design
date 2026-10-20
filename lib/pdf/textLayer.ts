@@ -3,7 +3,7 @@
 // défaut se contente d'une interop TypeScript (esModuleInterop) qui ne
 // tient pas forcément à l'exécution selon le bundler (vérifié : échoue sous
 // Node/ESM strict, malgré un `tsc` propre).
-import { openSync, type Font } from "fontkit";
+import { create, openSync, type Font } from "fontkit";
 import path from "path";
 import { mmToPx } from "./units";
 import { fontOptionById, resolveFontFile, type FontOption } from "../design/fonts";
@@ -36,7 +36,61 @@ function openFont(publicPath: string): Font {
   return font;
 }
 
+// Polices Google Fonts téléchargées (voir preloadFonts), par famille, graisse
+// et style. `loadInstance` est synchrone : elles doivent être chargées avant.
+const googleFontCache = new Map<string, Font>();
+const googleFontPending = new Map<string, Promise<void>>();
+
+// Graisse et style réellement disponibles pour une police Google.
+function googleVariant(font: FontOption, italic: boolean, bold: boolean): { weight: number; ital: 0 | 1; key: string } {
+  const weight = bold ? font.weightBold : font.weightRegular;
+  const ital = italic && (font.italicWeights?.length ?? 0) > 0 ? 1 : 0;
+  return { weight, ital, key: `${font.family}|${weight}|${ital}` };
+}
+
+/**
+ * Télécharge chez Google les polices du catalogue nécessaires à un rendu, une
+ * seule fois par instance du serveur. Sans navigateur reconnu, Google sert un
+ * fichier TrueType unique, lisible par fontkit. Une police introuvable n'est
+ * pas bloquante : le texte retombe sur Inter (voir loadInstance).
+ */
+export async function preloadFonts(requests: { fontId: string; italic?: boolean; bold?: boolean }[]): Promise<void> {
+  await Promise.all(
+    requests.map(({ fontId, italic = false, bold = false }) => {
+      const font = fontOptionById(fontId);
+      if (!font.google) return Promise.resolve();
+      const { weight, ital, key } = googleVariant(font, italic, bold);
+      if (googleFontCache.has(key)) return Promise.resolve();
+      let pending = googleFontPending.get(key);
+      if (!pending) {
+        pending = (async () => {
+          try {
+            const family = encodeURIComponent(font.family).replace(/%20/g, "+");
+            const css = await (await fetch(`https://fonts.googleapis.com/css2?family=${family}:ital,wght@${ital},${weight}`)).text();
+            const url = css.match(/url\((https:[^)]+)\)/)?.[1];
+            if (!url) throw new Error("adresse du fichier introuvable");
+            const bytes = Buffer.from(await (await fetch(url)).arrayBuffer());
+            googleFontCache.set(key, create(bytes) as Font);
+          } catch (err) {
+            console.warn(`Police Google « ${font.family} » (${weight}${ital ? " italique" : ""}) indisponible :`, err);
+          } finally {
+            googleFontPending.delete(key);
+          }
+        })();
+        googleFontPending.set(key, pending);
+      }
+      return pending;
+    })
+  );
+}
+
 export function loadInstance(font: FontOption, italic: boolean, bold: boolean): Font {
+  if (font.google) {
+    const cached = googleFontCache.get(googleVariant(font, italic, bold).key);
+    if (cached) return cached;
+    // Non chargée (voir preloadFonts) : Inter plutôt qu'un rendu en erreur.
+    return loadInstance(fontOptionById("inter"), italic, bold);
+  }
   const filePath = resolveFontFile(font, italic);
   const weight = bold ? font.weightBold : font.weightRegular;
   const key = `${filePath}:${weight}`;

@@ -1,5 +1,5 @@
 import sharp from "sharp";
-import { textLayerToSvgGroup } from "./textLayer";
+import { preloadFonts, textLayerToSvgGroup } from "./textLayer";
 import { shapeLayerToSvgGroup } from "./shapeLayer";
 import {
   layerImageFieldName,
@@ -46,6 +46,10 @@ export async function compositeLayers(
   dpi: number
 ): Promise<Buffer> {
   if (layers.length === 0) return base;
+  // Polices Google Fonts des calques de texte, téléchargées avant le rendu.
+  await preloadFonts(
+    layers.flatMap((r) => (r.type === "text" ? [{ fontId: r.layer.fontId, italic: r.layer.italic, bold: r.layer.bold }] : []))
+  );
 
   const overlays: sharp.OverlayOptions[] = [];
   for (const resolved of layers) {

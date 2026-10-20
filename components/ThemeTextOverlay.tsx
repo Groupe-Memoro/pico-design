@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { fontOptionById } from "@/lib/design/fonts";
 import { THEME_TEXT_LINE_HEIGHT, fitThemeTextSize, themeZoneText } from "@/lib/themeText";
 import type { ThemeTextZone } from "@/lib/types";
+import { loadFont } from "@/lib/design/fontLoader";
 
 /**
  * Aperçu des zones de texte d'un thème, par-dessus la page affichée
@@ -31,8 +32,8 @@ export default function ThemeTextOverlay({
   const [fontsVersion, setFontsVersion] = useState(0);
   useEffect(() => {
     let cancelled = false;
-    const specs = Array.from(new Set(zones.map((z) => fontSpec(z, 16))));
-    Promise.all(specs.map((s) => document.fonts.load(s).catch(() => null))).then(() => {
+    const specs = Array.from(new Map(zones.map((z) => [fontSpec(z, 16), z.fontId])));
+    Promise.all(specs.map(([spec, fontId]) => loadFont(fontId, spec))).then(() => {
       if (!cancelled) setFontsVersion((v) => v + 1);
     });
     return () => {

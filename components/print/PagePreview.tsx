@@ -2,6 +2,7 @@
 
 import { fontOptionById } from "@/lib/design/fonts";
 import { estimateFitSize, type LaidOutPage, type PrintGeometry } from "@/lib/print/elements";
+import { ensureFontCss } from "@/lib/design/fontLoader";
 
 const PT_TO_MM = 25.4 / 72;
 
@@ -79,6 +80,8 @@ export default function PagePreview({
           );
         }
         const font = fontOptionById(el.font);
+        // Police Google : sa feuille de style (une seule fois).
+        void ensureFontCss(el.font);
         const size = estimateFitSize(el.text, el.w, el.size, el.maxLines);
         return (
           <div
