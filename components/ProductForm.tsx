@@ -347,9 +347,9 @@ export default function ProductForm({
       const formData = buildFormData(name, tId, collectionId);
       let body: FormData = formData;
       try {
-        // Les fichiers de volets passent par le stockage : plusieurs fichiers
-        // dépasseraient vite la limite de 4,5 Mo d'une requête.
-        if (usePanels) body = await stageLargeFiles(formData);
+        // Les fichiers lourds passent par le stockage : Vercel refuse toute
+        // requête de plus de 4,5 Mo (une photo de grand format, des volets).
+        body = await stageLargeFiles(formData);
       } catch (err) {
         setLoading(false);
         setError(err instanceof Error ? err.message : "Envoi des fichiers impossible.");
@@ -404,7 +404,17 @@ export default function ProductForm({
       const templateName = templates.find((t) => t.id === tId)?.name ?? "";
       const productName = name.trim() ? `${name.trim()} — ${templateName}` : templateName;
       const formData = buildFormData(productName, tId, targetCollectionId);
-      const res = await fetch("/api/products", { method: "POST", body: formData });
+      // Même fichier pour tous les modèles : déposé une seule fois dans le
+      // stockage (voir stageLargeFiles), puis seulement référencé.
+      let body: FormData;
+      try {
+        body = await stageLargeFiles(formData);
+      } catch (err) {
+        failures.push(`${templateName} : ${err instanceof Error ? err.message : "envoi du fichier impossible"}`);
+        setCreateProgress((p) => (p ? { done: p.done + 1, total: p.total } : { done: 1, total }));
+        continue;
+      }
+      const res = await fetch("/api/products", { method: "POST", body });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         failures.push(`${templateName} : ${data.error ?? "erreur inconnue"}`);

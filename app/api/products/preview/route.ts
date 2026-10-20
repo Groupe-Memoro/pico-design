@@ -1,3 +1,4 @@
+import sharp from "sharp";
 import { checkRateLimit, tooManyRequests } from "@/lib/rateLimit";
 import { NextResponse } from "next/server";
 import { hydrateStagedFiles } from "@/lib/design/stagedFiles";
@@ -15,6 +16,9 @@ import { parsePositionValue } from "@/lib/pdf/crop";
 import { applyOrientation } from "@/lib/pdf/orientation";
 import { parseThemeSlotAdjustField, themeSlotFilesFromForm } from "@/lib/pdf/theme";
 import type { LogoShape, Template, VisualMode } from "@/lib/types";
+
+// Plus grand côté des images d'aperçu renvoyées à l'écran (écrans haute densité compris).
+const PREVIEW_IMAGE_MAX_PX = 1800;
 
 export const runtime = "nodejs"; // sharp a besoin du runtime Node, pas Edge.
 
@@ -205,6 +209,8 @@ export async function POST(request: Request) {
       themeId,
       themeSlotFiles,
       themeSlotAdjust,
+      // Un aperçu : inutile de composer un visuel de la banque à 300 dpi.
+      maxPx: PREVIEW_IMAGE_MAX_PX,
     });
   } catch (err) {
     const message =
@@ -215,9 +221,16 @@ export async function POST(request: Request) {
   }
 
   if (mode === "background") {
-    return new NextResponse(new Uint8Array(resolved.buffer), {
+    // Réduit à la taille d'affichage : renvoyer l'image d'impression entière
+    // (des dizaines de Mo en grand format) ralentissait chaque réglage.
+    const shown = await sharp(resolved.buffer)
+      .resize(PREVIEW_IMAGE_MAX_PX, PREVIEW_IMAGE_MAX_PX, { fit: "inside", withoutEnlargement: true })
+      .flatten({ background: "#ffffff" })
+      .jpeg({ quality: 85 })
+      .toBuffer();
+    return new NextResponse(new Uint8Array(shown), {
       headers: {
-        "Content-Type": resolved.contentType,
+        "Content-Type": "image/jpeg",
         "Cache-Control": "private, no-store",
       },
     });

@@ -38,6 +38,9 @@ export interface ResolveProductImageInput {
   // attribué au modèle, avec un ou plusieurs emplacements où les photos du client sont
   // recadrées — voir composeThemeImage. Prioritaire sur mosaic/file/visualId.
   themeId?: string | null;
+  // Aperçu à l'écran : plus grand côté voulu, en pixels, pour un visuel de la
+  // banque (plein format ou motif). Absent = résolution d'impression.
+  maxPx?: number;
   themeSlotFiles?: (File | null)[] | null;
   // Ajustement (position/zoom) du client dans chaque emplacement — voir
   // ThemeSlotAdjust/composeThemeImage. Absent/case manquante = cadrage
@@ -205,12 +208,17 @@ export async function resolveProductImage(
 
   const pageWidthMm = template.width_mm + template.bleed_mm * 2;
   const pageHeightMm = template.height_mm + template.bleed_mm * 2;
-  const targetWidthPx = mmToPx(pageWidthMm, template.dpi);
-  const targetHeightPx = mmToPx(pageHeightMm, template.dpi);
+  // Aperçu : composé directement à la taille affichée. À 300 dpi, un
+  // 30 × 40 po ferait plus de 100 millions de pixels pour un aperçu de 900.
+  const fullWidthPx = mmToPx(pageWidthMm, template.dpi);
+  const fullHeightPx = mmToPx(pageHeightMm, template.dpi);
+  const dpi = input.maxPx ? template.dpi * Math.min(1, input.maxPx / Math.max(fullWidthPx, fullHeightPx, 1)) : template.dpi;
+  const targetWidthPx = Math.max(1, mmToPx(pageWidthMm, dpi));
+  const targetHeightPx = Math.max(1, mmToPx(pageHeightMm, dpi));
 
   if (input.visualMode === "tile") {
     const tileSizeMm = input.tileSizeMm ?? 25;
-    const tileWidthPx = Math.max(1, mmToPx(tileSizeMm, template.dpi));
+    const tileWidthPx = Math.max(1, mmToPx(tileSizeMm, dpi));
     const buffer = await composeTiledImage(
       visualBuffer,
       tileWidthPx,

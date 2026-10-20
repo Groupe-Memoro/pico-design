@@ -129,26 +129,20 @@ export async function POST(request: Request) {
   const productId = randomUUID();
   const imagePath = `products/${productId}/source-${resolved.filename}`;
 
-  const { error: uploadError } = await supabase.storage
-    .from("uploads")
-    .upload(imagePath, resolved.buffer, { contentType: resolved.contentType, upsert: true });
-  if (uploadError) {
-    return NextResponse.json({ error: uploadError.message }, { status: 500 });
-  }
-
-  let backImagePath: string | null = null;
-  if (resolvedBack) {
-    backImagePath = `products/${productId}/back-${resolvedBack.filename}`;
-    const { error: backUploadError } = await supabase.storage
+  // Les images sources partent vers le stockage pendant que le PDF se
+  // génère (plus bas) : les deux prennent chacun une à quelques secondes en
+  // grand format.
+  const backImagePath = resolvedBack ? `products/${productId}/back-${resolvedBack.filename}` : null;
+  const uploads = Promise.all([
+    supabase.storage
       .from("uploads")
-      .upload(backImagePath, resolvedBack.buffer, {
-        contentType: resolvedBack.contentType,
-        upsert: true,
-      });
-    if (backUploadError) {
-      return NextResponse.json({ error: backUploadError.message }, { status: 500 });
-    }
-  }
+      .upload(imagePath, resolved.buffer, { contentType: resolved.contentType, upsert: true }),
+    resolvedBack && backImagePath
+      ? supabase.storage
+          .from("uploads")
+          .upload(backImagePath, resolvedBack.buffer, { contentType: resolvedBack.contentType, upsert: true })
+      : Promise.resolve({ error: null }),
+  ]);
 
   const shape: LogoShape = logoShape === "pastille" ? "pastille" : "logo";
   const color = typeof logoColor === "string" && isValidLogoColor(logoColor) ? logoColor : "#000000";
@@ -182,6 +176,11 @@ export async function POST(request: Request) {
     });
   } catch (err) {
     pdfError = err instanceof Error ? err.message : "Erreur lors de la génération du PDF.";
+  }
+
+  const uploadError = (await uploads).find((r) => r.error)?.error;
+  if (uploadError) {
+    return NextResponse.json({ error: uploadError.message }, { status: 500 });
   }
 
   const { data, error } = await supabase
