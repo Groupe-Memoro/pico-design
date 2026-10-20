@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { fontOptionById } from "@/lib/design/fonts";
-import { MAX_THEME_TEXT_LENGTH, THEME_TEXT_LINE_HEIGHT, fitThemeTextSize, themeZoneText } from "@/lib/themeText";
+import { MAX_THEME_TEXT_LENGTH, THEME_TEXT_LINE_HEIGHT, fitThemeTextSize, themeTextBlockTop, themeZoneText } from "@/lib/themeText";
 import type { ThemeTextZone } from "@/lib/types";
 import { loadFont } from "@/lib/design/fontLoader";
 
@@ -72,7 +72,9 @@ export default function ThemeTextOverlay({
         return (
           <div
             key={zone.id}
-            className="pointer-events-none absolute flex flex-col justify-center"
+            className={`pointer-events-none absolute flex flex-col ${
+              zone.verticalAlign === "top" ? "justify-start" : zone.verticalAlign === "bottom" ? "justify-end" : "justify-center"
+            }`}
             style={{
               left: (zone.positionX - zone.widthRatio / 2) * boxWidth,
               top: (zone.positionY - zone.heightRatio / 2) * boxHeight,
@@ -87,6 +89,9 @@ export default function ThemeTextOverlay({
               fontSize: size,
               lineHeight: THEME_TEXT_LINE_HEIGHT,
               whiteSpace: "pre",
+              // Le navigateur ajusterait le dessin des polices à « taille
+              // optique » selon la taille affichée ; le serveur ne le fait pas.
+              fontOpticalSizing: "none",
             }}
           >
             {lines.map((line, li) => (
@@ -138,6 +143,8 @@ function EditableZone({
     textAlign: zone.align,
     textTransform: zone.uppercase ? "uppercase" : "none",
     caretColor: zone.color,
+    // Même dessin qu'au serveur (voir le rendu en lecture plus haut).
+    fontOpticalSizing: "none",
   };
   const max = zone.maxChars > 0 ? zone.maxChars : MAX_THEME_TEXT_LENGTH;
   return (
@@ -167,8 +174,8 @@ function EditableZone({
             className="absolute inset-0 resize-none overflow-hidden border-0 bg-transparent p-0 outline-none"
             style={{
               ...textStyle,
-              // Bloc centré verticalement, comme le rendu.
-              paddingTop: Math.max(0, (boxH - lines.length * size * THEME_TEXT_LINE_HEIGHT) / 2),
+              // Bloc placé dans la hauteur comme au rendu (haut, milieu, bas).
+              paddingTop: Math.max(0, themeTextBlockTop(zone, 0, boxH, lines.length * size * THEME_TEXT_LINE_HEIGHT)),
               whiteSpace: "pre",
             }}
           />
@@ -180,8 +187,13 @@ function EditableZone({
             onChange={(e) => edit.onChange(index, e.target.value)}
             onBlur={edit.onEnd}
             onKeyDown={(e) => (e.key === "Enter" || e.key === "Escape") && e.currentTarget.blur()}
-            className="absolute inset-0 h-full w-full border-0 bg-transparent p-0 outline-none"
-            style={textStyle}
+            className="absolute left-0 w-full border-0 bg-transparent p-0 outline-none"
+            // Une ligne, à la hauteur où le rendu la pose.
+            style={{
+              ...textStyle,
+              height: size * THEME_TEXT_LINE_HEIGHT,
+              top: themeTextBlockTop(zone, 0, boxH, size * THEME_TEXT_LINE_HEIGHT),
+            }}
           />
         ))}
     </div>

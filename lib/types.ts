@@ -108,6 +108,7 @@ export interface ThemeSlot {
 // écrit son texte. La taille de police est un maximum : un texte trop long
 // rapetisse pour tenir dans la zone (voir fitThemeTextSize).
 export type ThemeTextAlign = "left" | "center" | "right";
+export type ThemeTextVerticalAlign = "top" | "middle" | "bottom";
 export interface ThemeTextZone {
   id: string;
   // Ce qu'on demande au client (« Nom de l'élève »).
@@ -124,6 +125,8 @@ export interface ThemeTextZone {
   italic: boolean;
   color: string;
   align: ThemeTextAlign;
+  // Position du bloc de texte dans la hauteur de la zone. Absent = milieu.
+  verticalAlign?: ThemeTextVerticalAlign;
   // Nombre de caractères permis (0 = sans limite) et retours à la ligne.
   maxChars: number;
   multiline: boolean;

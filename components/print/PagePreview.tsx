@@ -90,6 +90,8 @@ export default function PagePreview({
               ...box(el.x, el.y, el.w, el.h),
               fontFamily: `"${font.family}"`,
               fontWeight: el.bold ? font.weightBold : font.weightRegular,
+              // Même dessin qu'à l'impression (pas de « taille optique » auto).
+              fontOpticalSizing: "none",
               fontSize: cqw(size * PT_TO_MM),
               lineHeight: 1.25,
               color: el.color,

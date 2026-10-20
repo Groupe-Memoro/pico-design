@@ -1,6 +1,6 @@
 import { isKnownFontId } from "@/lib/design/fonts";
 import { normalizeRotation } from "@/lib/themeShapes";
-import type { ThemeTextAlign, ThemeTextZone } from "@/lib/types";
+import type { ThemeTextAlign, ThemeTextVerticalAlign, ThemeTextZone } from "@/lib/types";
 
 /**
  * Zones de texte des thèmes : règles communes à l'éditeur de thème, à l'outil
@@ -19,6 +19,20 @@ export const THEME_TEXT_ALIGNS: { value: ThemeTextAlign; label: string }[] = [
   { value: "center", label: "Centre" },
   { value: "right", label: "Droite" },
 ];
+
+export const THEME_TEXT_VERTICAL_ALIGNS: { value: ThemeTextVerticalAlign; label: string }[] = [
+  { value: "top", label: "Haut" },
+  { value: "middle", label: "Milieu" },
+  { value: "bottom", label: "Bas" },
+];
+
+// Haut du bloc de texte (px) dans une zone de `boxTop`/`boxHeight`, pour un
+// bloc de `blockHeight` : même calcul à l'écran et au serveur.
+export function themeTextBlockTop(zone: ThemeTextZone, boxTop: number, boxHeight: number, blockHeight: number): number {
+  if (zone.verticalAlign === "top") return boxTop;
+  if (zone.verticalAlign === "bottom") return boxTop + boxHeight - blockHeight;
+  return boxTop + (boxHeight - blockHeight) / 2;
+}
 
 let zoneCounter = 0;
 export function newThemeTextZone(index: number): ThemeTextZone {
@@ -70,6 +84,7 @@ export function sanitizeTextZone(raw: unknown, index: number): ThemeTextZone | n
     italic: r.italic === true,
     color,
     align,
+    verticalAlign: r.verticalAlign === "top" || r.verticalAlign === "bottom" ? r.verticalAlign : "middle",
     maxChars: clamp(Math.round(num(r.maxChars, 0)), 0, MAX_THEME_TEXT_LENGTH),
     multiline: r.multiline === true,
     uppercase: r.uppercase === true,

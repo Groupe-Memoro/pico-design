@@ -28,7 +28,7 @@ import {
 } from "@/lib/design/layers";
 import { rangeFillStyle } from "@/components/ui/rangeFill";
 import type { IllustrationWithUrl } from "@/lib/types";
-import FontSelectOptions from "@/components/FontSelectOptions";
+import FontPicker from "@/components/FontPicker";
 
 const SHAPE_OPTIONS: { value: ShapeKind; icon: (props: { className?: string }) => JSX.Element; label: string }[] = [
   { value: "rectangle", icon: SquareIcon, label: "Rectangle" },
@@ -335,13 +335,11 @@ export default function LayersPanel({
             placeholder="Ton texte"
           />
 
-          <select
+          <FontPicker
             value={selectedLayer.fontId}
-            onChange={(e) => updateLayer(selectedLayer.id, { fontId: e.target.value })}
+            onChange={(fontId) => updateLayer(selectedLayer.id, { fontId })}
             className="w-full rounded-lg border border-border px-2 py-1.5 text-sm"
-          >
-            <FontSelectOptions />
-          </select>
+          />
 
           <div className="flex items-center gap-3">
             <span className="text-xs text-text-subtle">Taille</span>

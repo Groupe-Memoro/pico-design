@@ -1867,6 +1867,8 @@ export default function ImageSourcePicker({
                             fontSize: fontSizePx,
                             lineHeight: 1.25,
                             fontWeight: designLayer.bold ? font.weightBold : font.weightRegular,
+                            // Même dessin qu'à l'impression (pas de « taille optique » auto).
+                            fontOpticalSizing: "none",
                             fontStyle: designLayer.italic ? "italic" : "normal",
                             color: designLayer.color,
                             textAlign: "center",

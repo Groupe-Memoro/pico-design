@@ -9,7 +9,7 @@ import { mmToPx } from "./units";
 import { fontOptionById, resolveFontFile, type FontOption } from "../design/fonts";
 import type { TextLayer } from "../design/layers";
 import type { ThemeTextZone } from "../types";
-import { THEME_TEXT_LINE_HEIGHT, fitThemeTextSize } from "../themeText";
+import { THEME_TEXT_LINE_HEIGHT, fitThemeTextSize, themeTextBlockTop } from "../themeText";
 
 // Rendu du texte en contours de glyphes (chemins SVG), via `fontkit` — pas
 // de police "installée" à trouver sur le serveur (fontconfig, dans le sharp
@@ -240,7 +240,7 @@ export function themeTextToSvgGroup(
   // le navigateur centre dans l'interligne, l'aperçu tombe donc au même endroit.
   const contentPx = ((instance.ascent - instance.descent) / instance.unitsPerEm) * sizePx;
   const boxLeft = zone.positionX * targetWidthPx - boxW / 2;
-  const blockTop = zone.positionY * targetHeightPx - (lineHeightPx * lines.length) / 2;
+  const blockTop = themeTextBlockTop(zone, zone.positionY * targetHeightPx - boxH / 2, boxH, lineHeightPx * lines.length);
   const groups = lines
     .map((line, i) => {
       const x = zone.align === "left" ? boxLeft : zone.align === "right" ? boxLeft + boxW - line.widthPx : boxLeft + (boxW - line.widthPx) / 2;

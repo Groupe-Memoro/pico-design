@@ -48,7 +48,7 @@ import {
   type TextLayer,
 } from "@/lib/design/layers";
 import type { PdfPagePlan } from "@/lib/pdf/pdfPages";
-import FontSelectOptions from "@/components/FontSelectOptions";
+import FontPicker from "@/components/FontPicker";
 
 // En dessous de ce zoom (voir ImageSourcePicker : 1 = cadrage "cover", pile
 // à la limite), une marge blanche apparaît autour du visuel — il ne couvre
@@ -1279,14 +1279,11 @@ export default function DesignEditor({
         <div className="flex min-h-0 flex-1 flex-col items-center gap-3 overflow-y-auto p-4">
           {selectedLayer?.type === "text" && (
             <div className="flex flex-wrap items-center gap-1 rounded-xl border border-border bg-surface p-1.5 shadow">
-              <select
+              <FontPicker
                 value={selectedLayer.fontId}
-                onChange={(e) => updateTextLayer({ fontId: e.target.value })}
-                aria-label="Police"
-                className="rounded-lg border border-border bg-surface px-2 py-1.5 text-sm"
-              >
-                <FontSelectOptions />
-              </select>
+                onChange={(fontId) => updateTextLayer({ fontId })}
+                className="w-44 rounded-lg border border-border bg-surface px-2 py-1.5 text-sm"
+              />
               <input
                 type="number"
                 min={3}

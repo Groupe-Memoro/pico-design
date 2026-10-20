@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { SpinnerIcon } from "@/components/icons";
 import { AGENDA_FORMATS, type Agenda, type AgendaSettings } from "@/lib/agendas/types";
-import FontSelectOptions from "@/components/FontSelectOptions";
+import FontPicker from "@/components/FontPicker";
 
 const inputClass = "mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm";
 const labelClass = "block text-sm font-medium";
@@ -58,9 +58,7 @@ export default function AgendaSettingsForm({ agenda, onSaved }: { agenda: Agenda
   }
 
   const fontSelect = (value: string, onChange: (v: string) => void) => (
-    <select value={value} onChange={(e) => onChange(e.target.value)} className={inputClass}>
-      <FontSelectOptions />
-    </select>
+    <FontPicker value={value} onChange={onChange} className={inputClass} />
   );
   const colorField = (label: string, value: string, onChange: (v: string) => void) => (
     <div>

@@ -21,7 +21,7 @@ import {
   type StickerZone,
   type ZoneRotation,
 } from "@/lib/stickers/types";
-import FontSelectOptions from "@/components/FontSelectOptions";
+import FontPicker from "@/components/FontPicker";
 import { loadFont } from "@/lib/design/fontLoader";
 
 const ASSET_HELP: Record<StickerAsset, string> = {
@@ -669,13 +669,11 @@ export default function StickerTemplateEditor({
                   ))}
                 </div>
                 <Field label="Police">
-                  <select
+                  <FontPicker
                     value={selected.fontId}
-                    onChange={(e) => updateZone(selected.id, { fontId: e.target.value })}
+                    onChange={(fontId) => updateZone(selected.id, { fontId })}
                     className={inputClass}
-                  >
-                    <FontSelectOptions />
-                  </select>
+                  />
                 </Field>
                 <div className="grid grid-cols-3 gap-2">
                   <Field label="Couleur">

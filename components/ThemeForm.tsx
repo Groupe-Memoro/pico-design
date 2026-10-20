@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Template, ThemeSlot, ThemeSlotShape, ThemeTextZone } from "@/lib/types";
 import ThemeTextOverlay from "@/components/ThemeTextOverlay";
-import { MAX_THEME_TEXT_ZONES, THEME_TEXT_ALIGNS, newThemeTextZone } from "@/lib/themeText";
+import { MAX_THEME_TEXT_ZONES, THEME_TEXT_ALIGNS, THEME_TEXT_VERTICAL_ALIGNS, newThemeTextZone } from "@/lib/themeText";
 import type { ThemeWithOverlayUrl } from "@/components/ThemesTable";
 import { CopyIcon, SpinnerIcon } from "@/components/icons";
 import FileDropZone from "@/components/FileDropZone";
@@ -22,7 +22,7 @@ import {
   slotShape,
 } from "@/lib/themeShapes";
 import { templateOptionLabel } from "@/lib/templateLabel";
-import FontSelectOptions from "@/components/FontSelectOptions";
+import FontPicker from "@/components/FontPicker";
 
 const MIN_RATIO = 0.05;
 
@@ -750,13 +750,11 @@ export default function ThemeForm({
                       <div className="grid grid-cols-2 gap-2">
                         <label className="block">
                           <span className="text-neutral-600">Police</span>
-                          <select
+                          <FontPicker
                             value={zone.fontId}
-                            onChange={(e) => updateZone(i, { fontId: e.target.value })}
-                            className="mt-1 w-full rounded border border-neutral-300 px-2 py-1"
-                          >
-                            <FontSelectOptions />
-                          </select>
+                            onChange={(fontId) => updateZone(i, { fontId })}
+                            className="mt-1 w-full rounded border border-neutral-300 bg-white px-2 py-1"
+                          />
                         </label>
                         <label className="block">
                           <span className="text-neutral-600">Taille max. (mm)</span>
@@ -789,6 +787,18 @@ export default function ThemeForm({
                           className="h-7 w-10 cursor-pointer rounded border border-neutral-300"
                           aria-label="Couleur"
                         />
+                        <div className="flex overflow-hidden rounded-lg border border-neutral-300" title="Alignement vertical dans la zone">
+                          {THEME_TEXT_VERTICAL_ALIGNS.map((a) => (
+                            <button
+                              key={a.value}
+                              type="button"
+                              onClick={() => updateZone(i, { verticalAlign: a.value })}
+                              className={`px-2 py-1 ${(zone.verticalAlign ?? "middle") === a.value ? "bg-emerald-600 text-white" : "bg-white text-neutral-700 hover:bg-neutral-50"}`}
+                            >
+                              {a.label}
+                            </button>
+                          ))}
+                        </div>
                         <div className="flex overflow-hidden rounded-lg border border-neutral-300">
                           {THEME_TEXT_ALIGNS.map((a) => (
                             <button
