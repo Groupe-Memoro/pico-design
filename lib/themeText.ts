@@ -1,4 +1,5 @@
 import { isKnownFontId } from "@/lib/design/fonts";
+import { normalizeRotation } from "@/lib/themeShapes";
 import type { ThemeTextAlign, ThemeTextZone } from "@/lib/types";
 
 /**
@@ -72,6 +73,7 @@ export function sanitizeTextZone(raw: unknown, index: number): ThemeTextZone | n
     maxChars: clamp(Math.round(num(r.maxChars, 0)), 0, MAX_THEME_TEXT_LENGTH),
     multiline: r.multiline === true,
     uppercase: r.uppercase === true,
+    rotationDeg: normalizeRotation(r.rotationDeg),
   };
 }
 

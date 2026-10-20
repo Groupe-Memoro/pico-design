@@ -3,7 +3,7 @@ import { coverCropToBuffer } from "./crop";
 import type { ThemeSlot, ThemeSlotAdjust, ThemeTextZone } from "../types";
 import { themeZoneText } from "../themeText";
 import { preloadFonts, themeTextToSvgGroup } from "./textLayer";
-import { MAX_THEME_SLOTS, maskSvgSized, sanitizeSlotShape, slotShape, slotSvgShape } from "../themeShapes";
+import { MAX_THEME_SLOTS, maskSvgSized, normalizeRotation, sanitizeSlotShape, slotShape, slotSvgShape } from "../themeShapes";
 
 const DEFAULT_ADJUST: ThemeSlotAdjust = { positionX: 0.5, positionY: 0.5, scale: 1 };
 
@@ -64,7 +64,32 @@ export async function composeThemeImage(
     const left = Math.min(Math.max(0, rawLeft), targetWidthPx - widthPx);
     const top = Math.min(Math.max(0, rawTop), targetHeightPx - heightPx);
     const cropped = await coverCropToBuffer(file, widthPx, heightPx, adjust.positionX, adjust.positionY, adjust.scale);
-    composites.push({ input: await cutToShape(cropped, slot, widthPx, heightPx), left, top });
+    const shaped = await cutToShape(cropped, slot, widthPx, heightPx);
+    const rotation = slot.rotationDeg ?? 0;
+    if (!rotation) {
+      composites.push({ input: shaped, left, top });
+      continue;
+    }
+    // Emplacement tourné : la photo découpée tourne autour du centre de
+    // l'emplacement (coins transparents), et seule la partie dans la page
+    // est gardée — sharp refuse une image qui déborderait du fond.
+    const { data, info } = await sharp(shaped)
+      .ensureAlpha()
+      .rotate(rotation, { background: { r: 0, g: 0, b: 0, alpha: 0 } })
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    const rotLeft = Math.round(slot.positionX * targetWidthPx - info.width / 2);
+    const rotTop = Math.round(slot.positionY * targetHeightPx - info.height / 2);
+    const cropLeft = Math.max(0, -rotLeft);
+    const cropTop = Math.max(0, -rotTop);
+    const visibleW = Math.min(info.width - cropLeft, targetWidthPx - Math.max(0, rotLeft));
+    const visibleH = Math.min(info.height - cropTop, targetHeightPx - Math.max(0, rotTop));
+    if (visibleW <= 0 || visibleH <= 0) continue;
+    const visible = await sharp(data, { raw: { width: info.width, height: info.height, channels: info.channels } })
+      .extract({ left: cropLeft, top: cropTop, width: visibleW, height: visibleH })
+      .png({ compressionLevel: 0 })
+      .toBuffer();
+    composites.push({ input: visible, left: Math.max(0, rotLeft), top: Math.max(0, rotTop) });
   }
 
   const overlayResized = await sharp(overlayImage)
@@ -148,7 +173,10 @@ export function parseThemeSlotsField(raw: FormDataEntryValue | null): ThemeSlot[
       heightRatio: Number(s?.heightRatio),
     }));
     if (slots.some((s) => Object.values(s).some((n) => !Number.isFinite(n)))) return null;
-    return slots.map((s, i): ThemeSlot => ({ ...s, ...sanitizeSlotShape(parsed[i] ?? {}) }));
+    return slots.map((s, i): ThemeSlot => {
+      const rotationDeg = normalizeRotation(parsed[i]?.rotationDeg);
+      return { ...s, ...sanitizeSlotShape(parsed[i] ?? {}), ...(rotationDeg ? { rotationDeg } : {}) };
+    });
   } catch {
     return null;
   }

@@ -249,5 +249,7 @@ export function themeTextToSvgGroup(
       return `<g transform="translate(${x} ${baseline})">${line.paths}</g>`;
     })
     .join("");
-  return `<g fill="${zone.color}">${groups}</g>`;
+  const rotation = zone.rotationDeg ?? 0;
+  const rotate = rotation ? ` transform="rotate(${rotation} ${zone.positionX * targetWidthPx} ${zone.positionY * targetHeightPx})"` : "";
+  return `<g fill="${zone.color}"${rotate}>${groups}</g>`;
 }

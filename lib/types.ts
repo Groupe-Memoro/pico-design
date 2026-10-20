@@ -98,6 +98,9 @@ export interface ThemeSlot {
   points?: ThemeSlotPoint[];
   // Masque SVG (forme "svg"), déjà nettoyé : voir sanitizeMaskSvg.
   maskSvg?: string;
+  // Rotation de l'emplacement autour de son centre, en degrés (sens horaire).
+  // Absent = 0. La photo tourne avec lui.
+  rotationDeg?: number;
 }
 
 // Zone de texte d'un thème : un rectangle de la page (centre et taille en
@@ -125,6 +128,8 @@ export interface ThemeTextZone {
   maxChars: number;
   multiline: boolean;
   uppercase: boolean;
+  // Rotation de la zone autour de son centre, en degrés (sens horaire).
+  rotationDeg?: number;
 }
 
 // Ajustement (position/zoom) apporté par le CLIENT à la photo d'un

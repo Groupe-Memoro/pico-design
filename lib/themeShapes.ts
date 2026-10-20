@@ -154,6 +154,14 @@ export function sanitizeSlotShape(raw: { shape?: unknown; points?: unknown; mask
   return {};
 }
 
+// Angle ramené entre -180 et 180 degrés (0 si illisible), au dixième près.
+export function normalizeRotation(raw: unknown): number {
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return 0;
+  const a = ((((n + 180) % 360) + 360) % 360) - 180;
+  return Math.round(a * 10) / 10;
+}
+
 function clamp01(n: number): number {
   return Math.min(1, Math.max(0, n));
 }

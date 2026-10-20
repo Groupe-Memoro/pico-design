@@ -18,6 +18,7 @@ import {
   slotMaskStyle,
   sanitizeMaskSvg,
   maskSvgAspect,
+  normalizeRotation,
   slotShape,
 } from "@/lib/themeShapes";
 import { templateOptionLabel } from "@/lib/templateLabel";
@@ -165,7 +166,7 @@ export default function ThemeForm({
 
   const dragRef = useRef<{
     index: number;
-    mode: "move" | "resize" | "vertex";
+    mode: "move" | "resize" | "vertex" | "rotate";
     // Sommet déplacé (mode "vertex", polygone seulement).
     pointIndex?: number;
     startX: number;
@@ -173,11 +174,34 @@ export default function ThemeForm({
     startSlot: ThemeSlot;
   } | null>(null);
 
+  // Mouvement du pointeur (px) ramené dans le repère d'un cadre tourné de
+  // `rotationDeg`, en fractions de la page.
+  function localDelta(dxPx: number, dyPx: number, rotationDeg: number): [number, number] {
+    const a = (rotationDeg * Math.PI) / 180;
+    const lx = dxPx * Math.cos(a) + dyPx * Math.sin(a);
+    const ly = -dxPx * Math.sin(a) + dyPx * Math.cos(a);
+    return [lx / boxSize.width, ly / boxSize.height];
+  }
+
+  // Angle (degrés) du pointeur autour du centre d'un cadre, poignée en haut =
+  // 0°. Au degré près ; par 15° avec Maj ; aimanté à 0, ±90 et 180.
+  function pointerAngle(e: React.PointerEvent, centerX: number, centerY: number): number | null {
+    const rect = previewBoxRef.current?.getBoundingClientRect();
+    if (!rect) return null;
+    const cx = rect.left + centerX * rect.width;
+    const cy = rect.top + centerY * rect.height;
+    let angle = (Math.atan2(e.clientY - cy, e.clientX - cx) * 180) / Math.PI + 90;
+    angle = ((((angle + 180) % 360) + 360) % 360) - 180;
+    if (e.shiftKey) return Math.round(angle / 15) * 15;
+    for (const snap of [-180, -90, 0, 90, 180]) if (Math.abs(angle - snap) < 3) return snap === -180 ? 180 : snap;
+    return Math.round(angle);
+  }
+
   function updateSlot(index: number, patch: Partial<ThemeSlot>) {
     setSlots((prev) => prev.map((s, i) => (i === index ? clampSlot({ ...s, ...patch }) : s)));
   }
 
-  function beginDrag(e: React.PointerEvent<HTMLDivElement>, index: number, mode: "move" | "resize" | "vertex", pointIndex?: number) {
+  function beginDrag(e: React.PointerEvent<HTMLDivElement>, index: number, mode: "move" | "resize" | "vertex" | "rotate", pointIndex?: number) {
     e.stopPropagation();
     dragRef.current = { index, mode, pointIndex, startX: e.clientX, startY: e.clientY, startSlot: slots[index] };
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -186,8 +210,17 @@ export default function ThemeForm({
   function handleDragMove(e: React.PointerEvent<HTMLDivElement>) {
     const d = dragRef.current;
     if (!d || boxSize.width === 0 || boxSize.height === 0) return;
-    const dx = (e.clientX - d.startX) / boxSize.width;
-    const dy = (e.clientY - d.startY) / boxSize.height;
+    if (d.mode === "rotate") {
+      const angle = pointerAngle(e, d.startSlot.positionX, d.startSlot.positionY);
+      if (angle !== null) updateSlot(d.index, { rotationDeg: angle });
+      return;
+    }
+    // Emplacement tourné : redimensionner et déplacer un sommet se font dans
+    // son propre repère (le mouvement du pointeur y est ramené).
+    const [dx, dy] =
+      d.mode === "move"
+        ? [(e.clientX - d.startX) / boxSize.width, (e.clientY - d.startY) / boxSize.height]
+        : localDelta(e.clientX - d.startX, e.clientY - d.startY, d.startSlot.rotationDeg ?? 0);
     if (d.mode === "vertex") {
       // Sommet en ratios du rectangle de l'emplacement, borné à celui-ci.
       const points = d.startSlot.points ?? [];
@@ -212,7 +245,7 @@ export default function ThemeForm({
 
   // Zones de texte : même glisser que les emplacements (déplacer, poignée de
   // coin pour la taille), bornées à la page.
-  const zoneDragRef = useRef<{ index: number; mode: "move" | "resize"; startX: number; startY: number; start: ThemeTextZone } | null>(null);
+  const zoneDragRef = useRef<{ index: number; mode: "move" | "resize" | "rotate"; startX: number; startY: number; start: ThemeTextZone } | null>(null);
 
   function updateZone(index: number, patch: Partial<ThemeTextZone>) {
     setTextZones((prev) =>
@@ -232,7 +265,7 @@ export default function ThemeForm({
     );
   }
 
-  function beginZoneDrag(e: React.PointerEvent<HTMLDivElement>, index: number, mode: "move" | "resize") {
+  function beginZoneDrag(e: React.PointerEvent<HTMLDivElement>, index: number, mode: "move" | "resize" | "rotate") {
     e.stopPropagation();
     setSelectedZone(index);
     zoneDragRef.current = { index, mode, startX: e.clientX, startY: e.clientY, start: textZones[index] };
@@ -242,17 +275,29 @@ export default function ThemeForm({
   function handleZoneDragMove(e: React.PointerEvent<HTMLDivElement>) {
     const d = zoneDragRef.current;
     if (!d || boxSize.width === 0 || boxSize.height === 0) return;
-    const dx = (e.clientX - d.startX) / boxSize.width;
-    const dy = (e.clientY - d.startY) / boxSize.height;
-    if (d.mode === "move") updateZone(d.index, { positionX: d.start.positionX + dx, positionY: d.start.positionY + dy });
-    // Coin bas-droit : le coin haut-gauche reste en place.
-    else
-      updateZone(d.index, {
-        widthRatio: d.start.widthRatio + dx,
-        heightRatio: d.start.heightRatio + dy,
-        positionX: d.start.positionX + dx / 2,
-        positionY: d.start.positionY + dy / 2,
-      });
+    if (d.mode === "rotate") {
+      const angle = pointerAngle(e, d.start.positionX, d.start.positionY);
+      if (angle !== null) updateZone(d.index, { rotationDeg: angle });
+      return;
+    }
+    const rawX = e.clientX - d.startX;
+    const rawY = e.clientY - d.startY;
+    if (d.mode === "move") {
+      updateZone(d.index, { positionX: d.start.positionX + rawX / boxSize.width, positionY: d.start.positionY + rawY / boxSize.height });
+      return;
+    }
+    // Coin bas-droit : le coin opposé reste en place, dans le repère de la
+    // zone (tournée ou non) — le centre avance de la moitié du mouvement.
+    const [lx, ly] = localDelta(rawX, rawY, d.start.rotationDeg ?? 0);
+    const a = ((d.start.rotationDeg ?? 0) * Math.PI) / 180;
+    const halfX = (lx * boxSize.width) / 2;
+    const halfY = (ly * boxSize.height) / 2;
+    updateZone(d.index, {
+      widthRatio: d.start.widthRatio + lx,
+      heightRatio: d.start.heightRatio + ly,
+      positionX: d.start.positionX + (halfX * Math.cos(a) - halfY * Math.sin(a)) / boxSize.width,
+      positionY: d.start.positionY + (halfX * Math.sin(a) + halfY * Math.cos(a)) / boxSize.height,
+    });
   }
 
   function endZoneDrag() {
@@ -603,6 +648,17 @@ export default function ThemeForm({
                   >
                     ✎ Tracer
                   </button>
+                  <label className="flex items-center gap-1 text-neutral-600" title="Rotation en degrés (poignée ronde au-dessus de l'emplacement)">
+                    ↻
+                    <input
+                      type="number"
+                      step="any"
+                      value={slot.rotationDeg ?? 0}
+                      onChange={(e) => updateSlot(i, { rotationDeg: normalizeRotation(e.target.value) })}
+                      className="w-16 rounded border border-neutral-300 px-2 py-1"
+                    />
+                    °
+                  </label>
                   {slotShape(slot) === "svg" && (
                     <button
                       type="button"
@@ -714,6 +770,17 @@ export default function ThemeForm({
                           />
                         </label>
                       </div>
+                      <label className="flex items-center gap-1.5 text-neutral-600">
+                        Rotation
+                        <input
+                          type="number"
+                          step="any"
+                          value={zone.rotationDeg ?? 0}
+                          onChange={(e) => updateZone(i, { rotationDeg: normalizeRotation(e.target.value) })}
+                          className="w-16 rounded border border-neutral-300 px-2 py-1"
+                        />
+                        °
+                      </label>
                       <div className="flex flex-wrap items-center gap-2">
                         <input
                           type="color"
@@ -879,6 +946,7 @@ export default function ThemeForm({
                   top: `${(slot.positionY - slot.heightRatio / 2) * 100}%`,
                   width: `${slot.widthRatio * 100}%`,
                   height: `${slot.heightRatio * 100}%`,
+                  transform: slot.rotationDeg ? `rotate(${slot.rotationDeg}deg)` : undefined,
                 }}
               >
                 {/* Cercle ou polygone : la forme remplie (là où ira la photo)
@@ -915,8 +983,15 @@ export default function ThemeForm({
                   top: `${(slot.positionY - slot.heightRatio / 2) * 100}%`,
                   width: `${slot.widthRatio * 100}%`,
                   height: `${slot.heightRatio * 100}%`,
+                  transform: slot.rotationDeg ? `rotate(${slot.rotationDeg}deg)` : undefined,
                 }}
               >
+                <RotateHandle
+                  onPointerDown={(e) => beginDrag(e, i, "rotate")}
+                  onPointerMove={handleDragMove}
+                  onPointerUp={endDrag}
+                  color="bg-blue-600"
+                />
                 <div className="pointer-events-auto absolute right-1 top-1 flex gap-1">
                   {slots.length < MAX_THEME_SLOTS && (
                     <button
@@ -999,8 +1074,15 @@ export default function ThemeForm({
                   top: `${(zone.positionY - zone.heightRatio / 2) * 100}%`,
                   width: `${zone.widthRatio * 100}%`,
                   height: `${zone.heightRatio * 100}%`,
+                  transform: zone.rotationDeg ? `rotate(${zone.rotationDeg}deg)` : undefined,
                 }}
               >
+                <RotateHandle
+                  onPointerDown={(e) => beginZoneDrag(e, i, "rotate")}
+                  onPointerMove={handleZoneDragMove}
+                  onPointerUp={endZoneDrag}
+                  color="bg-emerald-600"
+                />
                 <span className="pointer-events-none absolute -top-5 left-0 whitespace-nowrap rounded bg-emerald-600 px-1.5 text-[10px] font-medium text-white">
                   {zone.label}
                 </span>
@@ -1089,5 +1171,33 @@ function SlotOutline({ slot }: { slot: ThemeSlot }) {
         <ellipse cx={50} cy={50} rx={50} ry={50} vectorEffect="non-scaling-stroke" />
       )}
     </svg>
+  );
+}
+
+// Poignée de rotation : un rond au-dessus du milieu du cadre, relié par un
+// trait ; glisser pour tourner (Maj : par 15°).
+function RotateHandle({
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
+  color,
+}: {
+  onPointerDown: (e: React.PointerEvent<HTMLDivElement>) => void;
+  onPointerMove: (e: React.PointerEvent<HTMLDivElement>) => void;
+  onPointerUp: () => void;
+  color: string;
+}) {
+  return (
+    <>
+      <span className={`pointer-events-none absolute left-1/2 top-0 h-4 w-px -translate-x-1/2 -translate-y-full ${color}`} />
+      <div
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        title="Glisser pour tourner (Maj : par 15°)"
+        className={`pointer-events-auto absolute left-1/2 top-0 h-3.5 w-3.5 cursor-grab rounded-full border-2 border-white shadow ${color}`}
+        style={{ transform: "translate(-50%, calc(-100% - 14px))" }}
+      />
+    </>
   );
 }

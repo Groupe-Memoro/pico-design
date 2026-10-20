@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { fontOptionById } from "@/lib/design/fonts";
-import { THEME_TEXT_LINE_HEIGHT, fitThemeTextSize, themeZoneText } from "@/lib/themeText";
+import { MAX_THEME_TEXT_LENGTH, THEME_TEXT_LINE_HEIGHT, fitThemeTextSize, themeZoneText } from "@/lib/themeText";
 import type { ThemeTextZone } from "@/lib/types";
 import { loadFont } from "@/lib/design/fontLoader";
 
@@ -19,6 +19,8 @@ export default function ThemeTextOverlay({
   pageWidthMm,
   boxWidth,
   boxHeight,
+  hiddenIndex = null,
+  edit,
 }: {
   zones: ThemeTextZone[];
   // Texte du client par zone ; absent = texte de départ de la zone.
@@ -26,6 +28,17 @@ export default function ThemeTextOverlay({
   pageWidthMm: number;
   boxWidth: number;
   boxHeight: number;
+  // Zone en cours de modification : son texte est affiché par le champ
+  // (couche `edit`), pas ici.
+  hiddenIndex?: number | null;
+  // Couche cliquable (outil Shopify) : un clic sur une zone ouvre, à sa place,
+  // un champ dans la même police pour modifier le texte.
+  edit?: {
+    editingIndex: number | null;
+    onStart: (index: number) => void;
+    onChange: (index: number, text: string) => void;
+    onEnd: () => void;
+  };
 }) {
   // Les largeurs mesurées avant le chargement des polices seraient fausses :
   // on remesure une fois chacune chargée.
@@ -46,6 +59,8 @@ export default function ThemeTextOverlay({
   return (
     <>
       {zones.map((zone, i) => {
+        if (edit) return <EditableZone key={zone.id} zone={zone} index={i} raw={texts?.[i] ?? zone.defaultText} pxPerMm={pxPerMm} boxWidth={boxWidth} boxHeight={boxHeight} fontsVersion={fontsVersion} edit={edit} />;
+        if (i === hiddenIndex) return null;
         const text = themeZoneText(zone, texts?.[i]);
         if (!text.trim()) return null;
         const boxW = zone.widthRatio * boxWidth;
@@ -63,6 +78,7 @@ export default function ThemeTextOverlay({
               top: (zone.positionY - zone.heightRatio / 2) * boxHeight,
               width: boxW,
               height: boxH,
+              transform: zone.rotationDeg ? `rotate(${zone.rotationDeg}deg)` : undefined,
               textAlign: zone.align,
               color: zone.color,
               fontFamily: `"${font.family}"`,
@@ -80,6 +96,95 @@ export default function ThemeTextOverlay({
         );
       })}
     </>
+  );
+}
+
+// Une zone cliquable de l'outil : cadre pointillé au survol, et au clic un
+// champ posé exactement sur la zone, dans la police, la taille ajustée, la
+// couleur et l'alignement du rendu — on écrit « dans » le produit.
+function EditableZone({
+  zone,
+  index,
+  raw,
+  pxPerMm,
+  boxWidth,
+  boxHeight,
+  fontsVersion,
+  edit,
+}: {
+  zone: ThemeTextZone;
+  index: number;
+  raw: string;
+  pxPerMm: number;
+  boxWidth: number;
+  boxHeight: number;
+  fontsVersion: number;
+  edit: NonNullable<Parameters<typeof ThemeTextOverlay>[0]["edit"]>;
+}) {
+  const editing = edit.editingIndex === index;
+  const boxW = zone.widthRatio * boxWidth;
+  const boxH = zone.heightRatio * boxHeight;
+  const shown = themeZoneText(zone, raw);
+  const lines = (shown || " ").split("\n");
+  const size = fitThemeTextSize(zone.fontSizeMm * pxPerMm, measureLines(zone, lines, zone.fontSizeMm * pxPerMm, fontsVersion), boxW, boxH);
+  const font = fontOptionById(zone.fontId);
+  const textStyle: React.CSSProperties = {
+    fontFamily: `"${font.family}"`,
+    fontWeight: zone.bold ? font.weightBold : font.weightRegular,
+    fontStyle: zone.italic ? "italic" : "normal",
+    fontSize: size,
+    lineHeight: THEME_TEXT_LINE_HEIGHT,
+    color: zone.color,
+    textAlign: zone.align,
+    textTransform: zone.uppercase ? "uppercase" : "none",
+    caretColor: zone.color,
+  };
+  const max = zone.maxChars > 0 ? zone.maxChars : MAX_THEME_TEXT_LENGTH;
+  return (
+    <div
+      className={`absolute ${editing ? "outline-dashed outline-2 outline-[var(--accent,#631028)]" : "cursor-text hover:outline-dashed hover:outline-1 hover:outline-[var(--accent,#631028)]"}`}
+      style={{
+        left: (zone.positionX - zone.widthRatio / 2) * boxWidth,
+        top: (zone.positionY - zone.heightRatio / 2) * boxHeight,
+        width: boxW,
+        height: boxH,
+        transform: zone.rotationDeg ? `rotate(${zone.rotationDeg}deg)` : undefined,
+      }}
+      // Le glisser du fond (ou d'un calque) ne doit pas partir d'ici.
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={() => !editing && edit.onStart(index)}
+      title={editing ? undefined : `${zone.label} — cliquer pour modifier`}
+    >
+      {editing &&
+        (zone.multiline ? (
+          <textarea
+            autoFocus
+            value={raw}
+            maxLength={max}
+            onChange={(e) => edit.onChange(index, e.target.value)}
+            onBlur={edit.onEnd}
+            onKeyDown={(e) => e.key === "Escape" && (e.currentTarget as HTMLTextAreaElement).blur()}
+            className="absolute inset-0 resize-none overflow-hidden border-0 bg-transparent p-0 outline-none"
+            style={{
+              ...textStyle,
+              // Bloc centré verticalement, comme le rendu.
+              paddingTop: Math.max(0, (boxH - lines.length * size * THEME_TEXT_LINE_HEIGHT) / 2),
+              whiteSpace: "pre",
+            }}
+          />
+        ) : (
+          <input
+            autoFocus
+            value={raw}
+            maxLength={max}
+            onChange={(e) => edit.onChange(index, e.target.value)}
+            onBlur={edit.onEnd}
+            onKeyDown={(e) => (e.key === "Enter" || e.key === "Escape") && e.currentTarget.blur()}
+            className="absolute inset-0 h-full w-full border-0 bg-transparent p-0 outline-none"
+            style={textStyle}
+          />
+        ))}
+    </div>
   );
 }
 

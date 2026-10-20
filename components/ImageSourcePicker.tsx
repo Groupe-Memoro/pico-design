@@ -732,6 +732,8 @@ export default function ImageSourcePicker({
   // plutôt que l'approximation object-position/transform d'origine, qui ne
   // suivait pas correctement le glisser une fois dézoomé.
   const [boxSize, setBoxSize] = useState({ width: 0, height: 0 });
+  // Zone de texte du thème en cours de modification sur l'aperçu.
+  const [editingTextZone, setEditingTextZone] = useState<number | null>(null);
   const [naturalSize, setNaturalSize] = useState<{ width: number; height: number } | null>(null);
 
   const hasSource =
@@ -1066,8 +1068,13 @@ export default function ImageSourcePicker({
         const slot = slots[selectedThemeSlot];
         const slotWidthPx = slot.widthRatio * rect.width;
         const slotHeightPx = slot.heightRatio * rect.height;
-        const slotDx = dxPx / slotWidthPx;
-        const slotDy = dyPx / slotHeightPx;
+        // Emplacement tourné : le mouvement ramené dans son repère, pour que
+        // la photo suive le curseur.
+        const angle = ((slot.rotationDeg ?? 0) * Math.PI) / 180;
+        const localDx = dxPx * Math.cos(angle) + dyPx * Math.sin(angle);
+        const localDy = -dxPx * Math.sin(angle) + dyPx * Math.cos(angle);
+        const slotDx = localDx / slotWidthPx;
+        const slotDy = localDy / slotHeightPx;
         const current = slotAdjust[selectedThemeSlot] ?? { positionX: 0.5, positionY: 0.5, scale: 1 };
         const next = slotAdjust.slice();
         while (next.length <= selectedThemeSlot) next.push({ positionX: 0.5, positionY: 0.5, scale: 1 });
@@ -1703,6 +1710,8 @@ export default function ImageSourcePicker({
                         clipPath: slotClipPath(slot),
                         // Masque SVG fourni par l'admin (forme « svg »).
                         ...slotMaskStyle(slot),
+                        // Rotation autour du centre : la forme et la photo tournent ensemble.
+                        transform: slot.rotationDeg ? `rotate(${slot.rotationDeg}deg)` : undefined,
                       }}
                     >
                       {url && (
@@ -1739,7 +1748,13 @@ export default function ImageSourcePicker({
                       <svg
                         aria-hidden="true"
                         className="pointer-events-none absolute overflow-visible"
-                        style={{ left: slotLeftPx, top: slotTopPx, width: slotWidthPx, height: slotHeightPx }}
+                        style={{
+                          left: slotLeftPx,
+                          top: slotTopPx,
+                          width: slotWidthPx,
+                          height: slotHeightPx,
+                          transform: slot.rotationDeg ? `rotate(${slot.rotationDeg}deg)` : undefined,
+                        }}
                         viewBox={`0 0 ${slotWidthPx} ${slotHeightPx}`}
                         fill="none"
                         stroke={isSelected ? "var(--accent)" : "rgba(0,0,0,0.25)"}
@@ -1767,6 +1782,7 @@ export default function ImageSourcePicker({
                   pageWidthMm={template.width_mm + template.bleed_mm * 2}
                   boxWidth={boxSize.width}
                   boxHeight={boxSize.height}
+                  hiddenIndex={editingTextZone}
                 />
               )}
               {/* Calques (texte/image) : entre le fond et le cadre — visibles
@@ -1786,6 +1802,27 @@ export default function ImageSourcePicker({
                   imageUrls={layerImageUrls}
                   maxFontSizeMm={maxFontSizeMm}
                   hitRef={fabricHitRef}
+                />
+              )}
+              {/* Zones de texte du thème, cliquables : au-dessus des calques, un
+                  clic ouvre le texte à sa place pour le modifier. */}
+              {isTheme && template && themeTextZones.length > 0 && (
+                <ThemeTextOverlay
+                  zones={themeTextZones}
+                  texts={value.themeTexts}
+                  pageWidthMm={template.width_mm + template.bleed_mm * 2}
+                  boxWidth={boxSize.width}
+                  boxHeight={boxSize.height}
+                  edit={{
+                    editingIndex: editingTextZone,
+                    onStart: setEditingTextZone,
+                    onChange: (index, text) => {
+                      const next = themeTextZones.map((_, k) => value.themeTexts?.[k] ?? null);
+                      next[index] = text;
+                      onChange({ themeTexts: next });
+                    },
+                    onEnd: () => setEditingTextZone(null),
+                  }}
                 />
               )}
               {boxSize.width > 0 &&

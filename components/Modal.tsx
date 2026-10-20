@@ -35,11 +35,15 @@ export default function Modal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40" onClick={() => !busy && onClose()} />
+      {/* Le voile « Enregistrement » vit à côté de la zone qui défile, pas
+          dedans : sinon il restait en haut du contenu (souvent hors de vue)
+          dès qu'on avait fait défiler un long formulaire. */}
       <div
-        className={`relative w-full overflow-y-auto rounded-2xl bg-white p-6 shadow-xl ${
+        className={`relative flex w-full flex-col overflow-hidden rounded-2xl bg-white shadow-xl ${
           full ? "max-h-[96vh] max-w-[1600px]" : wide ? "max-h-[90vh] max-w-4xl" : "max-h-[90vh] max-w-lg"
         }`}
       >
+        <div className="min-h-0 overflow-y-auto p-6">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="font-heading text-lg font-semibold text-pico-black">{title}</h2>
           <button
@@ -54,6 +58,7 @@ export default function Modal({
           </button>
         </div>
         {children}
+        </div>
 
         {busy && (
           <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-2xl bg-white/85 backdrop-blur-[1px]">
