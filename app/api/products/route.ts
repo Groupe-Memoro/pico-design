@@ -9,6 +9,7 @@ import { isValidLogoColor } from "@/lib/pdf/logo";
 import { generateAndStoreProductPdf } from "@/lib/pdf/productPdf";
 import { parsePositionValue } from "@/lib/pdf/crop";
 import type { LogoShape, Template, VisualMode } from "@/lib/types";
+import { storageFileName } from "@/lib/storageName";
 
 export const runtime = "nodejs"; // sharp/pdf-lib ont besoin du runtime Node, pas Edge.
 
@@ -127,12 +128,12 @@ export async function POST(request: Request) {
   }
 
   const productId = randomUUID();
-  const imagePath = `products/${productId}/source-${resolved.filename}`;
+  const imagePath = `products/${productId}/source-${storageFileName(resolved.filename)}`;
 
   // Les images sources partent vers le stockage pendant que le PDF se
   // génère (plus bas) : les deux prennent chacun une à quelques secondes en
   // grand format.
-  const backImagePath = resolvedBack ? `products/${productId}/back-${resolvedBack.filename}` : null;
+  const backImagePath = resolvedBack ? `products/${productId}/back-${storageFileName(resolvedBack.filename)}` : null;
   const uploads = Promise.all([
     supabase.storage
       .from("uploads")

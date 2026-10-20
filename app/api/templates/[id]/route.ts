@@ -3,6 +3,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { uploadBeautyShotBundle } from "@/lib/templateBeautyShotUpload";
 import { parseOverlayOpacitiesField } from "@/lib/pdf/beautyShot";
 import { parseFoldField, parseFoldMarksField } from "@/lib/pdf/foldMarks";
+import { storageFileName } from "@/lib/storageName";
 
 const STRING_FIELDS = ["name", "category_id", "logo_h_align", "logo_v_align"] as const;
 const NULLABLE_STRING_FIELDS = ["sku_id"] as const;
@@ -56,7 +57,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     const file = formData.get(field);
     const remove = formData.get(`remove${field[0].toUpperCase()}${field.slice(1)}`) === "true";
     if (file instanceof File && file.size > 0) {
-      const path = `${params.id}/${field}-${file.name}`;
+      const path = `${params.id}/${field}-${storageFileName(file.name)}`;
       const buffer = Buffer.from(await file.arrayBuffer());
       const { error: uploadError } = await supabase.storage
         .from("overlays")

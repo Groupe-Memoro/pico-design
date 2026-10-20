@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { parseThemeSlotsField } from "@/lib/pdf/theme";
 import { MAX_THEME_SLOTS } from "@/lib/themeShapes";
+import { storageFileName } from "@/lib/storageName";
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   const supabase = createServerSupabaseClient();
@@ -29,7 +30,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
   const overlayFile = formData.get("overlay");
   if (overlayFile instanceof File && overlayFile.size > 0) {
-    const overlayPath = `themes/${params.id}/overlay-${overlayFile.name}`;
+    const overlayPath = `themes/${params.id}/overlay-${storageFileName(overlayFile.name)}`;
     const buffer = Buffer.from(await overlayFile.arrayBuffer());
     const { error: uploadError } = await supabase.storage
       .from("overlays")
@@ -44,7 +45,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   // remplace, `removeBackground` le retire.
   const backgroundFile = formData.get("background");
   if (backgroundFile instanceof File && backgroundFile.size > 0) {
-    const backgroundPath = `themes/${params.id}/background-${backgroundFile.name}`;
+    const backgroundPath = `themes/${params.id}/background-${storageFileName(backgroundFile.name)}`;
     const { error: uploadError } = await supabase.storage
       .from("overlays")
       .upload(backgroundPath, Buffer.from(await backgroundFile.arrayBuffer()), {

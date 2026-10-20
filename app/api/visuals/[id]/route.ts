@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { ALLOWED_VISUAL_TYPES, prepareUploadedFile } from "@/lib/visualUpload";
+import { storageFileName } from "@/lib/storageName";
 
 export const runtime = "nodejs"; // la rasterisation PDF a besoin du runtime Node, pas Edge.
 
@@ -39,7 +40,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       const message = err instanceof Error ? err.message : "Erreur lors du traitement du fichier.";
       return NextResponse.json({ error: message }, { status: 400 });
     }
-    const filePath = `${params.id}/${prepared.filename}`;
+    const filePath = `${params.id}/${storageFileName(prepared.filename)}`;
     const { error: uploadError } = await supabase.storage
       .from("visuals")
       .upload(filePath, prepared.buffer, { contentType: prepared.contentType, upsert: true });

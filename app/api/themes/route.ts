@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { parseThemeSlotsField } from "@/lib/pdf/theme";
 import { MAX_THEME_SLOTS } from "@/lib/themeShapes";
+import { storageFileName } from "@/lib/storageName";
 
 /**
  * CRUD des Thèmes (voir supabase/migrations/0046_themes.sql et
@@ -55,7 +56,7 @@ export async function POST(request: Request) {
   }
 
   const themeId = randomUUID();
-  const overlayPath = `themes/${themeId}/overlay-${overlayFile.name}`;
+  const overlayPath = `themes/${themeId}/overlay-${storageFileName(overlayFile.name)}`;
   const buffer = Buffer.from(await overlayFile.arrayBuffer());
   const { error: uploadError } = await supabase.storage
     .from("overlays")
@@ -69,7 +70,7 @@ export async function POST(request: Request) {
   // avant la migration.
   let backgroundPath: string | null = null;
   if (backgroundFile instanceof File && backgroundFile.size > 0) {
-    backgroundPath = `themes/${themeId}/background-${backgroundFile.name}`;
+    backgroundPath = `themes/${themeId}/background-${storageFileName(backgroundFile.name)}`;
     const { error: backgroundError } = await supabase.storage
       .from("overlays")
       .upload(backgroundPath, Buffer.from(await backgroundFile.arrayBuffer()), {

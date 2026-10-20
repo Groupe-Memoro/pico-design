@@ -4,6 +4,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { uploadBeautyShotBundle } from "@/lib/templateBeautyShotUpload";
 import { parseOverlayOpacitiesField } from "@/lib/pdf/beautyShot";
 import { parseFoldField, parseFoldMarksField } from "@/lib/pdf/foldMarks";
+import { storageFileName } from "@/lib/storageName";
 
 const STRING_FIELDS = ["name", "category_id", "logo_h_align", "logo_v_align"] as const;
 const NULLABLE_STRING_FIELDS = ["sku_id"] as const;
@@ -69,7 +70,7 @@ export async function POST(request: Request) {
   async function uploadOptionalFile(field: string): Promise<string | null> {
     const file = formData.get(field);
     if (!(file instanceof File) || file.size === 0) return null;
-    const path = `${templateId}/${field}-${file.name}`;
+    const path = `${templateId}/${field}-${storageFileName(file.name)}`;
     const buffer = Buffer.from(await file.arrayBuffer());
     const { error: uploadError } = await supabase.storage
       .from("overlays")
