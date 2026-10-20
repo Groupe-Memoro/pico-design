@@ -221,6 +221,8 @@ export default function DesignTool({
         sameThemeAsBefore && f.themeSlotAdjust?.length === themeSlotCount
           ? f.themeSlotAdjust
           : Array.from({ length: themeSlotCount }, () => ({ positionX: 0.5, positionY: 0.5, scale: 1 })),
+      // Textes : gardés pour le même thème, sinon les textes de départ du nouveau.
+      themeTexts: sameThemeAsBefore ? f.themeTexts : undefined,
     }));
     // Le verso n'a pas de notion de thème (voir le commentaire du
     // composant) : seule la mosaïque, qui s'applique aux deux côtés, le

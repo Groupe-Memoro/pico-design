@@ -21,6 +21,7 @@ import { generateStationeryMockupPng } from "@/lib/pdf/stationeryMockup";
 import { resolveLayersFromForm } from "@/lib/pdf/layers";
 import { parseThemeSlotAdjustField, themeSlotFilesFromForm } from "@/lib/pdf/theme";
 import type { Template } from "@/lib/types";
+import { parseThemeTextsField } from "@/lib/themeText";
 
 export const runtime = "nodejs"; // sharp a besoin du runtime Node, pas Edge.
 
@@ -151,6 +152,7 @@ export async function POST(request: Request) {
   const themeSlotAdjust = parseThemeSlotAdjustField(
     formData.get("themeSlotAdjust"),
   );
+  const themeTexts = parseThemeTextsField(formData.get("themeTexts"));
   const hasFile = file instanceof File && file.size > 0;
   // Rien à montrer pour ce côté (ni visuel, ni mosaïque, ni thème, ni
   // calque) : pas la peine de composer un mockup entièrement blanc.
@@ -200,6 +202,7 @@ export async function POST(request: Request) {
         themeId,
         themeSlotFiles,
         themeSlotAdjust,
+        themeTexts,
       });
       resolvedBuffer = resolved.buffer;
     } catch (err) {

@@ -57,8 +57,11 @@ function appendMosaicToForm(
   }
 }
 
-function appendThemeToForm(body: FormData, value: ImageSourceValue, themeId: string) {
-  body.append("themeId", themeId);
+function appendThemeToForm(body: FormData, value: ImageSourceValue, theme: ThemeWithOverlayUrl) {
+  body.append("themeId", theme.id);
+  // Un texte par zone ; null = texte de départ de la zone (voir lib/themeText.ts).
+  const zones = theme.text_zones ?? [];
+  if (zones.length > 0) body.append("themeTexts", JSON.stringify(zones.map((_, i) => value.themeTexts?.[i] ?? null)));
   (value.themeSlotFiles ?? []).forEach((f, i) => {
     if (f) body.append(`themeSlot${i}`, f);
   });
@@ -259,7 +262,7 @@ export default function DesignReviewOverlay({
       if (grant) body.append("grant", grant);
       body.append("rotated", String(rotated));
       if (front.sourceMode === "theme" && selectedTheme) {
-        appendThemeToForm(body, front, selectedTheme.id);
+        appendThemeToForm(body, front, selectedTheme);
       } else if (front.sourceMode === "mosaic") {
         appendMosaicToForm(body, front, mosaicGrid, false, panels);
       } else if (front.file) {
@@ -351,7 +354,7 @@ export default function DesignReviewOverlay({
         // Quel mockup rendre, quand le modèle en a plusieurs.
         if (mockupId) body.append("mockupId", mockupId);
         if (isTheme && selectedTheme) {
-          appendThemeToForm(body, value, selectedTheme.id);
+          appendThemeToForm(body, value, selectedTheme);
         } else if (isMosaic) {
           appendMosaicToForm(body, value, mosaicGrid, false, panels);
         } else if (file) {

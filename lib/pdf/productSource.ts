@@ -38,6 +38,9 @@ export interface ResolveProductImageInput {
   // attribué au modèle, avec un ou plusieurs emplacements où les photos du client sont
   // recadrées — voir composeThemeImage. Prioritaire sur mosaic/file/visualId.
   themeId?: string | null;
+  // Texte du client pour chaque zone de texte du thème (même ordre que
+  // `theme.text_zones`) ; absent = texte de départ de la zone.
+  themeTexts?: (string | null)[] | null;
   // Aperçu à l'écran : plus grand côté voulu, en pixels, pour un visuel de la
   // banque (plein format ou motif). Absent = résolution d'impression.
   maxPx?: number;
@@ -127,7 +130,8 @@ export async function resolveProductImage(
       targetWidthPx,
       targetHeightPx,
       input.themeSlotAdjust ?? [],
-      backgroundBuffer
+      backgroundBuffer,
+      { zones: theme.text_zones ?? [], texts: input.themeTexts ?? [], dpi: template.dpi }
     );
     return { buffer, contentType: "image/jpeg", filename: "theme.jpg" };
   }

@@ -1181,6 +1181,52 @@ export default function DesignEditor({
             )}
           </SidebarGroup>
 
+          {/* Zones de texte du thème : le client écrit ce qu'il veut, la
+              police et la couleur sont celles du thème. */}
+          {side === "front" &&
+            activeValue.sourceMode === "theme" &&
+            (selectedTheme?.text_zones?.length ?? 0) > 0 && (
+              <SidebarGroup title="Textes">
+                {selectedTheme!.text_zones!.map((zone, i) => {
+                  const value = activeValue.themeTexts?.[i] ?? zone.defaultText;
+                  const setText = (text: string) => {
+                    const next = selectedTheme!.text_zones!.map((_, j) => activeValue.themeTexts?.[j] ?? null);
+                    next[i] = text;
+                    activeOnChange({ themeTexts: next });
+                  };
+                  const max = zone.maxChars > 0 ? zone.maxChars : undefined;
+                  return (
+                    <label key={zone.id} className="block text-sm">
+                      <span className="flex items-baseline justify-between gap-2 text-text">
+                        {zone.label}
+                        {max && (
+                          <span className="text-xs text-text-subtle">
+                            {value.length}/{max}
+                          </span>
+                        )}
+                      </span>
+                      {zone.multiline ? (
+                        <textarea
+                          value={value}
+                          maxLength={max}
+                          rows={3}
+                          onChange={(e) => setText(e.target.value)}
+                          className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm"
+                        />
+                      ) : (
+                        <input
+                          value={value}
+                          maxLength={max}
+                          onChange={(e) => setText(e.target.value)}
+                          className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm"
+                        />
+                      )}
+                    </label>
+                  );
+                })}
+              </SidebarGroup>
+            )}
+
           {/* Seule l'orientation reste ici (les guides sont sous la page) :
               sans elle, le groupe n'aurait plus que son titre. */}
           {rawTemplate.allow_orientation_change && (
@@ -1352,6 +1398,7 @@ export default function DesignEditor({
                 themeOverlayUrl={
                   side === "front" ? (selectedTheme?.overlayUrl ?? null) : null
                 }
+                themeTextZones={side === "front" ? (selectedTheme?.text_zones ?? []) : []}
                 themeBackgroundUrl={
                   side === "front" ? (selectedTheme?.backgroundUrl ?? null) : null
                 }

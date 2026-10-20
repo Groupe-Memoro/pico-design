@@ -8,6 +8,8 @@ import path from "path";
 import { mmToPx } from "./units";
 import { fontOptionById, resolveFontFile, type FontOption } from "../design/fonts";
 import type { TextLayer } from "../design/layers";
+import type { ThemeTextZone } from "../types";
+import { THEME_TEXT_LINE_HEIGHT, fitThemeTextSize } from "../themeText";
 
 // Rendu du texte en contours de glyphes (chemins SVG), via `fontkit` — pas
 // de police "installée" à trouver sur le serveur (fontconfig, dans le sharp
@@ -154,4 +156,44 @@ export function textLayerToSvgGroup(
   const rotateAttr = rotationDeg ? `rotate(${rotationDeg} ${centerX} ${centerY}) ` : "";
 
   return `<g transform="${rotateAttr}translate(${blockLeft} ${blockTop})" fill="${layer.color}" opacity="${layer.opacity ?? 1}">${strokePass}<g>${lineGroups}</g></g>`;
+}
+
+/**
+ * Texte d'une zone de thème (voir lib/themeText.ts), en `<g>` SVG sur un
+ * canevas de `targetWidthPx`×`targetHeightPx` (la page, fond perdu compris) :
+ * réduit au besoin pour tenir dans la zone, centré verticalement, aligné à
+ * gauche, au centre ou à droite. "" si le texte est vide.
+ */
+export function themeTextToSvgGroup(
+  zone: ThemeTextZone,
+  text: string,
+  targetWidthPx: number,
+  targetHeightPx: number,
+  dpi: number
+): string {
+  if (!text.trim()) return "";
+  const instance = loadInstance(fontOptionById(zone.fontId), zone.italic, zone.bold);
+  const boxW = zone.widthRatio * targetWidthPx;
+  const boxH = zone.heightRatio * targetHeightPx;
+  const baseSizePx = mmToPx(zone.fontSizeMm, dpi);
+  const rawLines = text.split("\n");
+  const measured = rawLines.map((line) => layoutLine(instance, line, baseSizePx, 0).widthPx);
+  const sizePx = fitThemeTextSize(baseSizePx, measured, boxW, boxH);
+  const lines = rawLines.map((line) => layoutLine(instance, line, sizePx, 0));
+  const lineHeightPx = sizePx * THEME_TEXT_LINE_HEIGHT;
+  const ascentPx = (instance.ascent / instance.unitsPerEm) * sizePx;
+  // Hauteur réelle de la police (ascendante + descendante) : c'est elle que
+  // le navigateur centre dans l'interligne, l'aperçu tombe donc au même endroit.
+  const contentPx = ((instance.ascent - instance.descent) / instance.unitsPerEm) * sizePx;
+  const boxLeft = zone.positionX * targetWidthPx - boxW / 2;
+  const blockTop = zone.positionY * targetHeightPx - (lineHeightPx * lines.length) / 2;
+  const groups = lines
+    .map((line, i) => {
+      const x = zone.align === "left" ? boxLeft : zone.align === "right" ? boxLeft + boxW - line.widthPx : boxLeft + (boxW - line.widthPx) / 2;
+      // Le surplus d'interligne réparti au-dessus et au-dessous de la ligne.
+      const baseline = blockTop + i * lineHeightPx + (lineHeightPx - contentPx) / 2 + ascentPx;
+      return `<g transform="translate(${x} ${baseline})">${line.paths}</g>`;
+    })
+    .join("");
+  return `<g fill="${zone.color}">${groups}</g>`;
 }

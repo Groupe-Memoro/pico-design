@@ -1,6 +1,8 @@
 import sharp from "sharp";
 import { coverCropToBuffer } from "./crop";
-import type { ThemeSlot, ThemeSlotAdjust } from "../types";
+import type { ThemeSlot, ThemeSlotAdjust, ThemeTextZone } from "../types";
+import { themeZoneText } from "../themeText";
+import { themeTextToSvgGroup } from "./textLayer";
 import { MAX_THEME_SLOTS, maskSvgSized, sanitizeSlotShape, slotShape, slotSvgShape } from "../themeShapes";
 
 const DEFAULT_ADJUST: ThemeSlotAdjust = { positionX: 0.5, positionY: 0.5, scale: 1 };
@@ -31,7 +33,10 @@ export async function composeThemeImage(
   targetWidthPx: number,
   targetHeightPx: number,
   slotAdjust: (ThemeSlotAdjust | null | undefined)[] = [],
-  backgroundImage: Buffer | null = null
+  backgroundImage: Buffer | null = null,
+  // Zones de texte du thème et texte du client pour chacune (même ordre),
+  // posés par-dessus le graphisme ; `dpi` convertit leurs tailles en mm.
+  text: { zones: ThemeTextZone[]; texts: (string | null | undefined)[]; dpi: number } | null = null
 ): Promise<Buffer> {
   const composites: sharp.OverlayOptions[] = [];
 
@@ -67,6 +72,21 @@ export async function composeThemeImage(
     .png()
     .toBuffer();
   composites.push({ input: overlayResized, left: 0, top: 0 });
+
+  if (text && text.zones.length > 0) {
+    const groups = text.zones
+      .map((zone, i) => themeTextToSvgGroup(zone, themeZoneText(zone, text.texts[i]), targetWidthPx, targetHeightPx, text.dpi))
+      .join("");
+    if (groups) {
+      composites.push({
+        input: Buffer.from(
+          `<svg xmlns="http://www.w3.org/2000/svg" width="${targetWidthPx}" height="${targetHeightPx}">${groups}</svg>`
+        ),
+        left: 0,
+        top: 0,
+      });
+    }
+  }
 
   return sharp({
     create: { width: targetWidthPx, height: targetHeightPx, channels: 3, background: "#ffffff" },

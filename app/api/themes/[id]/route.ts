@@ -3,6 +3,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { parseThemeSlotsField } from "@/lib/pdf/theme";
 import { MAX_THEME_SLOTS } from "@/lib/themeShapes";
 import { storageFileName } from "@/lib/storageName";
+import { parseTextZonesField } from "@/lib/themeText";
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   const supabase = createServerSupabaseClient();
@@ -26,6 +27,12 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       return NextResponse.json({ error: `Emplacements invalides (1 à ${MAX_THEME_SLOTS} attendus).` }, { status: 400 });
     }
     update.slots = slots;
+  }
+
+  if (formData.has("textZones")) {
+    const textZones = parseTextZonesField(formData.get("textZones"));
+    if (!textZones) return NextResponse.json({ error: "Zones de texte invalides." }, { status: 400 });
+    update.text_zones = textZones;
   }
 
   const overlayFile = formData.get("overlay");

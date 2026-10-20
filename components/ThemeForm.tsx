@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { Template, ThemeSlot, ThemeSlotShape } from "@/lib/types";
+import type { Template, ThemeSlot, ThemeSlotShape, ThemeTextZone } from "@/lib/types";
+import ThemeTextOverlay from "@/components/ThemeTextOverlay";
+import { FONT_OPTIONS } from "@/lib/design/fonts";
+import { MAX_THEME_TEXT_ZONES, THEME_TEXT_ALIGNS, newThemeTextZone } from "@/lib/themeText";
 import type { ThemeWithOverlayUrl } from "@/components/ThemesTable";
 import { CopyIcon, SpinnerIcon } from "@/components/icons";
 import FileDropZone from "@/components/FileDropZone";
@@ -99,6 +102,10 @@ export default function ThemeForm({
   const template = templates.find((t) => t.id === templateId) ?? null;
   const pageAspectRatio = template ? (template.width_mm + template.bleed_mm * 2) / (template.height_mm + template.bleed_mm * 2) : 1;
   const [slots, setSlots] = useState<ThemeSlot[]>(() => theme?.slots ?? [defaultSlot(0, pageAspectRatio)]);
+  // Zones de texte libres (voir lib/themeText.ts) : le client y écrit ce
+  // qu'il veut ; la zone ouverte dans le panneau est encadrée sur l'aperçu.
+  const [textZones, setTextZones] = useState<ThemeTextZone[]>(() => theme?.text_zones ?? []);
+  const [selectedZone, setSelectedZone] = useState<number | null>(null);
   const [overlayFile, setOverlayFile] = useState<File | null>(null);
   const [overlayPreview, setOverlayPreview] = useState<string | null>(null);
   // Image de fond facultative (sous les photos) : un nouveau fichier, ou le
@@ -201,6 +208,65 @@ export default function ThemeForm({
 
   function endDrag() {
     dragRef.current = null;
+  }
+
+  // Zones de texte : même glisser que les emplacements (déplacer, poignée de
+  // coin pour la taille), bornées à la page.
+  const zoneDragRef = useRef<{ index: number; mode: "move" | "resize"; startX: number; startY: number; start: ThemeTextZone } | null>(null);
+
+  function updateZone(index: number, patch: Partial<ThemeTextZone>) {
+    setTextZones((prev) =>
+      prev.map((z, i) => {
+        if (i !== index) return z;
+        const next = { ...z, ...patch };
+        const widthRatio = Math.min(1, Math.max(0.02, next.widthRatio));
+        const heightRatio = Math.min(1, Math.max(0.02, next.heightRatio));
+        return {
+          ...next,
+          widthRatio,
+          heightRatio,
+          positionX: Math.min(1 - widthRatio / 2, Math.max(widthRatio / 2, next.positionX)),
+          positionY: Math.min(1 - heightRatio / 2, Math.max(heightRatio / 2, next.positionY)),
+        };
+      })
+    );
+  }
+
+  function beginZoneDrag(e: React.PointerEvent<HTMLDivElement>, index: number, mode: "move" | "resize") {
+    e.stopPropagation();
+    setSelectedZone(index);
+    zoneDragRef.current = { index, mode, startX: e.clientX, startY: e.clientY, start: textZones[index] };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }
+
+  function handleZoneDragMove(e: React.PointerEvent<HTMLDivElement>) {
+    const d = zoneDragRef.current;
+    if (!d || boxSize.width === 0 || boxSize.height === 0) return;
+    const dx = (e.clientX - d.startX) / boxSize.width;
+    const dy = (e.clientY - d.startY) / boxSize.height;
+    if (d.mode === "move") updateZone(d.index, { positionX: d.start.positionX + dx, positionY: d.start.positionY + dy });
+    // Coin bas-droit : le coin haut-gauche reste en place.
+    else
+      updateZone(d.index, {
+        widthRatio: d.start.widthRatio + dx,
+        heightRatio: d.start.heightRatio + dy,
+        positionX: d.start.positionX + dx / 2,
+        positionY: d.start.positionY + dy / 2,
+      });
+  }
+
+  function endZoneDrag() {
+    zoneDragRef.current = null;
+  }
+
+  function addZone() {
+    setTextZones((prev) => (prev.length >= MAX_THEME_TEXT_ZONES ? prev : [...prev, newThemeTextZone(prev.length)]));
+    setSelectedZone(textZones.length);
+  }
+
+  function removeZone(index: number) {
+    setTextZones((prev) => prev.filter((_, i) => i !== index));
+    setSelectedZone(null);
   }
 
   // Forme d'un emplacement. Cercle et polygone partent d'un emplacement
@@ -379,6 +445,7 @@ export default function ThemeForm({
     formData.append("templateId", templateId);
     formData.append("name", name);
     formData.append("slots", JSON.stringify(slots));
+    formData.append("textZones", JSON.stringify(textZones));
     if (overlayFile) formData.append("overlay", overlayFile);
     if (backgroundFile) formData.append("background", backgroundFile);
     else if (removeBackground) formData.append("removeBackground", "true");
@@ -565,6 +632,154 @@ export default function ThemeForm({
                 </div>
               ))}
             </div>
+          )}
+        </div>
+
+        <div>
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <label className="block text-sm font-medium">Zones de texte ({textZones.length})</label>
+            <button
+              type="button"
+              onClick={addZone}
+              disabled={textZones.length >= MAX_THEME_TEXT_ZONES || !template}
+              className="rounded-lg border border-neutral-300 px-3 py-1.5 text-xs text-neutral-700 hover:bg-neutral-50 disabled:opacity-40"
+            >
+              + Ajouter une zone de texte
+            </button>
+          </div>
+          {textZones.length === 0 && (
+            <p className="text-xs text-neutral-500">Le client pourra écrire son propre texte (nom, date, message…) dans chaque zone.</p>
+          )}
+          <div className="space-y-2">
+            {textZones.map((zone, i) => {
+              const open = selectedZone === i;
+              return (
+                <div key={zone.id} className={`rounded-lg border text-xs ${open ? "border-emerald-500" : "border-neutral-200"}`}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedZone(open ? null : i)}
+                    className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left"
+                  >
+                    <span className="font-medium text-neutral-800">{zone.label}</span>
+                    <span className="truncate text-neutral-500">{zone.defaultText || "(vide)"}</span>
+                  </button>
+                  {open && (
+                    <div className="space-y-2 border-t border-neutral-200 p-3">
+                      <label className="block">
+                        <span className="text-neutral-600">Question au client</span>
+                        <input
+                          value={zone.label}
+                          onChange={(e) => updateZone(i, { label: e.target.value })}
+                          placeholder="Ex. : Nom de l'élève"
+                          className="mt-1 w-full rounded border border-neutral-300 px-2 py-1"
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="text-neutral-600">Texte de départ</span>
+                        {zone.multiline ? (
+                          <textarea
+                            value={zone.defaultText}
+                            onChange={(e) => updateZone(i, { defaultText: e.target.value })}
+                            rows={2}
+                            className="mt-1 w-full rounded border border-neutral-300 px-2 py-1"
+                          />
+                        ) : (
+                          <input
+                            value={zone.defaultText}
+                            onChange={(e) => updateZone(i, { defaultText: e.target.value })}
+                            className="mt-1 w-full rounded border border-neutral-300 px-2 py-1"
+                          />
+                        )}
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <label className="block">
+                          <span className="text-neutral-600">Police</span>
+                          <select
+                            value={zone.fontId}
+                            onChange={(e) => updateZone(i, { fontId: e.target.value })}
+                            className="mt-1 w-full rounded border border-neutral-300 px-2 py-1"
+                          >
+                            {FONT_OPTIONS.map((f) => (
+                              <option key={f.id} value={f.id}>
+                                {f.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="block">
+                          <span className="text-neutral-600">Taille max. (mm)</span>
+                          <input
+                            type="number"
+                            step="any"
+                            min={1}
+                            value={zone.fontSizeMm}
+                            onChange={(e) => updateZone(i, { fontSizeMm: Math.max(1, Number(e.target.value) || 1) })}
+                            className="mt-1 w-full rounded border border-neutral-300 px-2 py-1"
+                          />
+                        </label>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <input
+                          type="color"
+                          value={zone.color}
+                          onChange={(e) => updateZone(i, { color: e.target.value })}
+                          className="h-7 w-10 cursor-pointer rounded border border-neutral-300"
+                          aria-label="Couleur"
+                        />
+                        <div className="flex overflow-hidden rounded-lg border border-neutral-300">
+                          {THEME_TEXT_ALIGNS.map((a) => (
+                            <button
+                              key={a.value}
+                              type="button"
+                              onClick={() => updateZone(i, { align: a.value })}
+                              className={`px-2 py-1 ${zone.align === a.value ? "bg-emerald-600 text-white" : "bg-white text-neutral-700 hover:bg-neutral-50"}`}
+                            >
+                              {a.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-x-3 gap-y-1 text-neutral-700">
+                        {(
+                          [
+                            ["bold", "Gras"],
+                            ["italic", "Italique"],
+                            ["uppercase", "Majuscules"],
+                            ["multiline", "Plusieurs lignes"],
+                          ] as const
+                        ).map(([key, label]) => (
+                          <label key={key} className="flex items-center gap-1">
+                            <input type="checkbox" checked={zone[key]} onChange={(e) => updateZone(i, { [key]: e.target.checked })} />
+                            {label}
+                          </label>
+                        ))}
+                      </div>
+                      <div className="flex items-center justify-between gap-2">
+                        <label className="flex items-center gap-1.5 text-neutral-600">
+                          Caractères max.
+                          <input
+                            type="number"
+                            min={0}
+                            value={zone.maxChars}
+                            onChange={(e) => updateZone(i, { maxChars: Math.max(0, Math.round(Number(e.target.value) || 0)) })}
+                            className="w-16 rounded border border-neutral-300 px-2 py-1"
+                          />
+                          <span className="text-neutral-400">(0 = sans limite)</span>
+                        </label>
+                        <button type="button" onClick={() => removeZone(i)} className="text-red-600 hover:underline">
+                          Retirer
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          {textZones.length > 0 && (
+            <p className="mt-2 text-xs text-neutral-500">
+              La taille est un maximum : un texte trop long rapetisse pour tenir dans sa zone.
+            </p>
           )}
         </div>
 
@@ -760,6 +975,44 @@ export default function ThemeForm({
                   onPointerMove={handleDragMove}
                   onPointerUp={endDrag}
                   className="pointer-events-auto absolute bottom-0 right-0 h-3 w-3 -translate-x-1/2 -translate-y-1/2 cursor-nwse-resize rounded-sm border border-white bg-blue-600"
+                  style={{ right: 0, bottom: 0, transform: "translate(50%, 50%)" }}
+                />
+              </div>
+            ))}
+            {/* Zones de texte : le texte de départ tel qu'il sera rendu, et un
+                cadre vert à glisser (poignée de coin pour la taille). */}
+            {template && (
+              <ThemeTextOverlay
+                zones={textZones}
+                pageWidthMm={template.width_mm + template.bleed_mm * 2}
+                boxWidth={boxSize.width}
+                boxHeight={boxSize.height}
+              />
+            )}
+            {textZones.map((zone, i) => (
+              <div
+                key={zone.id}
+                onPointerDown={(e) => beginZoneDrag(e, i, "move")}
+                onPointerMove={handleZoneDragMove}
+                onPointerUp={endZoneDrag}
+                className={`absolute cursor-move border-2 border-dashed ${
+                  selectedZone === i ? "border-emerald-600 bg-emerald-500/10" : "border-emerald-500/70"
+                }`}
+                style={{
+                  left: `${(zone.positionX - zone.widthRatio / 2) * 100}%`,
+                  top: `${(zone.positionY - zone.heightRatio / 2) * 100}%`,
+                  width: `${zone.widthRatio * 100}%`,
+                  height: `${zone.heightRatio * 100}%`,
+                }}
+              >
+                <span className="pointer-events-none absolute -top-5 left-0 whitespace-nowrap rounded bg-emerald-600 px-1.5 text-[10px] font-medium text-white">
+                  {zone.label}
+                </span>
+                <div
+                  onPointerDown={(e) => beginZoneDrag(e, i, "resize")}
+                  onPointerMove={handleZoneDragMove}
+                  onPointerUp={endZoneDrag}
+                  className="absolute h-3 w-3 cursor-nwse-resize rounded-sm border border-white bg-emerald-600"
                   style={{ right: 0, bottom: 0, transform: "translate(50%, 50%)" }}
                 />
               </div>

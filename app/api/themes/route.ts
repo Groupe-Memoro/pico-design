@@ -4,6 +4,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { parseThemeSlotsField } from "@/lib/pdf/theme";
 import { MAX_THEME_SLOTS } from "@/lib/themeShapes";
 import { storageFileName } from "@/lib/storageName";
+import { parseTextZonesField } from "@/lib/themeText";
 
 /**
  * CRUD des Thèmes (voir supabase/migrations/0046_themes.sql et
@@ -41,6 +42,7 @@ export async function POST(request: Request) {
   const overlayFile = formData.get("overlay");
   const backgroundFile = formData.get("background");
   const slots = parseThemeSlotsField(formData.get("slots"));
+  const textZones = parseTextZonesField(formData.get("textZones")) ?? [];
 
   if (typeof templateId !== "string" || !templateId) {
     return NextResponse.json({ error: "Modèle manquant." }, { status: 400 });
@@ -91,6 +93,8 @@ export async function POST(request: Request) {
       overlay_path: overlayPath,
       ...(backgroundPath ? { background_path: backgroundPath } : {}),
       slots,
+      // Écrite seulement s'il y en a (voir 0076_theme_text_zones.sql).
+      ...(textZones.length > 0 ? { text_zones: textZones } : {}),
       created_by: user.id,
     })
     .select()

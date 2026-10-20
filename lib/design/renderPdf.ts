@@ -9,6 +9,7 @@ import { pdfDownloadName } from "@/lib/imposition/saved";
 import { resolveLayersFromForm } from "@/lib/pdf/layers";
 import { parseThemeSlotAdjustField, themeSlotFilesFromForm } from "@/lib/pdf/theme";
 import type { Template } from "@/lib/types";
+import { parseThemeTextsField } from "@/lib/themeText";
 
 type Db = ReturnType<typeof createAdminSupabaseClient>;
 
@@ -120,6 +121,7 @@ export async function renderPdfFromForm(db: Db, formData: FormData, templateId: 
   const themeId = themeIdFromForm(formData);
   const themeSlotFiles = themeIdFromForm(formData) ? themeSlotFilesFromForm(formData) : null;
   const themeSlotAdjust = parseThemeSlotAdjustField(formData.get("themeSlotAdjust"));
+  const themeTexts = parseThemeTextsField(formData.get("themeTexts"));
   // Cadrage des cases de mosaïque, un jeu par côté (même format que themeSlotAdjust).
   const frontMosaicAdjust = parseThemeSlotAdjustField(formData.get("mosaicCellAdjust"));
   const backMosaicAdjust = parseThemeSlotAdjustField(formData.get("backMosaicCellAdjust"));
@@ -137,6 +139,7 @@ export async function renderPdfFromForm(db: Db, formData: FormData, templateId: 
         themeId,
         themeSlotFiles,
         themeSlotAdjust,
+        themeTexts,
       });
       frontBuffer = front.buffer;
     } catch (err) {

@@ -1,7 +1,8 @@
 "use client";
 
 import { Fragment, useEffect, useRef, useState } from "react";
-import type { LogoShape, Template, ThemeSlot, ThemeSlotAdjust, VisualMode } from "@/lib/types";
+import type { LogoShape, Template, ThemeSlot, ThemeSlotAdjust, VisualMode, ThemeTextZone } from "@/lib/types";
+import ThemeTextOverlay from "@/components/ThemeTextOverlay";
 import type { LogoShadowSettings } from "@/lib/logoShadowSettings";
 import type { VisualWithUrl } from "@/components/VisualsGrid";
 import VisualPicker from "@/components/VisualPicker";
@@ -98,6 +99,9 @@ export interface ImageSourceValue {
   // jeu de valeurs par emplacement (voir composeThemeImage). Case manquante
   // = cadrage "cover" par défaut pour cet emplacement.
   themeSlotAdjust?: ThemeSlotAdjust[];
+  // Texte du client pour chaque zone de texte du thème (même ordre que
+  // `theme.text_zones`) ; absent = texte de départ de la zone.
+  themeTexts?: (string | null)[];
   // Banque de photos (sourceMode "theme") : les photos ajoutées par le
   // client, indépendamment des emplacements — glissées ensuite dans
   // `themeSlotFiles` (voir ThemeBankThumbnail/ThemeSlotDropTarget). Retirer
@@ -563,6 +567,7 @@ export default function ImageSourcePicker({
   themeId = null,
   themeSlots = [],
   themeOverlayUrl = null,
+  themeTextZones = [],
   themeBackgroundUrl = null,
   selectedThemeSlot = null,
   onSelectThemeSlot,
@@ -645,6 +650,8 @@ export default function ImageSourcePicker({
   // Graphisme du thème (avec transparence) — affiché par-dessus les photos,
   // fixe, jamais déplaçable (comme frameOverlayUrl).
   themeOverlayUrl?: string | null;
+  // Zones de texte du thème, dessinées par-dessus le graphisme (recto).
+  themeTextZones?: ThemeTextZone[];
   // Image de fond du thème (facultative) — sous les photos, fixe.
   themeBackgroundUrl?: string | null;
   // Emplacement actuellement sélectionné (glisser/zoomer l'affecte, lui et
@@ -1750,6 +1757,15 @@ export default function ImageSourcePicker({
                   alt=""
                   draggable={false}
                   className="pointer-events-none absolute inset-0 h-full w-full"
+                />
+              )}
+              {isTheme && template && (
+                <ThemeTextOverlay
+                  zones={themeTextZones}
+                  texts={value.themeTexts}
+                  pageWidthMm={template.width_mm + template.bleed_mm * 2}
+                  boxWidth={boxSize.width}
+                  boxHeight={boxSize.height}
                 />
               )}
               {/* Calques (texte/image) : entre le fond et le cadre — visibles

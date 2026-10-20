@@ -100,6 +100,33 @@ export interface ThemeSlot {
   maskSvg?: string;
 }
 
+// Zone de texte d'un thème : un rectangle de la page (centre et taille en
+// fractions de la page, fond perdu compris — comme ThemeSlot) où le client
+// écrit son texte. La taille de police est un maximum : un texte trop long
+// rapetisse pour tenir dans la zone (voir fitThemeTextSize).
+export type ThemeTextAlign = "left" | "center" | "right";
+export interface ThemeTextZone {
+  id: string;
+  // Ce qu'on demande au client (« Nom de l'élève »).
+  label: string;
+  // Texte de départ, que le client remplace (vide = zone vide au départ).
+  defaultText: string;
+  positionX: number;
+  positionY: number;
+  widthRatio: number;
+  heightRatio: number;
+  fontId: string;
+  fontSizeMm: number;
+  bold: boolean;
+  italic: boolean;
+  color: string;
+  align: ThemeTextAlign;
+  // Nombre de caractères permis (0 = sans limite) et retours à la ligne.
+  maxChars: number;
+  multiline: boolean;
+  uppercase: boolean;
+}
+
 // Ajustement (position/zoom) apporté par le CLIENT à la photo d'un
 // emplacement, à l'intérieur de son rectangle (voir ThemeSlot, fixé par
 // l'admin) — même sémantique que positionX/positionY/scale d'ImageSourceValue
@@ -125,6 +152,9 @@ export interface Theme {
   // pas de photo. Sans fond, la page est blanche sous les photos.
   background_path?: string | null;
   slots: ThemeSlot[];
+  // Zones de texte libres (voir lib/themeText.ts et la migration 0076) : le
+  // client y écrit ce qu'il veut, dans la police et la couleur fixées ici.
+  text_zones?: ThemeTextZone[];
   created_at: string;
   created_by: string | null;
 }

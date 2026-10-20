@@ -16,6 +16,7 @@ import { parsePositionValue } from "@/lib/pdf/crop";
 import { applyOrientation } from "@/lib/pdf/orientation";
 import { parseThemeSlotAdjustField, themeSlotFilesFromForm } from "@/lib/pdf/theme";
 import type { LogoShape, Template, VisualMode } from "@/lib/types";
+import { parseThemeTextsField } from "@/lib/themeText";
 
 // Plus grand côté des images d'aperçu renvoyées à l'écran (écrans haute densité compris).
 const PREVIEW_IMAGE_MAX_PX = 1800;
@@ -96,6 +97,7 @@ export async function POST(request: Request) {
   const themeSlotAdjust = parseThemeSlotAdjustField(
     formData.get("themeSlotAdjust"),
   );
+  const themeTexts = parseThemeTextsField(formData.get("themeTexts"));
   const logoShape = formData.get("logoShape");
   const logoColor = formData.get("logoColor");
   const logoSecondaryColor = formData.get("logoSecondaryColor");
@@ -209,6 +211,7 @@ export async function POST(request: Request) {
       themeId,
       themeSlotFiles,
       themeSlotAdjust,
+      themeTexts,
       // Un aperçu : inutile de composer un visuel de la banque à 300 dpi.
       maxPx: PREVIEW_IMAGE_MAX_PX,
     });
