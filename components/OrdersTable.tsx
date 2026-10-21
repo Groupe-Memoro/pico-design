@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { DownloadIcon, RefreshCcwIcon, SpinnerIcon, TrashIcon } from "@/components/icons";
+import { DownloadIcon, EyeIcon, RefreshCcwIcon, SpinnerIcon, TrashIcon } from "@/components/icons";
 
 export interface OrderRow {
   id: string;
@@ -14,6 +14,8 @@ export interface OrderRow {
   shop_domain: string | null;
   // Date du retrait de l'outil (null = commande visible), voir 0063_orders_archived.sql.
   archived_at: string | null;
+  // Date à laquelle quelqu'un l'a regardée (null = nouvelle), voir 0077_orders_viewed.sql.
+  viewed_at?: string | null;
   created_at: string;
   order_items: {
     id: string;
@@ -240,6 +242,23 @@ export default function OrdersTable({
     setRecherche("");
   }
 
+  // La pastille du menu (voir Nav) se met à jour aussitôt.
+  const notifyMenu = () => window.dispatchEvent(new Event("pico:orders-changed"));
+
+  // Une commande regardée (ouverte dans Shopify, PDF, suivi, retrait…) n'est
+  // plus « nouvelle » : pour toute l'équipe.
+  async function marquerVue(order: OrderRow, vue = true) {
+    if (vue === Boolean(order.viewed_at)) return;
+    const now = vue ? new Date().toISOString() : null;
+    setRows((all) => all.map((o) => (o.id === order.id ? { ...o, viewed_at: now } : o)));
+    await fetch(`/api/orders/${order.id}/viewed`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ viewed: vue }),
+    }).catch(() => null);
+    notifyMenu();
+  }
+
   async function archiver(order: OrderRow, archived: boolean) {
     const numero = order.order_number ?? order.shopify_order_id;
     if (
@@ -252,7 +271,9 @@ export default function OrdersTable({
     }
     const before = order.archived_at;
     const now = archived ? new Date().toISOString() : null;
-    setRows((all) => all.map((o) => (o.id === order.id ? { ...o, archived_at: now } : o)));
+    setRows((all) =>
+      all.map((o) => (o.id === order.id ? { ...o, archived_at: now, viewed_at: archived ? now : o.viewed_at } : o))
+    );
     const res = await fetch(`/api/orders/${order.id}/archive`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -263,12 +284,13 @@ export default function OrdersTable({
       const data = res ? await res.json().catch(() => ({})) : {};
       alert(data.error ?? "L'opération a échoué.");
     }
+    notifyMenu();
   }
 
   async function changeStatus(orderId: string, picoStatus: string) {
     setRows((all) =>
       all.map((o) =>
-        o.id === orderId ? { ...o, pico_status: picoStatus } : o,
+        o.id === orderId ? { ...o, pico_status: picoStatus, viewed_at: o.viewed_at ?? new Date().toISOString() } : o,
       ),
     );
     await fetch(`/api/orders/${orderId}/status`, {
@@ -276,6 +298,7 @@ export default function OrdersTable({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ picoStatus }),
     });
+    notifyMenu();
   }
 
   if (rows.length === 0) {
@@ -425,6 +448,7 @@ export default function OrdersTable({
                       href={`https://${order.shop_domain ?? shopDomain}/admin/orders/${order.shopify_order_id}`}
                       target="_blank"
                       rel="noreferrer"
+                      onClick={() => marquerVue(order)}
                       className="font-medium text-primary underline"
                     >
                       {order.order_number ?? order.shopify_order_id}
@@ -432,6 +456,11 @@ export default function OrdersTable({
                   ) : (
                     <span className="font-medium">
                       {order.order_number ?? order.shopify_order_id}
+                    </span>
+                  )}
+                  {!order.viewed_at && !order.archived_at && (
+                    <span className="ml-2 rounded-full bg-primary px-2 py-0.5 text-[11px] font-semibold text-text-on-brand">
+                      Nouvelle
                     </span>
                   )}
                 </td>
@@ -483,7 +512,10 @@ export default function OrdersTable({
                                 ? `/api/orders/${item.design_submission_id}/pdf`
                                 : `/api/products/${item.product_id}/pdf`
                             }
-                            onClick={() => setBusy(item.id)}
+                            onClick={() => {
+                              setBusy(item.id);
+                              void marquerVue(order);
+                            }}
                             className="inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-xs text-text-muted hover:text-text"
                           >
                             {busy === item.id ? (
@@ -506,7 +538,10 @@ export default function OrdersTable({
                       (order.order_items.length > 1 || order.order_items.some((i) => i.quantity > 1)) && (
                         <button
                           type="button"
-                          onClick={() => downloadPrints(order.id)}
+                          onClick={() => {
+                            void marquerVue(order);
+                            downloadPrints(order.id);
+                          }}
                           disabled={busy === `prints-${order.id}`}
                           className="inline-flex w-fit items-center gap-1 rounded-lg border border-border px-2 py-1 text-xs text-text-muted hover:text-text disabled:opacity-60"
                         >
@@ -517,6 +552,17 @@ export default function OrdersTable({
                   </div>
                 </td>
                 <td className="whitespace-nowrap px-4 py-3 text-right">
+                  {!order.archived_at && (
+                    <button
+                      type="button"
+                      onClick={() => marquerVue(order, !order.viewed_at)}
+                      title={order.viewed_at ? "Remettre en nouvelle commande" : "Marquer comme vue"}
+                      aria-label={order.viewed_at ? "Remettre en nouvelle commande" : "Marquer comme vue"}
+                      className="inline-flex rounded-lg p-1.5 text-text-muted hover:bg-surface-muted hover:text-text"
+                    >
+                      <EyeIcon className={`h-4 w-4 ${order.viewed_at ? "opacity-40" : ""}`} />
+                    </button>
+                  )}
                   {order.archived_at ? (
                     <button
                       type="button"

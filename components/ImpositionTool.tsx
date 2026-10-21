@@ -20,7 +20,7 @@ import {
   type Layout,
   type PieceOrientation,
 } from "@/lib/imposition/layout";
-import { DUPLO_MARKS, computeDuploLayout } from "@/lib/imposition/duplo";
+import { DUPLO_MARKS, computeDuploLayout, computeDuploTwoPassLayout } from "@/lib/imposition/duplo";
 import { MAX_DOCUMENT_COPIES, leafAt, planDocument } from "@/lib/imposition/documentPlan";
 import { regMarkRects, type MmRect } from "@/lib/imposition/regmark";
 import { formatInches, sheetLabel } from "@/lib/imposition/presets";
@@ -29,6 +29,7 @@ import { MM_TO_PT, formatIn } from "@/lib/pdf/units";
 import { MACHINES, MACHINE_LABELS, type CutterMachine } from "@/lib/imposition/machines";
 import type { SavedImposition } from "@/lib/imposition/saved";
 import type { ImpositionCutter, ImpositionDuploJob, ImpositionSheet } from "@/lib/types";
+import SearchSelect from "@/components/SearchSelect";
 
 // Taille de page (fond perdu inclus) d'un format du catalogue.
 export interface FormatOption {
@@ -168,6 +169,14 @@ export default function ImpositionTool({
   // catalogue) ; la Graphtec l'est, par un profil de découpe.
   const [machine, setMachine] = useState<CutterMachine>(cfg?.machine ?? "duplo");
   const [duploJobId, setDuploJobId] = useState(cfg?.duploJobId ?? "");
+  // 2e passe sur la Duplo (ex. couper puis rainer) : son job ("" = aucune) et
+  // la façon de remettre la feuille, qui dépend du job.
+  const [duploJob2Id, setDuploJob2Id] = useState(cfg?.duploJob2Id ?? "");
+  // Deux passes : le 1er job coupe la feuille en morceaux, le 2e repasse chaque
+  // morceau (coupe finale, rainure) — ex. cartes de souhait.
+  const [twoPass, setTwoPass] = useState(Boolean(cfg?.duploJob2Id));
+  // Le morceau entre-t-il tourné vers la droite (horaire) ou la gauche ?
+  const [duploJob2Turn, setDuploJob2Turn] = useState<"cw" | "ccw">(cfg?.duploJob2Turn ?? "cw");
   const [cutterId, setCutterId] = useState(cfg?.cutterId ?? "");
   const [showMarks, setShowMarks] = useState(true);
   const [showGuide, setShowGuide] = useState(true);
@@ -332,8 +341,64 @@ export default function ImpositionTool({
       })
       .sort((a, b) => b.layout.cells.length - a.layout.cells.length || a.job.job_no - b.job.job_no);
   }, [duploJobs, isDuplo, sheet, piece.widthMm, piece.heightMm, piece.bleedMm, orientation]);
-  // Un job qui ne convient plus (autre feuille, autre format) est simplement ignoré.
-  const activeDuplo = duploCandidates.find((c) => c.job.id === duploJobId) ?? null;
+  // Jobs prévus pour la taille de la feuille choisie (dans un sens ou l'autre).
+  const fitsSheet = (j: (typeof duploJobs)[number]) =>
+    Boolean(sheet) &&
+    ((Math.abs(j.width_mm - sheet!.width_mm) <= 1 && Math.abs(j.length_mm - sheet!.height_mm) <= 1) ||
+      (Math.abs(j.width_mm - sheet!.height_mm) <= 1 && Math.abs(j.length_mm - sheet!.width_mm) <= 1));
+  const geometry = (j: (typeof duploJobs)[number]) => ({ widthMm: j.width_mm, lengthMm: j.length_mm, slits: j.slits, cuts: j.cuts });
+  const selectedJob1 = duploJobs.find((j) => j.id === duploJobId) ?? null;
+  const selectedJob2 = twoPass ? (duploJobs.find((j) => j.id === duploJob2Id && j.id !== duploJobId) ?? null) : null;
+  // Deux passes : la grille vient des deux jobs ensemble.
+  const twoPassResult = useMemo(() => {
+    if (!isDuplo || !twoPass || !sheet || !selectedJob1 || !selectedJob2) return null;
+    return computeDuploTwoPassLayout({
+      job1: geometry(selectedJob1),
+      job2: geometry(selectedJob2),
+      sheetWidth: sheet.width_mm,
+      sheetHeight: sheet.height_mm,
+      pieceWidth: piece.widthMm,
+      pieceHeight: piece.heightMm,
+      bleedMm: piece.bleedMm,
+      orientation,
+      offsetX: 0,
+      offsetY: 0,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDuplo, twoPass, sheet, selectedJob1, selectedJob2, piece.widthMm, piece.heightMm, piece.bleedMm, orientation]);
+  // 2e passe : les jobs qui vont avec le 1er d'abord, puis tous les autres.
+  const secondPassFits = useMemo(() => {
+    if (!twoPass || !sheet || !selectedJob1) return new Map<string, number>();
+    const fits = new Map<string, number>();
+    for (const j of duploJobs) {
+      if (j.id === selectedJob1.id) continue;
+      const r = computeDuploTwoPassLayout({
+        job1: geometry(selectedJob1),
+        job2: geometry(j),
+        sheetWidth: sheet.width_mm,
+        sheetHeight: sheet.height_mm,
+        pieceWidth: piece.widthMm,
+        pieceHeight: piece.heightMm,
+        bleedMm: piece.bleedMm,
+        orientation,
+        offsetX: 0,
+        offsetY: 0,
+      });
+      if (r) fits.set(j.id, r.layout.cells.length);
+    }
+    return fits;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [twoPass, sheet, selectedJob1, duploJobs, piece.widthMm, piece.heightMm, piece.bleedMm, orientation]);
+  // Le job actif et sa grille : une passe (le job coupe ce format), ou deux.
+  const onePassLayout = !twoPass ? (duploCandidates.find((c) => c.job.id === duploJobId)?.layout ?? null) : null;
+  const activeDuplo =
+    selectedJob1 && (onePassLayout || twoPassResult)
+      ? { job: selectedJob1, layout: (onePassLayout ?? twoPassResult!.layout) }
+      : null;
+  const activeDuplo2 = activeDuplo && twoPass ? selectedJob2 : null;
+  // Une passe, job choisi parmi « les autres » : ses traits ne tombent pas sur ce format.
+  const mismatchedDuplo = !twoPass && !activeDuplo ? selectedJob1 : null;
+  const otherDuploJobs = duploJobs.filter((j) => !duploCandidates.some((c) => c.job.id === j.id));
   // Grille de la Graphtec : celle du profil, fixe (colonnes × rangées, marges, espacement).
   const cutterLayout = useMemo(() => {
     if (!activeCutter || !sheet) return null;
@@ -475,8 +540,10 @@ export default function ImpositionTool({
       : !activeDuplo
         ? duploJobs.length === 0
           ? "Importez le catalogue de jobs de la Duplo (Job Duplo > Gérer)."
-          : duploCandidates.length === 0
-            ? "Aucun job Duplo ne convient à cette feuille et à ce format : créez-le sur la Duplo, puis réimportez l'AllJobs."
+          : twoPass
+            ? "Choisissez deux jobs Duplo qui vont ensemble (passe 1 et passe 2)."
+            : duploCandidates.length === 0
+            ? "Aucun job Duplo ne coupe ce format en une passe : créez-le sur la Duplo, ou essayez « Deux passes »."
             : "Choisissez un job Duplo."
         : null
     : !activeCutter
@@ -630,6 +697,10 @@ export default function ImpositionTool({
     body.append("sheetId", sheet.id);
     body.append("machine", machine);
     if (activeDuplo) body.append("duploJobId", activeDuplo.job.id);
+    if (activeDuplo2) {
+      body.append("duploJob2Id", activeDuplo2.id);
+      body.append("duploJob2Turn", duploJob2Turn);
+    }
     if (activeCutter) body.append("cutterId", activeCutter.id);
     body.append("pieceWidthMm", String(piece.widthMm));
     body.append("pieceHeightMm", String(piece.heightMm));
@@ -644,6 +715,8 @@ export default function ImpositionTool({
         sheetId: sheet.id,
         machine,
         duploJobId: activeDuplo?.job.id ?? "",
+        duploJob2Id: activeDuplo2?.id ?? "",
+        duploJob2Turn,
         cutterId: activeCutter?.id ?? "",
         formatId,
         custom: { widthMm: customWidth, heightMm: customHeight, bleedMm: customBleed },
@@ -788,20 +861,25 @@ export default function ImpositionTool({
             {!isDocument && (
             <div>
               <label className={labelClass}>Format</label>
-              <select value={formatId} onChange={(e) => setFormatId(e.target.value)} className={selectClass}>
-                {formatGroups.map((group) => (
-                  <optgroup key={group.category} label={group.category}>
-                    {group.formats.map((f) => (
-                      <option key={f.id} value={f.id}>
-                        {/* Format fini à l'affichage ; la page (fond perdu
-                            compris) reste celle du calcul de la feuille. */}
-                        {f.name} · {sizeLabel(f.widthMm - 2 * f.bleedMm, f.heightMm - 2 * f.bleedMm)}
-                      </option>
-                    ))}
-                  </optgroup>
-                ))}
-                <option value={CUSTOM}>Personnalisé…</option>
-              </select>
+              <SearchSelect
+                value={formatId}
+                onChange={setFormatId}
+                className={selectClass}
+                ariaLabel="Format"
+                placeholder="Rechercher un format (nom, taille…)"
+                options={[
+                  ...formatGroups.flatMap((group) =>
+                    group.formats.map((f) => ({
+                      value: f.id,
+                      // Taille sans le fond perdu ; la page (fond perdu compris)
+                      // reste celle du calcul de la feuille.
+                      label: `${f.name} · ${sizeLabel(f.widthMm - 2 * f.bleedMm, f.heightMm - 2 * f.bleedMm)}`,
+                      group: group.category,
+                    }))
+                  ),
+                  { value: CUSTOM, label: "Personnalisé…", group: "Autre" },
+                ]}
+              />
               {formatId === CUSTOM && (
                 <div className="mt-3 space-y-2">
                   <div className="flex justify-end">
@@ -921,24 +999,131 @@ export default function ImpositionTool({
                     Gérer
                   </button>
                 </div>
+                <label className="mt-1 flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={twoPass}
+                    onChange={(e) => {
+                      setTwoPass(e.target.checked);
+                      if (!e.target.checked) setDuploJob2Id("");
+                    }}
+                  />
+                  Deux passes (la feuille est coupée en morceaux, puis chaque morceau repasse)
+                </label>
+                {twoPass && <p className="mt-2 text-xs font-medium text-neutral-600">Passe 1 — découpe de la feuille</p>}
                 <select
-                  value={activeDuplo?.job.id ?? ""}
+                  value={selectedJob1?.id ?? ""}
                   onChange={(e) => setDuploJobId(e.target.value)}
                   className={selectClass}
                 >
                   <option value="">
                     {duploJobs.length === 0
                       ? "— Aucun job importé —"
-                      : duploCandidates.length === 0
-                        ? "— Aucun job pour cette feuille et ce format —"
-                        : "— Choisir un job —"}
+                      : "— Choisir un job —"}
                   </option>
-                  {duploCandidates.map(({ job, layout: jobLayout }) => (
-                    <option key={job.id} value={job.id}>
-                      N° {job.job_no} — {job.name} · {jobLayout.cells.length} pièces ({jobLayout.cols} × {jobLayout.rows})
-                    </option>
-                  ))}
+                  {twoPass
+                    ? [
+                        { label: "Pour cette feuille", jobs: duploJobs.filter(fitsSheet) },
+                        { label: "Autres jobs", jobs: duploJobs.filter((j) => !fitsSheet(j)) },
+                      ]
+                        .filter((g) => g.jobs.length > 0)
+                        .map((g) => (
+                          <optgroup key={g.label} label={g.label}>
+                            {g.jobs.map((job) => (
+                              <option key={job.id} value={job.id}>
+                                N° {job.job_no} — {job.name}
+                              </option>
+                            ))}
+                          </optgroup>
+                        ))
+                    : (
+                      <>
+                        {duploCandidates.length > 0 && (
+                          <optgroup label="Pour cette feuille et ce format">
+                            {duploCandidates.map(({ job, layout: jobLayout }) => (
+                              <option key={job.id} value={job.id}>
+                                N° {job.job_no} — {job.name} · {jobLayout.cells.length} pièces ({jobLayout.cols} × {jobLayout.rows})
+                              </option>
+                            ))}
+                          </optgroup>
+                        )}
+                        {otherDuploJobs.length > 0 && (
+                          <optgroup label="Autres jobs">
+                            {otherDuploJobs.map((job) => (
+                              <option key={job.id} value={job.id}>
+                                N° {job.job_no} — {job.name}
+                              </option>
+                            ))}
+                          </optgroup>
+                        )}
+                      </>
+                    )}
                 </select>
+                {mismatchedDuplo && (
+                  <p className="mt-1 text-xs text-amber-700">
+                    Les traits du job n° {mismatchedDuplo.job_no} ne tombent pas sur ce format : il ne peut pas couper
+                    ces pièces en une passe. S&apos;il coupe la feuille en morceaux à repasser, cochez « Deux passes ».
+                  </p>
+                )}
+                {twoPass && (
+                  <>
+                    <p className="mt-3 text-xs font-medium text-neutral-600">Passe 2 — sur chaque morceau (coupe finale, rainure)</p>
+                    <select
+                      value={selectedJob2?.id ?? ""}
+                      onChange={(e) => setDuploJob2Id(e.target.value)}
+                      className={selectClass}
+                      disabled={!selectedJob1}
+                    >
+                      <option value="">{selectedJob1 ? "— Choisir le job de la 2e passe —" : "— Choisissez d'abord la passe 1 —"}</option>
+                      {[
+                        { label: "Vont avec la passe 1", jobs: duploJobs.filter((j) => secondPassFits.has(j.id)) },
+                        { label: "Autres jobs", jobs: duploJobs.filter((j) => j.id !== selectedJob1?.id && !secondPassFits.has(j.id)) },
+                      ]
+                        .filter((g) => g.jobs.length > 0)
+                        .map((g) => (
+                          <optgroup key={g.label} label={g.label}>
+                            {g.jobs.map((job) => (
+                              <option key={job.id} value={job.id}>
+                                N° {job.job_no} — {job.name}
+                                {secondPassFits.has(job.id) ? ` · ${secondPassFits.get(job.id)} pièces` : ""}
+                              </option>
+                            ))}
+                          </optgroup>
+                        ))}
+                    </select>
+                    {selectedJob1 && selectedJob2 && !twoPassResult && (
+                      <p className="mt-1 text-xs text-amber-700">
+                        Ces deux jobs ne vont pas ensemble : la passe 1 doit couper la feuille en morceaux de{" "}
+                        {Math.round(selectedJob2.width_mm * 10) / 10} × {Math.round(selectedJob2.length_mm * 10) / 10} mm (la
+                        feuille du job n° {selectedJob2.job_no}), et ce job doit couper ce format dans chaque morceau.
+                      </p>
+                    )}
+                    {twoPassResult && selectedJob2 && (
+                      <p className="mt-1 text-xs text-neutral-500">
+                        {twoPassResult.pieces.length} morceau{twoPassResult.pieces.length > 1 ? "x" : ""} ×{" "}
+                        {twoPassResult.layout.cells.length / twoPassResult.pieces.length} pièce
+                        {twoPassResult.layout.cells.length / twoPassResult.pieces.length > 1 ? "s" : ""} ={" "}
+                        {twoPassResult.layout.cells.length} pièces. Le code-barres
+                        {selectedJob2.reg_mark ? " et le repère REG" : ""} du job n° {selectedJob2.job_no} sont posés sur
+                        chaque morceau, en haut à droite une fois le morceau dans la machine.
+                        {barcodeJobNos.includes(selectedJob2.job_no) ? "" : " ⚠ Aucun code-barres importé pour ce job."}
+                      </p>
+                    )}
+                    {twoPassResult?.pieces[0]?.rotated && (
+                      <label className="mt-2 block text-xs text-neutral-600">
+                        Le morceau entre tourné d&apos;un quart de tour :
+                        <select
+                          value={duploJob2Turn}
+                          onChange={(e) => setDuploJob2Turn(e.target.value === "ccw" ? "ccw" : "cw")}
+                          className={`${selectClass} mt-1`}
+                        >
+                          <option value="cw">Tourné vers la droite (sens horaire) — code sur le bord gauche du morceau</option>
+                          <option value="ccw">Tourné vers la gauche (sens antihoraire) — code sur le bord droit du morceau</option>
+                        </select>
+                      </label>
+                    )}
+                  </>
+                )}
                 {activeDuplo && (
                   <p className="mt-1 text-xs text-neutral-500">
                     Les pièces suivent les traits du job : marges, espacement et centrage du profil sont ignorés

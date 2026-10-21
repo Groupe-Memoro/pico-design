@@ -27,7 +27,7 @@ import {
   type Layout,
   type LayoutInput,
 } from "./layout";
-import { computeDuploLayout, type DuploJobGeometry } from "./duplo";
+import { computeDuploLayout, computeDuploTwoPassLayout, type DuploJobGeometry, type DuploPiece } from "./duplo";
 import { regMarkFits, regMarkRects, type RegCorner } from "./regmark";
 
 export interface ImpositionSource {
@@ -73,6 +73,40 @@ export interface ImposeInput extends LayoutInput {
   pieceBleedMm?: number;
   barcode?: ImpositionBarcode | null;
   regMark?: ImpositionRegMark | null;
+  // 2e passe sur la Duplo (ex. cartes de souhait) : le job qui repasse chaque
+  // morceau coupé par le 1er job (voir computeDuploTwoPassLayout), et son
+  // code-barres et repère REG, posés en haut de chaque morceau.
+  duploJob2?: DuploJobGeometry | null;
+  secondPass?: DuploSecondPass | null;
+}
+
+export interface DuploSecondPass {
+  barcode: ImpositionBarcode | null;
+  regMark: ImpositionRegMark | null;
+  // Morceau tourné d'un quart de tour pour entrer dans la machine : dans le
+  // sens horaire ("cw") ou antihoraire ("ccw"). Sans effet si le morceau
+  // garde le sens de la feuille.
+  turn?: "cw" | "ccw";
+}
+
+// Code-barres et repère d'un morceau qui entre tourné : le coin « haut-droite »
+// du 2e job, vu une fois le morceau tourné, ramené sur la feuille. Tourné dans
+// le sens horaire, le bord gauche du morceau devient le bord d'attaque.
+function turnedMarks(second: DuploSecondPass): Pick<DuploSecondPass, "barcode" | "regMark"> {
+  const cw = (second.turn ?? "cw") === "cw";
+  const corner = cw ? ("top-left" as const) : ("bottom-right" as const);
+  return {
+    barcode: second.barcode
+      ? {
+          ...second.barcode,
+          corner,
+          xMm: second.barcode.yMm,
+          yMm: second.barcode.xMm,
+          rotation: (((cw ? 90 : 270) + second.barcode.rotation) % 360) as Rotation,
+        }
+      : null,
+    regMark: second.regMark ? { corner, sideMm: second.regMark.leadMm, leadMm: second.regMark.sideMm } : null,
+  };
 }
 
 export interface ImposeResult {
@@ -220,7 +254,10 @@ async function drawBarcode(
   sheetPage: ReturnType<PDFDocument["addPage"]>,
   barcode: ImpositionBarcode,
   sheetWidth: number,
-  sheetHeight: number
+  sheetHeight: number,
+  // Rectangle de référence pour le coin d'ancrage (un morceau de la 1re passe) ;
+  // absent = la feuille entière.
+  frame: DuploPiece = { x: 0, y: 0, width: sheetWidth, height: sheetHeight }
 ) {
   let embedded: PDFEmbeddedPage;
   try {
@@ -231,8 +268,8 @@ async function drawBarcode(
   const turned = barcode.rotation % 180 !== 0;
   const width = mm(turned ? embedded.height : embedded.width);
   const height = mm(turned ? embedded.width : embedded.height);
-  const x = barcode.corner.endsWith("right") ? sheetWidth - barcode.xMm - width : barcode.xMm;
-  const y = barcode.corner.startsWith("bottom") ? sheetHeight - barcode.yMm - height : barcode.yMm;
+  const x = frame.x + (barcode.corner.endsWith("right") ? frame.width - barcode.xMm - width : barcode.xMm);
+  const y = frame.y + (barcode.corner.startsWith("bottom") ? frame.height - barcode.yMm - height : barcode.yMm);
   if (
     x < -PAGE_SIZE_TOLERANCE_MM ||
     y < -PAGE_SIZE_TOLERANCE_MM ||
@@ -266,6 +303,7 @@ async function drawBarcode(
     toPdfRect({ col: 0, row: 0, x, y, width, height }, sheetHeight),
     barcode.rotation
   );
+  return { x, y, width, height };
 }
 
 // Repère REG : deux traits noirs (K seul) formant un L.
@@ -273,9 +311,14 @@ function drawRegMark(
   sheetPage: ReturnType<PDFDocument["addPage"]>,
   reg: ImpositionRegMark,
   sheetWidth: number,
-  sheetHeight: number
+  sheetHeight: number,
+  frame: DuploPiece = { x: 0, y: 0, width: sheetWidth, height: sheetHeight }
 ) {
-  const rects = regMarkRects(reg.corner, reg.sideMm, reg.leadMm, sheetWidth, sheetHeight);
+  const rects = regMarkRects(reg.corner, reg.sideMm, reg.leadMm, frame.width, frame.height).map((r) => ({
+    ...r,
+    x: r.x + frame.x,
+    y: r.y + frame.y,
+  }));
   if (!regMarkFits(rects, sheetWidth, sheetHeight)) {
     throw new Error(
       `Le repère REG de ce job (à ${fmtMm(reg.sideMm)} × ${fmtMm(reg.leadMm)} du bord) déborde de la feuille.`
@@ -377,7 +420,29 @@ export function backRotationFor(frontRotation: Rotation, verticalAxis: boolean):
 
 export async function imposeToPdf(input: ImposeInput): Promise<ImposeResult> {
   let layout: Layout | null;
-  if (input.duploJob) {
+  // Morceaux coupés par le 1er job, quand il y a une 2e passe.
+  let duploPieces: DuploPiece[] = [];
+  if (input.duploJob && input.duploJob2) {
+    const twoPass = computeDuploTwoPassLayout({
+      job1: input.duploJob,
+      job2: input.duploJob2,
+      sheetWidth: input.sheetWidth,
+      sheetHeight: input.sheetHeight,
+      pieceWidth: input.pieceWidth,
+      pieceHeight: input.pieceHeight,
+      bleedMm: input.pieceBleedMm ?? 0,
+      orientation: input.orientation,
+      offsetX: input.offsetX,
+      offsetY: input.offsetY,
+    });
+    if (!twoPass) {
+      throw new Error(
+        "Ces deux jobs Duplo ne vont pas ensemble : le 1er doit couper la feuille en morceaux de la taille de feuille du 2e, et le 2e doit couper ce format dans chaque morceau."
+      );
+    }
+    layout = twoPass.layout;
+    duploPieces = twoPass.pieces;
+  } else if (input.duploJob) {
     layout = computeDuploLayout({
       job: input.duploJob,
       sheetWidth: input.sheetWidth,
@@ -449,6 +514,32 @@ export async function imposeToPdf(input: ImposeInput): Promise<ImposeResult> {
         const source = prepared[index];
         drawPiece(front, source.front, cell, input.sheetHeight, frontRotationFor(source, cell));
       });
+    });
+  }
+
+  // 2e passe : le code-barres et le repère du 2e job en haut de chaque
+  // morceau coupé par le 1er, là où la machine les lit au 2e passage — par-dessus
+  // les visuels (le fond perdu d'une pièce ne doit pas les masquer), mais jamais
+  // sur une pièce finie.
+  const second = input.secondPass ?? null;
+  if (second && duploPieces.length > 0 && (second.barcode || second.regMark)) {
+    const bleed = input.pieceBleedMm ?? 0;
+    const finished = layout.cells.map((c) => ({ x: c.x + bleed, y: c.y + bleed, width: c.width - 2 * bleed, height: c.height - 2 * bleed }));
+    const overlaps = (r: { x: number; y: number; width: number; height: number }) =>
+      finished.some((f) => r.x < f.x + f.width - 0.01 && r.x + r.width > f.x + 0.01 && r.y < f.y + f.height - 0.01 && r.y + r.height > f.y + 0.01);
+    await inLayer(front, layers.add("Marques 2e passe (sur chaque morceau)"), async () => {
+      for (const piece of duploPieces) {
+        const marks = piece.rotated ? turnedMarks(second) : second;
+        if (marks.barcode) {
+          const rect = await drawBarcode(out, front, marks.barcode, input.sheetWidth, input.sheetHeight, piece);
+          if (overlaps(rect)) {
+            throw new Error(
+              "Le code-barres de la 2e passe tomberait sur une pièce finie : le 2e job ne laisse pas assez de place au-dessus des pièces."
+            );
+          }
+        }
+        if (marks.regMark) drawRegMark(front, marks.regMark, input.sheetWidth, input.sheetHeight, piece);
+      }
     });
   }
 

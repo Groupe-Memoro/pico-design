@@ -174,10 +174,9 @@ function intervals(edges: number[], extent: number, size: number): [number, numb
   const all = [0, ...edges.filter((e) => e > 0 && e < extent), extent];
   const result: [number, number][] = [];
   for (let i = 0; i < all.length - 1; i++) {
-    if (Math.abs(all[i + 1] - all[i] - size) <= PIECE_TOLERANCE_MM) {
-      result.push([all[i], all[i + 1]]);
-      i++;
-    }
+    // Deux pièces voisines peuvent partager un même trait (pas de bande
+    // perdue entre elles) : l'intervalle suivant est examiné lui aussi.
+    if (Math.abs(all[i + 1] - all[i] - size) <= PIECE_TOLERANCE_MM) result.push([all[i], all[i + 1]]);
   }
   return result;
 }
@@ -261,5 +260,82 @@ export function computeDuploLayout(input: DuploLayoutInput): Layout | null {
     cellHeight,
     cells,
     usable: { x: x0, y: y0, width: x1 - x0, height: y1 - y0 },
+  };
+}
+
+// Morceau de feuille coupé à la 1re passe, en mm sur la feuille.
+export interface DuploPiece {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  // Vrai si le morceau entre dans la machine tourné d'un quart de tour par
+  // rapport à la feuille (sa largeur sur la feuille est la longueur du 2e job).
+  rotated?: boolean;
+}
+
+/**
+ * Deux passes sur la Duplo (ex. cartes de souhait) : le 1er job coupe la
+ * feuille en morceaux de la taille de feuille du 2e job (ex. 12 × 18 → deux
+ * 10 × 8), puis chaque morceau repasse avec le 2e job, qui coupe la pièce
+ * finale (et la rainure). Les pièces sont placées selon les traits du 2e job,
+ * dans chaque morceau. Retourne null si l'un des deux jobs ne convient pas.
+ */
+export function computeDuploTwoPassLayout(
+  input: Omit<DuploLayoutInput, "job"> & { job1: DuploJobGeometry; job2: DuploJobGeometry }
+): { layout: Layout; pieces: DuploPiece[] } | null {
+  const stage1 = computeDuploLayout({
+    job: input.job1,
+    sheetWidth: input.sheetWidth,
+    sheetHeight: input.sheetHeight,
+    pieceWidth: input.job2.widthMm,
+    pieceHeight: input.job2.lengthMm,
+    bleedMm: 0,
+    orientation: "auto",
+    offsetX: 0,
+    offsetY: 0,
+  });
+  if (!stage1) return null;
+  const cells: Cell[] = [];
+  let local: Layout | null = null;
+  for (const piece of stage1.cells) {
+    local = computeDuploLayout({
+      job: input.job2,
+      sheetWidth: piece.width,
+      sheetHeight: piece.height,
+      pieceWidth: input.pieceWidth,
+      pieceHeight: input.pieceHeight,
+      bleedMm: input.bleedMm,
+      orientation: input.orientation,
+      offsetX: 0,
+      offsetY: 0,
+    });
+    if (!local) return null;
+    for (const c of local.cells) {
+      cells.push({
+        ...c,
+        col: piece.col * local.cols + c.col,
+        row: piece.row * local.rows + c.row,
+        x: piece.x + c.x + input.offsetX,
+        y: piece.y + c.y + input.offsetY,
+      });
+    }
+  }
+  if (!local || cells.length === 0) return null;
+  const x0 = Math.min(...cells.map((c) => c.x));
+  const y0 = Math.min(...cells.map((c) => c.y));
+  const x1 = Math.max(...cells.map((c) => c.x + c.width));
+  const y1 = Math.max(...cells.map((c) => c.y + c.height));
+  return {
+    layout: {
+      cols: stage1.cols * local.cols,
+      rows: stage1.rows * local.rows,
+      rotated: local.rotated,
+      cellWidth: local.cellWidth,
+      cellHeight: local.cellHeight,
+      cells,
+      usable: { x: x0, y: y0, width: x1 - x0, height: y1 - y0 },
+    },
+    pieces: stage1.cells.map(({ x, y, width, height }) => ({ x, y, width, height, rotated: stage1.rotated })),
   };
 }

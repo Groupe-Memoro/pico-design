@@ -41,6 +41,10 @@ export interface ImpositionConfig {
   sheetId: string;
   machine: CutterMachine;
   duploJobId: string;
+  // 2e passe sur la Duplo : le job qui repasse chaque morceau ("" = aucune).
+  duploJob2Id?: string;
+  // Sens du quart de tour du morceau à la 2e passe (s'il entre tourné).
+  duploJob2Turn?: "cw" | "ccw";
   // Profil de découpe Graphtec ("" pour la Duplo, et pour les impositions
   // enregistrées avant les profils).
   cutterId: string;

@@ -17,7 +17,7 @@ export default async function ProductsPage() {
     supabase
       .from("products")
       .select(
-        "*, template:templates(name, category_id, width_mm, height_mm, mask_path, shading_path, beauty_shot_xml_path)"
+        "*, template:templates(name, category_id, width_mm, height_mm, fold, mask_path, shading_path, beauty_shot_xml_path)"
       )
       .order("name", { ascending: true }),
     supabase.from("templates").select("*").order("name", { ascending: true }),

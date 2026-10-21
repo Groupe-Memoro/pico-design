@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { formatIn } from "@/lib/pdf/units";
 import type { Category, Template } from "@/lib/types";
+import { templateSizeLabel } from "@/lib/templateLabel";
 
 /**
  * Écran « Choisir un modèle » de l'Outil Shopify : fusionne les anciennes
@@ -50,7 +50,7 @@ export default function TemplateGallery({
       >
         <span className="font-heading text-base font-semibold text-text group-hover:text-primary">{t.name}</span>
         <span className="text-sm text-text-subtle">
-          {formatIn(t.width_mm)}×{formatIn(t.height_mm)}
+          {templateSizeLabel(t, true, "×")}
         </span>
         {t.two_sided && (
           <span className="mt-1 inline-flex items-center rounded-full bg-primary-subtle px-2 py-0.5 text-xs font-medium text-primary">

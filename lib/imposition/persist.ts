@@ -48,6 +48,8 @@ function parseConfigBase(raw: unknown): Omit<ImpositionConfig, "sources"> {
     sheetId: c.sheetId,
     machine: c.machine,
     duploJobId: typeof c.duploJobId === "string" ? c.duploJobId : "",
+    duploJob2Id: typeof c.duploJob2Id === "string" ? c.duploJob2Id : "",
+    duploJob2Turn: c.duploJob2Turn === "ccw" ? "ccw" : "cw",
     cutterId: typeof c.cutterId === "string" ? c.cutterId : "",
     formatId: c.formatId,
     custom: { widthMm: num(custom.widthMm), heightMm: num(custom.heightMm), bleedMm: num(custom.bleedMm) },

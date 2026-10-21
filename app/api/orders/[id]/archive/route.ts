@@ -18,7 +18,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   const archivedAt = archived ? new Date().toISOString() : null;
   const { data, error } = await supabase
     .from("orders")
-    .update({ archived_at: archivedAt })
+    // Retirer une commande, c'est l'avoir vue.
+    .update(archived ? { archived_at: archivedAt, viewed_at: archivedAt } : { archived_at: archivedAt })
     .eq("id", params.id)
     .select("id");
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

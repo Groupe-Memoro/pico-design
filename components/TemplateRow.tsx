@@ -3,8 +3,8 @@
 import { useState } from "react";
 import type { Template } from "@/lib/types";
 import type { TemplateWithOverlayUrl } from "@/components/TemplatesTable";
-import { formatIn } from "@/lib/pdf/units";
 import { CheckIcon, CopyIcon, EyeIcon, FilePenIcon, LayersIcon, ShopifyIcon, SpinnerIcon, TrashIcon } from "@/components/icons";
+import { templateSizeLabel } from "@/lib/templateLabel";
 
 export default function TemplateRow({
   template,
@@ -86,7 +86,7 @@ export default function TemplateRow({
       </td>
       <td className="p-4 font-mono text-xs text-neutral-500">{skuCode ?? "—"}</td>
       <td className="p-4 text-neutral-700">
-        {formatIn(template.width_mm)}×{formatIn(template.height_mm)}
+        {templateSizeLabel(template, true, "×")}
       </td>
       <td className="p-4 text-right">
         <div className="flex justify-end gap-1">

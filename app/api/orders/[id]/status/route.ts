@@ -21,7 +21,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
   const { error } = await supabase
     .from("orders")
-    .update({ pico_status: picoStatus, updated_at: new Date().toISOString() })
+    // Faire avancer une commande, c'est l'avoir vue (pastille du menu).
+    .update({ pico_status: picoStatus, updated_at: new Date().toISOString(), viewed_at: new Date().toISOString() })
     .eq("id", params.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });

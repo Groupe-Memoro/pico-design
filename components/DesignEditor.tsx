@@ -49,6 +49,7 @@ import {
 } from "@/lib/design/layers";
 import type { PdfPagePlan } from "@/lib/pdf/pdfPages";
 import FontPicker from "@/components/FontPicker";
+import { templateSizeLabel } from "@/lib/templateLabel";
 
 // En dessous de ce zoom (voir ImageSourcePicker : 1 = cadrage "cover", pile
 // à la limite), une marge blanche apparaît autour du visuel — il ne couvre
@@ -574,7 +575,7 @@ export default function DesignEditor({
         brandScope={brandScope}
         shopHome={shopHome}
         title={template.name}
-        subtitle={`${formatIn(template.width_mm)} × ${formatIn(template.height_mm)} po${template.two_sided ? " · Recto verso" : " · Recto"}`}
+        subtitle={`${templateSizeLabel(template, true)} po${template.two_sided ? " · Recto verso" : " · Recto"}`}
         onChangeModel={onChangeModel}
         center={
           template.two_sided && (

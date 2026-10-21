@@ -151,3 +151,27 @@ export function panelCells(
     labels: panels.map((p) => p.label),
   };
 }
+
+/**
+ * Format fini d'un modèle : plié s'il a un pli (le plus grand volet, dans le
+ * sens des plis), sinon ses dimensions. Ex. 10 × 7 po plié en deux → 5 × 7.
+ * `open` : la feuille dépliée (null sans pli). Affichage seulement — le
+ * modèle, l'imposition et le PDF travaillent toujours sur la feuille ouverte.
+ */
+export function finishedSize(t: { width_mm: number; height_mm: number; fold?: unknown }): {
+  widthMm: number;
+  heightMm: number;
+  open: { widthMm: number; heightMm: number } | null;
+} {
+  const widthMm = Number(t.width_mm);
+  const heightMm = Number(t.height_mm);
+  const fold = parseFold(t.fold);
+  if (!fold) return { widthMm, heightMm, open: null };
+  const vertical = fold.direction === "vertical";
+  const panel = Math.max(...foldPanels(fold, vertical ? widthMm : heightMm, "front").map((p) => p.size));
+  return {
+    widthMm: vertical ? panel : widthMm,
+    heightMm: vertical ? heightMm : panel,
+    open: { widthMm, heightMm },
+  };
+}

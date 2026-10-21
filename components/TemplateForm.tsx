@@ -5,7 +5,7 @@ import type { Category, LogoHAlign, LogoVAlign, Sku, Template } from "@/lib/type
 import { inToMm, mmToIn } from "@/lib/pdf/units";
 import { SpinnerIcon } from "@/components/icons";
 import SkuPicker from "@/components/SkuPicker";
-import { FOLD_DESIGN_MODES, FOLD_TYPES, foldAxisLength, foldPanels, parseFold, type FoldConfig, type FoldDesignMode, type FoldDirection, type FoldType } from "@/lib/folds";
+import { FOLD_DESIGN_MODES, FOLD_TYPES, foldAxisLength, foldPanels, parseFold, type FoldConfig, type FoldDesignMode, type FoldDirection, type FoldType, finishedSize } from "@/lib/folds";
 
 type Unit = "mm" | "in";
 
@@ -225,7 +225,9 @@ export default function TemplateForm({
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium">Largeur ({unit === "mm" ? "mm" : "po"})</label>
+            <label className="block text-sm font-medium">
+              Largeur ({unit === "mm" ? "mm" : "po"}){fold ? " — feuille ouverte" : ""}
+            </label>
             <input
               type="number"
               step="any"
@@ -235,7 +237,9 @@ export default function TemplateForm({
             />
           </div>
           <div>
-            <label className="block text-sm font-medium">Hauteur ({unit === "mm" ? "mm" : "po"})</label>
+            <label className="block text-sm font-medium">
+              Hauteur ({unit === "mm" ? "mm" : "po"}){fold ? " — feuille ouverte" : ""}
+            </label>
             <input
               type="number"
               step="any"
@@ -737,6 +741,15 @@ function FoldSection({
             />
             {unit === "mm" ? "mm" : "po"}
           </label>
+          {(() => {
+            const size = finishedSize({ width_mm: widthMm, height_mm: heightMm, fold });
+            return (
+              <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+                Format fini (plié) : <strong>{fmt(size.widthMm)} × {fmt(size.heightMm)}</strong>
+                <span className="text-emerald-700"> — feuille ouverte {fmt(widthMm)} × {fmt(heightMm)}</span>
+              </p>
+            );
+          })()}
           <div className="mt-3 grid grid-cols-1 gap-3 text-xs sm:grid-cols-2">
             {(["front", "back"] as const).map((side) => (
               <div key={side} className="rounded-lg bg-neutral-50 p-3">

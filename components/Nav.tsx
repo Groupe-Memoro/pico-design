@@ -96,6 +96,35 @@ export default function Nav() {
   // de jouer à l'intérieur de chacun (voir groupMenuOrder).
   const groupes = useMemo(() => groupMenuOrder(menuOrder), [menuOrder]);
 
+  // Nouvelles commandes (reçues, pas encore en production) : une pastille sur
+  // « Commandes », mise à jour chaque minute, au retour sur l'onglet et à
+  // chaque changement de page (après avoir fait avancer une commande, par ex.).
+  const showsOrders = menuOrder.includes("orders");
+  const [newOrders, setNewOrders] = useState(0);
+  useEffect(() => {
+    if (!showsOrders) return;
+    let cancelled = false;
+    const refresh = () =>
+      fetch("/api/orders/new-count", { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (!cancelled && d && typeof d.count === "number") setNewOrders(d.count);
+        })
+        .catch(() => {});
+    refresh();
+    const timer = window.setInterval(refresh, 60_000);
+    const onVisible = () => document.visibilityState === "visible" && refresh();
+    document.addEventListener("visibilitychange", onVisible);
+    // L'écran Commandes signale chaque commande vue, retirée ou avancée.
+    window.addEventListener("pico:orders-changed", refresh);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("pico:orders-changed", refresh);
+    };
+  }, [showsOrders, pathname]);
+
   const initials = name
     ? name
         .split(/\s+/)
@@ -153,6 +182,8 @@ export default function Nav() {
   // passe alors dans l'infobulle).
   function navLink(href: string, title: string, Icon: (props: { className?: string }) => JSX.Element, iconOnly = false) {
     const active = isActive(href);
+    const badge = href === MENU_ITEMS.orders.href ? newOrders : 0;
+    const badgeText = badge > 99 ? "99+" : String(badge);
     return (
       <Link
         key={href}
@@ -165,8 +196,24 @@ export default function Nav() {
         } ${active ? "bg-primary-subtle font-medium text-primary" : "text-text-muted hover:bg-surface-muted hover:text-text"}`}
       >
         {/* Même secousse « jello » au survol que partout ailleurs ; `motion-safe` la coupe au besoin. */}
-        <Icon className="h-[18px] w-[18px] shrink-0 motion-safe:group-hover:animate-jello" />
+        <span className="relative shrink-0">
+          <Icon className="h-[18px] w-[18px] shrink-0 motion-safe:group-hover:animate-jello" />
+          {/* Menu réduit : la pastille sur l'icône. */}
+          {iconOnly && badge > 0 && (
+            <span className="absolute -right-2 -top-2 min-w-[16px] rounded-full bg-primary px-1 text-center text-[10px] font-semibold leading-4 text-text-on-brand">
+              {badgeText}
+            </span>
+          )}
+        </span>
         {!iconOnly && <span className="truncate">{title}</span>}
+        {!iconOnly && badge > 0 && (
+          <span
+            className="ml-auto rounded-full bg-primary px-2 text-xs font-semibold leading-5 text-text-on-brand"
+            title={`${badge} nouvelle${badge > 1 ? "s" : ""} commande${badge > 1 ? "s" : ""}`}
+          >
+            {badgeText}
+          </span>
+        )}
       </Link>
     );
   }
@@ -224,9 +271,13 @@ export default function Nav() {
               aria-expanded={mobileOpen}
               aria-controls="mobile-nav"
               title={mobileOpen ? "Fermer le menu" : "Ouvrir le menu"}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-text-muted hover:bg-surface-muted hover:text-text lg:hidden"
+              className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-text-muted hover:bg-surface-muted hover:text-text lg:hidden"
             >
               {mobileOpen ? <XIcon className="h-5 w-5" /> : <MenuIcon className="h-5 w-5" />}
+              {/* Menu fermé : un point signale de nouvelles commandes. */}
+              {!mobileOpen && newOrders > 0 && (
+                <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-primary" aria-hidden="true" />
+              )}
             </button>
             {/* Aide : intégrer Pico Design à une boutique Shopify (page /aide). */}
             <Link

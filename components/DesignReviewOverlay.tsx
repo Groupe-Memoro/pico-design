@@ -4,13 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import type { ImageSourceValue } from "@/components/ImageSourcePicker";
 import type { ThemeWithOverlayUrl } from "@/components/ThemesTable";
 import type { Category, Template, TemplateMockup } from "@/lib/types";
-import { formatIn } from "@/lib/pdf/units";
 import { stageLargeFiles } from "@/lib/design/stageUpload";
 import { SpinnerIcon, XIcon } from "@/components/icons";
 import MockupGallery, { type MockupView } from "@/components/MockupGallery";
 import { parseFold } from "@/lib/folds";
 import { layerImageFieldName, type DesignLayer } from "@/lib/design/layers";
 import { filenameFromDisposition } from "@/lib/contentDisposition";
+import { templateSizeLabel } from "@/lib/templateLabel";
 
 // Ajoute les calques d'un côté au formulaire : un champ JSON (métadonnées
 // seulement — un fichier n'est pas sérialisable en JSON) et, pour chaque
@@ -444,7 +444,7 @@ export default function DesignReviewOverlay({
               <div>
                 <dt className="text-text-subtle">Format</dt>
                 <dd className="mt-0.5 font-medium text-text">
-                  {formatIn(template.width_mm)} × {formatIn(template.height_mm)} po
+                  {templateSizeLabel(template, true)} po
                   {template.two_sided ? " · Recto verso" : " · Recto"}
                 </dd>
               </div>

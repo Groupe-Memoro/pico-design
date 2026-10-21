@@ -10,6 +10,7 @@ import {
   type ImpositionMarks,
   type ImpositionRegMark,
   type ImpositionSource,
+  type DuploSecondPass,
 } from "@/lib/imposition/render";
 import { barcodePath } from "@/lib/imposition/barcodes";
 import { productDisplayName } from "@/lib/imposition/productLabel";
@@ -92,6 +93,10 @@ export async function buildImposition(
     orientationRaw === "normal" || orientationRaw === "rotated" ? orientationRaw : "auto";
   const flip: FlipEdge = formData.get("flip") === "short" ? "short" : "long";
   const duploJobId = String(formData.get("duploJobId") ?? "");
+  // 2e passe sur la Duplo (facultative) : le job qui repasse chaque morceau.
+  const duploJob2Id = String(formData.get("duploJob2Id") ?? "");
+  // Morceau tourné d'un quart de tour pour la 2e passe : sens horaire ou antihoraire.
+  const duploJob2Turn = formData.get("duploJob2Turn") === "ccw" ? "ccw" : "cw";
   const cutterId = String(formData.get("cutterId") ?? "");
   const pieceBleedMm = Number(formData.get("pieceBleedMm") ?? 0) || 0;
   // Imposition qu'on modifie : seuls ses propres PDF enregistrés peuvent être réutilisés.
@@ -180,25 +185,44 @@ export async function buildImposition(
     | "barcode"
     | "regMark"
     | "duploJob"
+    | "duploJob2"
+    | "secondPass"
   >;
   if (duploJob) {
-    // Code-barres du job Duplo (s'il en a un d'importé) : posé au recto à la
-    // position fixe lue par la machine.
-    let barcode: ImpositionBarcode | null = null;
-    const { data: barcodeFile } = await admin.storage.from("imposition").download(barcodePath(duploJob.job_no));
-    if (barcodeFile) {
-      barcode = {
-        pdf: new Uint8Array(await barcodeFile.arrayBuffer()),
-        corner: DUPLO_MARKS.corner,
-        xMm: DUPLO_MARKS.barcodeXMm,
-        yMm: DUPLO_MARKS.barcodeYMm,
-        rotation: DUPLO_MARKS.barcodeRotation,
-      };
+    // Code-barres d'un job Duplo (s'il en a un d'importé), à la position fixe
+    // lue par la machine, et son repère REG dans le même coin, aux distances du job.
+    async function jobMarks(job: ImpositionDuploJob) {
+      let barcode: ImpositionBarcode | null = null;
+      const { data: barcodeFile } = await admin.storage.from("imposition").download(barcodePath(job.job_no));
+      if (barcodeFile) {
+        barcode = {
+          pdf: new Uint8Array(await barcodeFile.arrayBuffer()),
+          corner: DUPLO_MARKS.corner,
+          xMm: DUPLO_MARKS.barcodeXMm,
+          yMm: DUPLO_MARKS.barcodeYMm,
+          rotation: DUPLO_MARKS.barcodeRotation,
+        };
+      }
+      const regMark: ImpositionRegMark | null = job.reg_mark
+        ? { corner: DUPLO_MARKS.corner, sideMm: job.side_mark_mm, leadMm: job.lead_mark_mm }
+        : null;
+      return { barcode, regMark };
     }
-    // Repère REG du job : dans le même coin que le code-barres, aux distances du job.
-    const regMark: ImpositionRegMark | null = duploJob.reg_mark
-      ? { corner: DUPLO_MARKS.corner, sideMm: duploJob.side_mark_mm, leadMm: duploJob.lead_mark_mm }
-      : null;
+    const { barcode, regMark } = await jobMarks(duploJob);
+    // 2e passe : le 1er job coupe la feuille en morceaux, le 2e coupe la pièce
+    // finale dans chacun (voir computeDuploTwoPassLayout).
+    let secondPass: DuploSecondPass | null = null;
+    let job2Geometry: ImposeInput["duploJob2"] = null;
+    if (duploJob2Id) {
+      const { data: job2 } = await supabase
+        .from("imposition_duplo_jobs")
+        .select("*")
+        .eq("id", duploJob2Id)
+        .single<ImpositionDuploJob>();
+      if (!job2) throw new ImpositionError("Job Duplo de la 2e passe introuvable.", 404);
+      secondPass = { ...(await jobMarks(job2)), turn: duploJob2Turn };
+      job2Geometry = { widthMm: job2.width_mm, lengthMm: job2.length_mm, slits: job2.slits, cuts: job2.cuts };
+    }
     machineInput = {
       // Marges, espacement et calibration ne servent pas : la grille vient du job.
       margins: { top: 0, right: 0, bottom: 0, left: 0 },
@@ -212,6 +236,8 @@ export async function buildImposition(
       marks: null,
       barcode,
       regMark,
+      secondPass,
+      duploJob2: job2Geometry,
       duploJob: {
         widthMm: duploJob.width_mm,
         lengthMm: duploJob.length_mm,
@@ -251,6 +277,8 @@ export async function buildImposition(
       barcode: null,
       regMark: null,
       duploJob: null,
+      duploJob2: null,
+      secondPass: null,
     };
   }
 

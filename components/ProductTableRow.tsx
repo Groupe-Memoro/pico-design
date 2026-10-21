@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import type { Product } from "@/lib/types";
-import { formatIn } from "@/lib/pdf/units";
 import { CheckIcon, DownloadIcon, FilePenIcon, LayersIcon, ShopifyIcon, SpinnerIcon, TrashIcon } from "@/components/icons";
+import { templateSizeLabel } from "@/lib/templateLabel";
 
 export default function ProductTableRow({
   product,
@@ -23,7 +23,7 @@ export default function ProductTableRow({
   templateName: string;
   categoryLabel: string;
   collectionLabel: string | null;
-  dimensions: { width_mm: number; height_mm: number } | null;
+  dimensions: { width_mm: number; height_mm: number; fold?: unknown } | null;
   imageUrl: string | null;
   hasMockup: boolean;
   selected: boolean;
@@ -86,7 +86,7 @@ export default function ProductTableRow({
       <td className="p-4 font-semibold text-pico-black">{product.name}</td>
       <td className="p-4 text-neutral-700">{templateName}</td>
       <td className="p-4 text-neutral-700">
-        {dimensions ? `${formatIn(dimensions.width_mm)}×${formatIn(dimensions.height_mm)}` : "—"}
+        {dimensions ? templateSizeLabel(dimensions, false, "×") : "—"}
       </td>
       <td className="p-4 text-neutral-500">{categoryLabel}</td>
       <td className="p-4 text-neutral-500">{collectionLabel ?? "—"}</td>
