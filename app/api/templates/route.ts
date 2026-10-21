@@ -112,6 +112,7 @@ export async function POST(request: Request) {
       fold: parseFoldField(formData.get("fold")),
       // Module de l'Outil Shopify : création de design, ou impression de photos.
       tool_module: formData.get("tool_module") === "photos" ? "photos" : "design",
+      ...(formData.get("imposition_profile_id") ? { imposition_profile_id: String(formData.get("imposition_profile_id")) } : {}),
       created_by: user.id,
     })
     .select()

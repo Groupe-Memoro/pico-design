@@ -24,6 +24,7 @@ export default function TemplateForm({
   template,
   categories,
   skus,
+  impositionProfiles = [],
   currentOverlayUrl,
   onSuccess,
   onBusyChange,
@@ -31,6 +32,7 @@ export default function TemplateForm({
   template?: Template;
   categories: Category[];
   skus: Sku[];
+  impositionProfiles?: { id: string; name: string }[];
   currentOverlayUrl?: string | null;
   onSuccess: () => void;
   onBusyChange?: (busy: boolean) => void;
@@ -55,6 +57,8 @@ export default function TemplateForm({
     logo_margin_y_mm: template?.logo_margin_y_mm ?? 5,
     two_sided: template?.two_sided ?? false,
     tool_module: template?.tool_module ?? "design",
+    // Profil d'imposition de la mise en production ("" = aucun).
+    imposition_profile_id: template?.imposition_profile_id ?? "",
     logo_on_front: template?.logo_on_front ?? true,
     logo_on_back: template?.logo_on_back ?? false,
     allow_orientation_change: template?.allow_orientation_change ?? false,
@@ -359,6 +363,26 @@ export default function TemplateForm({
         <p className="mt-1 text-xs text-neutral-500">
           Impression de photos : le client téléverse ses photos (ou un zip), valide le cadrage de chacune et choisit les
           quantités ; une ligne de panier par photo.
+        </p>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium">Profil d&apos;imposition</label>
+        <select
+          value={form.imposition_profile_id}
+          onChange={(e) => update("imposition_profile_id", e.target.value)}
+          className="mt-1 w-full rounded border border-neutral-300 px-3 py-2 text-sm"
+        >
+          <option value="">Aucun (à imposer à la main)</option>
+          {impositionProfiles.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+        <p className="mt-1 text-xs text-neutral-500">
+          À la mise en production d&apos;une commande, les designs de ce modèle sont imposés automatiquement avec ce
+          profil. Les profils se créent dans Imposition (« Enregistrer comme profil »).
         </p>
       </div>
 

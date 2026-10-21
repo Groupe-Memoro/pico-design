@@ -3,7 +3,7 @@ import type { FormatOption, ProductOption } from "@/components/ImpositionTool";
 import { templateLabel } from "@/lib/templateLabel";
 import { productDisplayName } from "@/lib/imposition/productLabel";
 import { BARCODE_DIR, jobNosFromStoredNames } from "@/lib/imposition/barcodes";
-import type { Category, ImpositionCutter, ImpositionDuploJob, ImpositionSheet, Template } from "@/lib/types";
+import type { Category, ImpositionCutter, ImpositionDuploJob, ImpositionSheet, Template, ImpositionProfile } from "@/lib/types";
 
 interface ProductRow {
   id: string;
@@ -25,6 +25,7 @@ export async function loadImpositionToolData() {
     { data: categories },
     { data: products },
     { data: visuals },
+    { data: profiles },
   ] =
     await Promise.all([
       supabase
@@ -47,6 +48,8 @@ export async function loadImpositionToolData() {
         .not("pdf_path", "is", null)
         .order("name", { ascending: true }),
       supabase.from("visuals").select("id, name"),
+      // Profils d'imposition (voir 0078), appliqués et enregistrés depuis l'outil.
+      supabase.from("imposition_profiles").select("*").order("name", { ascending: true }),
     ]);
   const visualNames = new Map(((visuals as { id: string; name: string }[]) ?? []).map((v) => [v.id, v.name]));
 
@@ -92,5 +95,6 @@ export async function loadImpositionToolData() {
     barcodeJobNos,
     formats,
     products: productOptions,
+    profiles: (profiles as ImpositionProfile[]) ?? [],
   };
 }

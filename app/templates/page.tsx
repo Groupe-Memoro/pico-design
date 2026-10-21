@@ -5,10 +5,12 @@ import type { Category, Sku, Template } from "@/lib/types";
 export default async function TemplatesPage() {
   await requireUser();
   const supabase = createServerSupabaseClient();
-  const [{ data: templates }, { data: categories }, { data: skus }] = await Promise.all([
+  const [{ data: templates }, { data: categories }, { data: skus }, { data: profiles }] = await Promise.all([
     supabase.from("templates").select("*").order("name", { ascending: true }),
     supabase.from("categories").select("*").order("sort_order", { ascending: true }),
     supabase.from("skus").select("*").order("sku", { ascending: true }),
+    // Profils d'imposition (voir 0078) : choisis dans la fiche du modèle.
+    supabase.from("imposition_profiles").select("id, name").order("name", { ascending: true }),
   ]);
 
   const rows = (templates as Template[]) ?? [];
@@ -32,6 +34,7 @@ export default async function TemplatesPage() {
       templates={withOverlayUrls}
       categories={(categories as Category[]) ?? []}
       skus={(skus as Sku[]) ?? []}
+      impositionProfiles={(profiles as { id: string; name: string }[]) ?? []}
     />
   );
 }

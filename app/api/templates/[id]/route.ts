@@ -103,6 +103,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     }
     if (formData.has("fold")) update.fold = parseFoldField(formData.get("fold"));
     if (formData.has("tool_module")) update.tool_module = formData.get("tool_module") === "photos" ? "photos" : "design";
+    if (formData.has("imposition_profile_id")) update.imposition_profile_id = String(formData.get("imposition_profile_id")) || null;
     if (formData.has("foldMarksHorizontal")) {
       update.fold_marks_horizontal_mm = parseFoldMarksField(formData.get("foldMarksHorizontal"));
     }

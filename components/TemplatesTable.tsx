@@ -36,10 +36,12 @@ export default function TemplatesTable({
   templates,
   categories,
   skus,
+  impositionProfiles = [],
 }: {
   templates: TemplateWithOverlayUrl[];
   categories: Category[];
   skus: Sku[];
+  impositionProfiles?: { id: string; name: string }[];
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -267,6 +269,7 @@ export default function TemplatesTable({
             template={modal.mode === "edit" ? modal.template : undefined}
             categories={categories}
             skus={skus}
+            impositionProfiles={impositionProfiles}
             currentOverlayUrl={modal.mode === "edit" ? modal.template.overlayUrl : null}
             onSuccess={handleSuccess}
             onBusyChange={setFormBusy}

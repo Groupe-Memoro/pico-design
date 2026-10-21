@@ -117,15 +117,59 @@ function Filtre({
  * l'avancement en atelier : il est volontairement distinct des statuts
  * Shopify, qui décrivent le paiement et l'expédition.
  */
+// Mise en production (voir app/api/production) : les PDF imposés produits.
+export interface ProductionBatch {
+  id: string;
+  order_ids: string[];
+  files: { name: string; path: string; sheets: number; pieces: number }[];
+  created_at: string;
+}
+
 export default function OrdersTable({
   orders,
   shopDomain,
+  batches: initialBatches = [],
 }: {
   orders: OrderRow[];
   shopDomain: string | null;
+  batches?: ProductionBatch[];
 }) {
   const [rows, setRows] = useState(orders);
   const [busy, setBusy] = useState<string | null>(null);
+  // Mise en production : commandes cochées, et le résultat de la dernière.
+  const [selected, setSelected] = useState<string[]>([]);
+  const [batches, setBatches] = useState(initialBatches);
+  const [producing, setProducing] = useState(false);
+  const [result, setResult] = useState<{ batch: ProductionBatch; skipped: string[] } | null>(null);
+  const toggle = (id: string) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+
+  // Les designs des commandes cochées, regroupés par profil d'imposition et
+  // imposés par le serveur ; les commandes passent « en production ».
+  async function mettreEnProduction() {
+    if (selected.length === 0) return;
+    setProducing(true);
+    const res = await fetch("/api/production", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orderIds: selected }),
+    }).catch(() => null);
+    const data = res ? await res.json().catch(() => ({})) : {};
+    setProducing(false);
+    if (!res?.ok) {
+      const details = Array.isArray(data.skipped) && data.skipped.length ? `\n\n${data.skipped.join("\n")}` : "";
+      alert((data.error ?? "La mise en production a échoué.") + details);
+      return;
+    }
+    const batch: ProductionBatch = { id: data.batchId, order_ids: selected, files: data.files, created_at: new Date().toISOString() };
+    setBatches((all) => [batch, ...all]);
+    const now = new Date().toISOString();
+    setRows((all) =>
+      all.map((o) => (selected.includes(o.id) ? { ...o, pico_status: "en_production", viewed_at: o.viewed_at ?? now } : o))
+    );
+    setSelected([]);
+    setResult({ batch, skipped: data.skipped ?? [] });
+    window.dispatchEvent(new Event("pico:orders-changed"));
+  }
 
   // PDF des tirages d'une commande : fabriqué par le serveur (voir
   // app/api/orders/[id]/prints), puis téléchargé par son adresse signée.
@@ -331,6 +375,61 @@ export default function OrdersTable({
         )}
       </div>
 
+      {!voirRetirees && (
+        <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-border bg-surface-muted px-3 py-2 text-sm">
+          <span className="text-text-muted">
+            {selected.length === 0
+              ? "Cochez des commandes pour les mettre en production : leurs designs sont imposés selon le profil de chaque modèle."
+              : `${selected.length} commande${selected.length > 1 ? "s" : ""} cochée${selected.length > 1 ? "s" : ""}`}
+          </span>
+          {selected.length > 0 && (
+            <button
+              type="button"
+              onClick={mettreEnProduction}
+              disabled={producing}
+              className="ml-auto inline-flex items-center gap-2 rounded-full bg-primary px-4 py-1.5 font-medium text-text-on-brand hover:bg-primary-hover disabled:opacity-60"
+            >
+              {producing && <SpinnerIcon className="h-4 w-4" />}
+              {producing ? "Imposition en cours…" : "Mettre en production"}
+            </button>
+          )}
+        </div>
+      )}
+
+      {result && (
+        <div className="mt-3 rounded-xl border border-green-300 bg-green-50 p-3 text-sm text-green-900">
+          <div className="flex items-start justify-between gap-3">
+            <p className="font-medium">Mise en production : {result.batch.files.length} PDF imposé{result.batch.files.length > 1 ? "s" : ""}</p>
+            <button type="button" onClick={() => setResult(null)} className="text-xs underline">
+              Fermer
+            </button>
+          </div>
+          <ul className="mt-2 space-y-1">
+            {result.batch.files.map((f, i) => (
+              <li key={i}>
+                <a href={`/api/production/${result.batch.id}/files/${i}`} className="inline-flex items-center gap-1 underline">
+                  <DownloadIcon className="h-3.5 w-3.5" />
+                  {f.name}
+                </a>{" "}
+                <span className="text-green-800">
+                  — {f.pieces} pièce{f.pieces > 1 ? "s" : ""}, {f.sheets} feuille{f.sheets > 1 ? "s" : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+          {result.skipped.length > 0 && (
+            <div className="mt-2 text-amber-800">
+              <p className="font-medium">Laissés de côté :</p>
+              <ul className="list-disc pl-5">
+                {result.skipped.map((s, i) => (
+                  <li key={i}>{s}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
         <input
           type="search"
@@ -396,6 +495,9 @@ export default function OrdersTable({
         <table className="w-full text-sm">
           <thead className="border-b border-border text-left text-xs uppercase text-text-subtle">
             <tr>
+              <th className="py-3 pl-4">
+                <span className="sr-only">Choisir</span>
+              </th>
               <th className="px-4 py-3">
                 <button
                   type="button"
@@ -442,6 +544,16 @@ export default function OrdersTable({
                 key={order.id}
                 className="border-b border-border last:border-0"
               >
+                <td className="py-3 pl-4 align-top">
+                  {!order.archived_at && (
+                    <input
+                      type="checkbox"
+                      checked={selected.includes(order.id)}
+                      onChange={() => toggle(order.id)}
+                      aria-label={`Choisir la commande ${order.order_number ?? order.shopify_order_id}`}
+                    />
+                  )}
+                </td>
                 <td className="px-4 py-3">
                   {order.shop_domain || shopDomain ? (
                     <a
@@ -549,6 +661,23 @@ export default function OrdersTable({
                           PDF des tirages ({order.order_items.reduce((n, i) => n + (i.design_submission_id || i.product_id ? i.quantity : 0), 0)})
                         </button>
                       )}
+                    {/* PDF imposés des mises en production de cette commande. */}
+                    {batches
+                      .filter((b) => b.order_ids.includes(order.id))
+                      .flatMap((b) =>
+                        b.files.map((f, i) => (
+                          <a
+                            key={`${b.id}-${i}`}
+                            href={`/api/production/${b.id}/files/${i}`}
+                            onClick={() => void marquerVue(order)}
+                            title={`Mis en production le ${new Date(b.created_at).toLocaleDateString("fr-CA")}`}
+                            className="inline-flex w-fit items-center gap-1 rounded-lg border border-border px-2 py-1 text-xs text-primary hover:bg-primary-subtle"
+                          >
+                            <DownloadIcon className="h-3.5 w-3.5" />
+                            Imposé : {f.name}
+                          </a>
+                        ))
+                      )}
                   </div>
                 </td>
                 <td className="whitespace-nowrap px-4 py-3 text-right">
@@ -589,7 +718,7 @@ export default function OrdersTable({
             ))}
             {visibles.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-4 py-6 text-center text-sm text-text-subtle">
+                <td colSpan={9} className="px-4 py-6 text-center text-sm text-text-subtle">
                   {voirRetirees ? "Aucune commande retirée." : "Aucune commande ne correspond."}
                 </td>
               </tr>

@@ -60,6 +60,8 @@ export interface Template {
   fold: unknown | null;
   // Module de l'Outil Shopify que ce modèle ouvre (voir 0074_photo_prints.sql).
   tool_module: "design" | "photos";
+  // Profil d'imposition utilisé à la mise en production (voir 0078).
+  imposition_profile_id?: string | null;
   two_sided: boolean;
   logo_on_front: boolean;
   logo_on_back: boolean;
@@ -304,6 +306,23 @@ export interface ImpositionCutter {
   center_grid: boolean;
   marks_path: string | null;
   guide_path: string | null;
+  created_at: string;
+  created_by: string | null;
+}
+
+// Profil d'imposition (voir supabase/migrations/0078_imposition_profiles.sql) :
+// la façon d'imposer les modèles qui le choisissent, à la mise en production.
+export interface ImpositionProfile {
+  id: string;
+  name: string;
+  sheet_id: string;
+  machine: "duplo" | "graphtec";
+  duplo_job_id: string | null;
+  duplo_job2_id: string | null;
+  duplo_job2_turn: "cw" | "ccw";
+  cutter_id: string | null;
+  orientation: "auto" | "normal" | "rotated";
+  flip: "long" | "short";
   created_at: string;
   created_by: string | null;
 }

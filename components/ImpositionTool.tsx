@@ -28,7 +28,7 @@ import { IMAGE_TYPES, imageToPdf, isImageFile } from "@/lib/imposition/imageToPd
 import { MM_TO_PT, formatIn } from "@/lib/pdf/units";
 import { MACHINES, MACHINE_LABELS, type CutterMachine } from "@/lib/imposition/machines";
 import type { SavedImposition } from "@/lib/imposition/saved";
-import type { ImpositionCutter, ImpositionDuploJob, ImpositionSheet } from "@/lib/types";
+import type { ImpositionCutter, ImpositionDuploJob, ImpositionSheet, ImpositionProfile } from "@/lib/types";
 import SearchSelect from "@/components/SearchSelect";
 
 // Taille de page (fond perdu inclus) d'un format du catalogue.
@@ -134,6 +134,7 @@ export default function ImpositionTool({
   barcodeJobNos,
   formats,
   products,
+  profiles: initialProfiles = [],
   saved = null,
 }: {
   sheets: ImpositionSheet[];
@@ -144,6 +145,8 @@ export default function ImpositionTool({
   barcodeJobNos: number[];
   formats: FormatOption[];
   products: ProductOption[];
+  // Profils d'imposition (voir 0078) : réglages enregistrés, liés aux modèles.
+  profiles?: ImpositionProfile[];
   // Imposition enregistrée qu'on modifie (null = nouvelle imposition).
   saved?: SavedImposition | null;
 }) {
@@ -185,6 +188,10 @@ export default function ImpositionTool({
   const [assetVersion, setAssetVersion] = useState(0);
   const [orientation, setOrientation] = useState<PieceOrientation>(cfg?.orientation ?? "auto");
   const [flip, setFlip] = useState<FlipEdge>(cfg?.flip ?? "long");
+  // Profils d'imposition : la liste (mise à jour sur place) et celui appliqué.
+  const [profiles, setProfiles] = useState<ImpositionProfile[]>(initialProfiles);
+  const [profileId, setProfileId] = useState("");
+  const [profileBusy, setProfileBusy] = useState(false);
 
   // Type d'imposition : des pièces répétées (cartes, aimants…) sur UNE feuille,
   // ou un document de plusieurs pages en feuilles séparées, coupé au massicot
@@ -690,6 +697,79 @@ export default function ImpositionTool({
     return body;
   }
 
+  // Applique les réglages d'un profil à l'outil.
+  function applyProfile(p: ImpositionProfile) {
+    setMachine(p.machine);
+    if (p.machine === "duplo") {
+      setSheetId(p.sheet_id);
+      setDuploJobId(p.duplo_job_id ?? "");
+      setTwoPass(Boolean(p.duplo_job2_id));
+      setDuploJob2Id(p.duplo_job2_id ?? "");
+      setDuploJob2Turn(p.duplo_job2_turn);
+    } else {
+      setCutterId(p.cutter_id ?? "");
+    }
+    setOrientation(p.orientation);
+    setFlip(p.flip);
+  }
+
+  // Réglages en cours, au format d'un profil.
+  function currentProfileBody(name: string) {
+    return {
+      name,
+      sheet_id: sheet?.id ?? "",
+      machine,
+      duplo_job_id: isDuplo ? (selectedJob1?.id ?? null) : null,
+      duplo_job2_id: isDuplo && twoPass ? (selectedJob2?.id ?? null) : null,
+      duplo_job2_turn: duploJob2Turn,
+      cutter_id: isDuplo ? null : (activeCutter?.id ?? null),
+      orientation,
+      flip,
+    };
+  }
+
+  async function saveAsProfile() {
+    const name = window.prompt("Nom du profil (ex. Cartes de souhait 10 × 7 — Duplo 16 + 17) :");
+    if (!name?.trim()) return;
+    setProfileBusy(true);
+    const res = await fetch("/api/imposition/profiles", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(currentProfileBody(name.trim())),
+    }).catch(() => null);
+    setProfileBusy(false);
+    const data = res ? await res.json().catch(() => ({})) : {};
+    if (!res?.ok) return alert(data.error ?? "Enregistrement impossible.");
+    setProfiles((all) => [...all, data.profile].sort((a, b) => a.name.localeCompare(b.name, "fr")));
+    setProfileId(data.profile.id);
+  }
+
+  async function updateProfile() {
+    const current = profiles.find((p) => p.id === profileId);
+    if (!current) return;
+    setProfileBusy(true);
+    const res = await fetch(`/api/imposition/profiles/${current.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(currentProfileBody(current.name)),
+    }).catch(() => null);
+    setProfileBusy(false);
+    const data = res ? await res.json().catch(() => ({})) : {};
+    if (!res?.ok) return alert(data.error ?? "Mise à jour impossible.");
+    setProfiles((all) => all.map((p) => (p.id === current.id ? data.profile : p)));
+  }
+
+  async function deleteProfile() {
+    const current = profiles.find((p) => p.id === profileId);
+    if (!current || !confirm(`Supprimer le profil « ${current.name} » ?\n\nLes modèles qui l'utilisaient n'auront plus de profil.`)) return;
+    setProfileBusy(true);
+    const res = await fetch(`/api/imposition/profiles/${current.id}`, { method: "DELETE" }).catch(() => null);
+    setProfileBusy(false);
+    if (!res?.ok) return alert("Suppression impossible.");
+    setProfiles((all) => all.filter((p) => p.id !== current.id));
+    setProfileId("");
+  }
+
   function buildBody(): FormData | null {
     if (isDocument) return buildDocumentBody();
     if (!sheet || (!activeDuplo && !activeCutter)) return null;
@@ -933,6 +1013,47 @@ export default function ImpositionTool({
                     </option>
                   ))}
                 </select>
+              </div>
+            )}
+
+            {!isDocument && (
+              <div className="rounded-lg border border-neutral-200 p-3">
+                <label className={labelClass}>Profil d&apos;imposition</label>
+                <select
+                  value={profileId}
+                  onChange={(e) => {
+                    setProfileId(e.target.value);
+                    const p = profiles.find((x) => x.id === e.target.value);
+                    if (p) applyProfile(p);
+                  }}
+                  className={selectClass}
+                >
+                  <option value="">— Réglages libres —</option>
+                  {profiles.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+                <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                  <button type="button" onClick={saveAsProfile} disabled={profileBusy} className="rounded-lg border border-neutral-300 px-2.5 py-1 hover:bg-neutral-50 disabled:opacity-50">
+                    Enregistrer comme profil
+                  </button>
+                  {profileId && (
+                    <>
+                      <button type="button" onClick={updateProfile} disabled={profileBusy} className="rounded-lg border border-neutral-300 px-2.5 py-1 hover:bg-neutral-50 disabled:opacity-50">
+                        Mettre à jour le profil
+                      </button>
+                      <button type="button" onClick={deleteProfile} disabled={profileBusy} className="rounded-lg border border-neutral-300 px-2.5 py-1 text-red-600 hover:bg-red-50 disabled:opacity-50">
+                        Supprimer
+                      </button>
+                    </>
+                  )}
+                </div>
+                <p className="mt-1 text-xs text-neutral-500">
+                  Un profil garde la feuille, la découpeuse, le ou les jobs Duplo (ou le profil Graphtec), le sens des pièces
+                  et le retournement. Choisissez-le dans la fiche d&apos;un modèle pour imposer ses commandes automatiquement.
+                </p>
               </div>
             )}
 

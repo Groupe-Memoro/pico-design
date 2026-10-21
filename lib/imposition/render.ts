@@ -418,7 +418,15 @@ export function backRotationFor(frontRotation: Rotation, verticalAxis: boolean):
   return ((frontRotation + (pieceAxisVertical === verticalAxis ? 0 : 180)) % 360) as Rotation;
 }
 
-export async function imposeToPdf(input: ImposeInput): Promise<ImposeResult> {
+/**
+ * Grille d'une imposition (sans rien dessiner) : celle du job Duplo (une ou
+ * deux passes) ou du profil Graphtec, et les morceaux de la 1re passe. Lève
+ * une Error (message en français) si le format n'y entre pas.
+ */
+export function impositionLayout(input: Omit<ImposeInput, "sources" | "marks" | "flip">): {
+  layout: Layout;
+  duploPieces: DuploPiece[];
+} {
   let layout: Layout | null;
   // Morceaux coupés par le 1er job, quand il y a une 2e passe.
   let duploPieces: DuploPiece[] = [];
@@ -465,6 +473,11 @@ export async function imposeToPdf(input: ImposeInput): Promise<ImposeResult> {
       )}) ne rentre pas dans la zone utile de la feuille.`
     );
   }
+  return { layout, duploPieces };
+}
+
+export async function imposeToPdf(input: ImposeInput): Promise<ImposeResult> {
+  const { layout, duploPieces } = impositionLayout(input);
 
   const { assignment, overflow } = assignCells(input.sources, layout.cells.length);
   if (overflow > 0) {
