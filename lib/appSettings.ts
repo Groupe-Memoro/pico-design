@@ -23,7 +23,7 @@ export type SettingsScope = BaseScope | string;
 // Conservé pour les appelants qui n'itèrent que sur les deux jeux de base.
 export const SETTINGS_SCOPES = BASE_SCOPES;
 
-export const SCOPE_LABELS: Record<BaseScope, string> = {
+const SCOPE_LABELS: Record<BaseScope, string> = {
   admin: "Administration",
   tool: "Outil Shopify (par défaut)",
 };
@@ -52,7 +52,7 @@ export function isSettingsScope(value: unknown): value is SettingsScope {
  * isAllowedReturnUrl, côté serveur uniquement. Un domaine inventé ne donne
  * ici qu'un jeu inexistant, donc l'habillage par défaut.
  */
-export function shopScopeOfReturnUrl(value: unknown): string | null {
+function shopScopeOfReturnUrl(value: unknown): string | null {
   if (typeof value !== "string" || !value) return null;
   try {
     const url = new URL(value);
@@ -162,7 +162,7 @@ export const UI_FONT_CHOICES = [
 
 export type UiFont = (typeof UI_FONT_CHOICES)[number];
 
-export function isUiFont(value: unknown): value is UiFont {
+function isUiFont(value: unknown): value is UiFont {
   return typeof value === "string" && (UI_FONT_CHOICES as readonly string[]).includes(value);
 }
 
@@ -191,7 +191,7 @@ export function brandFontVar(value: BrandFont): string {
 /** Une police d'interface : de marque, ou tirée du catalogue Google. */
 export type FontChoice = UiFont | BrandFont;
 
-export function isFontChoice(value: unknown): value is FontChoice {
+function isFontChoice(value: unknown): value is FontChoice {
   return isUiFont(value) || isBrandFont(value);
 }
 
@@ -294,7 +294,7 @@ export function parseTypography(raw: unknown): TypographySettings {
   };
 }
 
-export function parseColors(raw: unknown): Partial<Record<ColorKey, string>> {
+function parseColors(raw: unknown): Partial<Record<ColorKey, string>> {
   const source = (raw ?? {}) as Record<string, unknown>;
   const out: Partial<Record<ColorKey, string>> = {};
   for (const field of COLOR_FIELDS) {

@@ -202,6 +202,7 @@ export default function TemplatesTable({
                 <th className="p-4">Impression</th>
                 <th className="p-4">SKU</th>
                 <th className="p-4">Dimensions</th>
+                <th className="p-4 text-center">Imposition</th>
                 <th className="p-4"></th>
               </tr>
             </thead>
@@ -211,6 +212,7 @@ export default function TemplatesTable({
                   key={t.id}
                   template={t}
                   skuCode={skuCode(t.sku_id)}
+                  impositionProfileName={impositionProfiles.find((p) => p.id === t.imposition_profile_id)?.name ?? null}
                   selected={selection.selected.has(t.id)}
                   onToggleSelect={() => selection.toggle(t.id)}
                   onPreview={(tpl) => setModal({ mode: "preview", template: tpl, nonce: Date.now() })}

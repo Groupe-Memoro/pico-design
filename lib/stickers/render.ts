@@ -44,7 +44,7 @@ function hexToRgb(hex: string) {
 
 // Mesures d'un texte pour 1 mm de corps : largeur, et hauteur ascendante →
 // descendante (pour le centrage vertical et l'ajustement en hauteur).
-export function measureZoneText(zone: StickerZone, text: string) {
+function measureZoneText(zone: StickerZone, text: string) {
   const font = loadInstance(fontOptionById(zone.fontId), false, zone.bold);
   const run = font.layout(text);
   const advance = run.glyphs.reduce((sum, g) => sum + g.advanceWidth, 0);

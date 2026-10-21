@@ -49,14 +49,14 @@ function zoomToTileSizeIn(zoom: number): number {
 
 // Zoom proposé par défaut pour une nouvelle mosaïque (l'échelle ci-dessus
 // n'est pas linéaire : 60 correspond à un motif d'environ 2,6 po).
-export const DEFAULT_TILE_ZOOM = 60;
+const DEFAULT_TILE_ZOOM = 60;
 export const DEFAULT_TILE_SIZE_MM = inToMm(zoomToTileSizeIn(DEFAULT_TILE_ZOOM));
 
 export function isPdfFile(file: File | null): boolean {
   return Boolean(file && (file.type === "application/pdf" || /\.pdf$/i.test(file.name)));
 }
 
-export const SOURCE_MODES: { value: SourceMode; label: string }[] = [
+const SOURCE_MODES: { value: SourceMode; label: string }[] = [
   { value: "upload", label: "Uploader une image" },
   { value: "full", label: "Visuel — plein format" },
   { value: "tile", label: "Visuel — mosaïque" },

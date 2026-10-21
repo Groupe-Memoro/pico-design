@@ -28,7 +28,7 @@ function clampNumber(value: unknown, key: keyof LogoShadowSettings): number {
   return Math.min(max, Math.max(min, n));
 }
 
-export function normalizeLogoShadow(raw: Partial<Record<keyof LogoShadowSettings, unknown>>): LogoShadowSettings {
+function normalizeLogoShadow(raw: Partial<Record<keyof LogoShadowSettings, unknown>>): LogoShadowSettings {
   return {
     blur: clampNumber(raw.blur, "blur"),
     distance: clampNumber(raw.distance, "distance"),

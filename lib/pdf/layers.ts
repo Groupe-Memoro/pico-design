@@ -1,4 +1,5 @@
 import sharp from "sharp";
+import type { Blend, OverlayOptions } from "sharp";
 import { preloadFonts, textLayerToSvgGroup } from "./textLayer";
 import { shapeLayerToSvgGroup } from "./shapeLayer";
 import {
@@ -51,19 +52,19 @@ export async function compositeLayers(
     layers.flatMap((r) => (r.type === "text" ? [{ fontId: r.layer.fontId, italic: r.layer.italic, bold: r.layer.bold }] : []))
   );
 
-  const overlays: sharp.OverlayOptions[] = [];
+  const overlays: OverlayOptions[] = [];
   for (const resolved of layers) {
     if (resolved.type === "text") {
       if (!resolved.layer.content.trim()) continue;
       const group = textLayerToSvgGroup(resolved.layer, targetWidthPx, targetHeightPx, dpi);
       const svg = `<svg width="${targetWidthPx}" height="${targetHeightPx}" xmlns="http://www.w3.org/2000/svg">${group}</svg>`;
       const png = await sharp(Buffer.from(svg)).png().toBuffer();
-      overlays.push({ input: png, left: 0, top: 0, blend: sharpBlendFor(resolved.layer.blendMode) as sharp.Blend });
+      overlays.push({ input: png, left: 0, top: 0, blend: sharpBlendFor(resolved.layer.blendMode) as Blend });
     } else if (resolved.type === "shape") {
       const group = shapeLayerToSvgGroup(resolved.layer, targetWidthPx, targetHeightPx, dpi);
       const svg = `<svg width="${targetWidthPx}" height="${targetHeightPx}" xmlns="http://www.w3.org/2000/svg">${group}</svg>`;
       const png = await sharp(Buffer.from(svg)).png().toBuffer();
-      overlays.push({ input: png, left: 0, top: 0, blend: sharpBlendFor(resolved.layer.blendMode) as sharp.Blend });
+      overlays.push({ input: png, left: 0, top: 0, blend: sharpBlendFor(resolved.layer.blendMode) as Blend });
     } else {
       const widthPx = Math.max(1, Math.round(resolved.layer.widthRatio * targetWidthPx));
       const meta = await sharp(resolved.buffer).metadata();
@@ -117,7 +118,7 @@ export async function compositeLayers(
         Math.max(0, targetHeightPx - effectiveHeightPx),
         Math.max(0, Math.round(resolved.layer.positionY * targetHeightPx - effectiveHeightPx / 2))
       );
-      overlays.push({ input: resized, left, top, blend: sharpBlendFor(resolved.layer.blendMode) as sharp.Blend });
+      overlays.push({ input: resized, left, top, blend: sharpBlendFor(resolved.layer.blendMode) as Blend });
     }
   }
 

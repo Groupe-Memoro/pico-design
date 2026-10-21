@@ -65,7 +65,7 @@ export interface StickerTemplate {
 
 // Plus petite taille de texte imprimée (mm) : en dessous, un nom trop long
 // déborde plutôt que de devenir illisible — l'aperçu le montre.
-export const MIN_FONT_MM = 1.5;
+const MIN_FONT_MM = 1.5;
 // Marge intérieure de la zone, de chaque côté, en part de sa largeur.
 const SIDE_PADDING = 0.04;
 

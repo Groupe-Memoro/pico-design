@@ -25,6 +25,7 @@ import type {
   Theme,
   Visual,
 } from "@/lib/types";
+import { signedUrls } from "@/lib/storageUrls";
 
 // Données de l'outil de design : modèles, catégories, SKUs (affiché au
 // résumé), banque de visuels et thèmes (visuels préfaits, voir
@@ -145,32 +146,19 @@ export default async function DesignPage({
       .order("created_at", { ascending: true }),
   ]);
 
+  // Adresses signées par lots (une requête par bucket, pas une par fichier).
   const visualRows = (visuals as Visual[]) ?? [];
-  const visualsWithUrls: VisualWithUrl[] = await Promise.all(
-    visualRows.map(async (v) => {
-      const { data } = await supabase.storage
-        .from("visuals")
-        .createSignedUrl(v.file_path, 60 * 30);
-      return { ...v, fileUrl: data?.signedUrl ?? null };
-    }),
-  );
-
   const themeRows = (themes as Theme[]) ?? [];
-  const themesWithUrls: ThemeWithOverlayUrl[] = await Promise.all(
-    themeRows.map(async (t) => {
-      const [{ data }, background] = await Promise.all([
-        supabase.storage.from("overlays").createSignedUrl(t.overlay_path, 60 * 30),
-        t.background_path
-          ? supabase.storage.from("overlays").createSignedUrl(t.background_path, 60 * 30)
-          : null,
-      ]);
-      return {
-        ...t,
-        overlayUrl: data?.signedUrl ?? null,
-        backgroundUrl: background?.data?.signedUrl ?? null,
-      };
-    }),
-  );
+  const [visualUrls, overlayUrls] = await Promise.all([
+    signedUrls(supabase, "visuals", visualRows.map((v) => v.file_path)),
+    signedUrls(supabase, "overlays", themeRows.flatMap((t) => [t.overlay_path, t.background_path])),
+  ]);
+  const visualsWithUrls: VisualWithUrl[] = visualRows.map((v) => ({ ...v, fileUrl: visualUrls.get(v.file_path) ?? null }));
+  const themesWithUrls: ThemeWithOverlayUrl[] = themeRows.map((t) => ({
+    ...t,
+    overlayUrl: overlayUrls.get(t.overlay_path) ?? null,
+    backgroundUrl: (t.background_path && overlayUrls.get(t.background_path)) || null,
+  }));
 
   const illustrations = await loadIllustrations(supabase);
 
@@ -251,21 +239,13 @@ async function publicTool(
       .order("created_at", { ascending: true }),
   ]);
 
-  const themesWithUrls: ThemeWithOverlayUrl[] = await Promise.all(
-    ((themes as Theme[]) ?? []).map(async (t) => {
-      const [{ data }, background] = await Promise.all([
-        admin.storage.from("overlays").createSignedUrl(t.overlay_path, 60 * 30),
-        t.background_path
-          ? admin.storage.from("overlays").createSignedUrl(t.background_path, 60 * 30)
-          : null,
-      ]);
-      return {
-        ...t,
-        overlayUrl: data?.signedUrl ?? null,
-        backgroundUrl: background?.data?.signedUrl ?? null,
-      };
-    }),
-  );
+  const publicThemes = (themes as Theme[]) ?? [];
+  const publicOverlayUrls = await signedUrls(admin, "overlays", publicThemes.flatMap((t) => [t.overlay_path, t.background_path]));
+  const themesWithUrls: ThemeWithOverlayUrl[] = publicThemes.map((t) => ({
+    ...t,
+    overlayUrl: publicOverlayUrls.get(t.overlay_path) ?? null,
+    backgroundUrl: (t.background_path && publicOverlayUrls.get(t.background_path)) || null,
+  }));
 
   // La banque d'illustrations, elle, est faite pour le client : contrairement
   // aux visuels, elle part aussi en mode public (en adresses signées).

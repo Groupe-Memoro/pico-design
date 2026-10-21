@@ -13,7 +13,7 @@ import {
 
 import { lineMm, type LaidOutPage, type LayoutElement, type PrintGeometry } from "../print/elements";
 
-export { estimateFitSize, type LaidOutPage, type LayoutElement } from "../print/elements";
+export { type LaidOutPage, type LayoutElement } from "../print/elements";
 export type AlbumGeometry = PrintGeometry;
 
 /**

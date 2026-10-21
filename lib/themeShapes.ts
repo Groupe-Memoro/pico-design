@@ -45,7 +45,7 @@ export function slotShape(slot: ThemeSlot): ThemeSlotShape {
 // affiché chez le client et rendu par le serveur : il est nettoyé (ni script,
 // ni gestionnaire d'événement, ni ressource externe).
 
-export const MAX_MASK_SVG_CHARS = 200_000;
+const MAX_MASK_SVG_CHARS = 200_000;
 
 export function sanitizeMaskSvg(raw: unknown): string | null {
   if (typeof raw !== "string" || raw.length > MAX_MASK_SVG_CHARS) return null;

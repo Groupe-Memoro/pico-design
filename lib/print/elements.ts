@@ -47,8 +47,8 @@ export interface PrintGeometry {
   bleedMm: number;
 }
 
-export const PT_TO_MM = 25.4 / 72;
-export const LINE_HEIGHT = 1.25;
+const PT_TO_MM = 25.4 / 72;
+const LINE_HEIGHT = 1.25;
 
 export const lineMm = (sizePt: number) => sizePt * PT_TO_MM * LINE_HEIGHT;
 

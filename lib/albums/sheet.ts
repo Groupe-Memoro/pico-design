@@ -21,7 +21,7 @@ function decodeText(bytes: Uint8Array): string {
   return utf8.includes("�") ? new TextDecoder("windows-1252").decode(bytes) : utf8;
 }
 
-export function parseCsv(text: string): string[][] {
+function parseCsv(text: string): string[][] {
   const clean = text.replace(/^﻿/, "");
   const firstLine = clean.split(/\r?\n/, 1)[0] ?? "";
   const delimiter = [";", "\t", ","].reduce((best, d) => (firstLine.split(d).length > firstLine.split(best).length ? d : best), ",");

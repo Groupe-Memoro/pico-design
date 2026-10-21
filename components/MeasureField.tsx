@@ -10,7 +10,7 @@ function round(value: number, decimals: number): number {
   return Math.round(value * f) / f;
 }
 
-export function toDisplayValue(mm: number, unit: Unit): number {
+function toDisplayValue(mm: number, unit: Unit): number {
   return unit === "mm" ? round(mm, 2) : round(mmToIn(mm), 3);
 }
 

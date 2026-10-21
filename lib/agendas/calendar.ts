@@ -11,12 +11,12 @@ export const WEEKDAYS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "sam
 
 const DAY_MS = 86_400_000;
 
-export function parseIso(iso: string): number {
+function parseIso(iso: string): number {
   const [y, m, d] = iso.split("-").map(Number);
   return Date.UTC(y, m - 1, d);
 }
 
-export function toIso(time: number): string {
+function toIso(time: number): string {
   return new Date(time).toISOString().slice(0, 10);
 }
 
@@ -160,6 +160,3 @@ export function quebecHolidays(from: string, to: string): { day: string; label: 
   return list.filter((h) => h.day >= from && h.day <= to).sort((a, b) => a.day.localeCompare(b.day));
 }
 
-export function formatLongDate(iso: string): string {
-  return `${WEEKDAYS[weekdayIndex(iso)]} ${dayOfMonth(iso)} ${MONTHS[monthIndex(iso)]} ${year(iso)}`;
-}

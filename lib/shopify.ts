@@ -94,12 +94,6 @@ export function shopDomainOfOrder(order: ShopifyOrder): string | null {
   }
 }
 
-/** URL de la commande dans l'admin Shopify, pour le lien du module. */
-export function adminOrderUrl(shopifyOrderId: string): string | null {
-  const domain = shopDomain();
-  return domain ? `https://${domain}/admin/orders/${shopifyOrderId}` : null;
-}
-
 /**
  * L'adresse de retour après personnalisation est-elle acceptable ?
  *

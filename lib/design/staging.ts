@@ -14,7 +14,7 @@ export type StagingBucket = typeof STAGING_BUCKET | typeof TEAM_STAGING_BUCKET;
 
 // <AAAA-MM-JJ>/<uuid> : rien d'autre n'est relu, ce qui interdit de faire
 // lire au serveur un fichier qui n'a pas été déposé par ce mécanisme.
-export const STAGED_PATH = /^\d{4}-\d{2}-\d{2}\/[0-9a-f-]{36}$/;
+const STAGED_PATH = /^\d{4}-\d{2}-\d{2}\/[0-9a-f-]{36}$/;
 
 // Un fichier déposé est remplacé dans le FormData par cette chaîne : le
 // préfixe, puis son chemin, son nom et son type en JSON.

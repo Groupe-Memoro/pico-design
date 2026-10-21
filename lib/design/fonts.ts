@@ -264,8 +264,6 @@ export const FONT_OPTIONS: FontOption[] = [
   },
 ];
 
-export const DEFAULT_FONT_ID = "inter";
-
 const CATEGORY_LABELS: Record<string, string> = {
   s: "Sans-serif",
   r: "Serif",

@@ -1,4 +1,5 @@
 import sharp from "sharp";
+import type { OverlayOptions } from "sharp";
 import { foldAxisLength, foldPanels, parseFold } from "../folds";
 import { mmToPx } from "./units";
 import { rasterizeLogoToPng, isSvg } from "./logo";
@@ -152,7 +153,7 @@ export async function generateTemplatePreviewPng(
   `;
 
   let base: Buffer;
-  const composites: sharp.OverlayOptions[] = [];
+  const composites: OverlayOptions[] = [];
 
   if (transparent) {
     base = await sharp({

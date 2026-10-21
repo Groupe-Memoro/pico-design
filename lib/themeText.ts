@@ -60,7 +60,7 @@ export function newThemeTextZone(index: number): ThemeTextZone {
 const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
 
 // Zone relue d'un formulaire ou de la base : bornée, avec des valeurs sûres.
-export function sanitizeTextZone(raw: unknown, index: number): ThemeTextZone | null {
+function sanitizeTextZone(raw: unknown, index: number): ThemeTextZone | null {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;
   const num = (v: unknown, fallback: number) => (Number.isFinite(Number(v)) ? Number(v) : fallback);
@@ -92,7 +92,7 @@ export function sanitizeTextZone(raw: unknown, index: number): ThemeTextZone | n
   };
 }
 
-export function sanitizeTextZones(raw: unknown): ThemeTextZone[] {
+function sanitizeTextZones(raw: unknown): ThemeTextZone[] {
   if (!Array.isArray(raw)) return [];
   return raw
     .slice(0, MAX_THEME_TEXT_ZONES)

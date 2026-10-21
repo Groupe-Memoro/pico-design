@@ -72,7 +72,7 @@ export interface Layout {
 // Tolérance sur les comparaisons de longueurs, en mm : absorbe les erreurs
 // d'arrondi des conversions po/mm/pt sans jamais faire passer une pièce qui
 // déborde vraiment.
-export const LENGTH_EPSILON_MM = 0.01;
+const LENGTH_EPSILON_MM = 0.01;
 
 function fitCount(available: number, size: number, gutter: number): number {
   if (size <= 0 || available + LENGTH_EPSILON_MM < size) return 0;

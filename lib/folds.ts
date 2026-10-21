@@ -47,8 +47,8 @@ export const FOLD_TYPES: { type: FoldType; label: string }[] = [
 
 // Le volet qui rentre à l'intérieur d'un pli roulé est plus étroit, pour ne
 // pas buter contre le pli : 1/16 po, l'usage.
-export const ROLL_FOLD_INSET_MM = 1.5875;
-export const DEFAULT_FOLD_SAFETY_MM = 3.175;
+const ROLL_FOLD_INSET_MM = 1.5875;
+const DEFAULT_FOLD_SAFETY_MM = 3.175;
 
 export function parseFold(raw: unknown): FoldConfig | null {
   if (!raw || typeof raw !== "object") return null;
@@ -115,13 +115,6 @@ export function foldPanels(fold: FoldConfig, length: number, side: "front" | "ba
     start += size;
     return panel;
   });
-}
-
-// Positions des plis (mm depuis le bord de coupe) d'un côté.
-export function foldLines(fold: FoldConfig, length: number, side: "front" | "back"): number[] {
-  return foldPanels(fold, length, side)
-    .slice(1)
-    .map((p) => p.start);
 }
 
 // Longueur de l'axe des plis d'un format fini.

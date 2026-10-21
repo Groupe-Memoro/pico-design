@@ -232,7 +232,7 @@ export function drawPiece(
   sheetPage.pushOperators(popGraphicsState());
 }
 
-export function toPdfRect(cell: Cell, sheetHeight: number) {
+function toPdfRect(cell: Cell, sheetHeight: number) {
   return {
     x: mmToPt(cell.x),
     y: mmToPt(sheetHeight - cell.y - cell.height),

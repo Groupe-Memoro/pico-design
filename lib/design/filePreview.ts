@@ -9,7 +9,7 @@ import { stageLargeFiles } from "@/lib/design/stageUpload";
  */
 const cache = new WeakMap<File, Promise<string | null>>();
 
-export function isPdfFile(file: File): boolean {
+function isPdfFile(file: File): boolean {
   return file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
 }
 

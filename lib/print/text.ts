@@ -52,7 +52,7 @@ function wrap(font: Font, text: string, size: number, maxWidth: number): string[
 
 // Lignes et taille qui tiennent dans la boîte : la taille demandée si possible,
 // sinon plus petite (jusqu'à 60 %), sinon coupée avec « … ».
-export function fitText(font: Font, el: TextElement): { lines: string[]; size: number } {
+function fitText(font: Font, el: TextElement): { lines: string[]; size: number } {
   const maxWidth = el.w * MM_TO_PT;
   for (let size = el.size; size >= el.size * MIN_SCALE; size *= 0.94) {
     const lines = wrap(font, el.text, size, maxWidth);

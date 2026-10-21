@@ -120,7 +120,7 @@ export const MENU_ITEMS: Record<
 // Ce découpage prime sur l'ordre personnalisé (voir groupMenuOrder) : un
 // glisser-déposer déplace un lien À L'INTÉRIEUR de son groupe, jamais d'un
 // groupe à l'autre, sans quoi le regroupement ne tiendrait pas.
-export const MENU_GROUPS: MenuKey[][] = [
+const MENU_GROUPS: MenuKey[][] = [
   ["products", "templates", "skus", "imposition"],
   ["themes", "visuals", "illustrations"],
   ["stickers", "albums", "agendas"],
@@ -161,7 +161,7 @@ export function hasSidebar(pathname: string): boolean {
 
 // Ordre par défaut quand l'utilisateur n'a encore rien personnalisé : celui
 // des groupes, mis à plat.
-export const DEFAULT_MENU_ORDER: MenuKey[] = MENU_GROUPS.flat();
+const DEFAULT_MENU_ORDER: MenuKey[] = MENU_GROUPS.flat();
 
 function isMenuKey(value: string): value is MenuKey {
   return Object.prototype.hasOwnProperty.call(MENU_ITEMS, value);

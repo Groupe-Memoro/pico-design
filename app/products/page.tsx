@@ -2,6 +2,7 @@ import { createServerSupabaseClient, requireUser } from "@/lib/supabase/server";
 import ProductsTable, { type ProductWithTemplate } from "@/components/ProductsTable";
 import type { VisualWithUrl } from "@/components/VisualsGrid";
 import type { Category, ProductCollection, Template, Visual } from "@/lib/types";
+import { signedUrls } from "@/lib/storageUrls";
 
 export default async function ProductsPage() {
   await requireUser();
@@ -32,25 +33,20 @@ export default async function ProductsPage() {
 
   const rows = (products as ProductWithTemplate[]) ?? [];
 
-  const withUrls = await Promise.all(
-    rows.map(async (p) => {
-      // TTL généreux : l'URL sert aussi à l'aperçu dans la modale d'édition,
-      // ouverte potentiellement longtemps après le chargement de la page.
-      const { data } = await supabase.storage.from("uploads").createSignedUrl(p.image_path, 60 * 30);
-      const backData = p.back_image_path
-        ? await supabase.storage.from("uploads").createSignedUrl(p.back_image_path, 60 * 30)
-        : null;
-      return { ...p, imageUrl: data?.signedUrl ?? null, backImageUrl: backData?.data?.signedUrl ?? null };
-    })
-  );
-
+  // Adresses signées par lots (une requête par bucket, pas une par fichier).
+  // TTL généreux : l'URL sert aussi à l'aperçu dans la modale d'édition,
+  // ouverte potentiellement longtemps après le chargement de la page.
   const visualRows = (visuals as Visual[]) ?? [];
-  const visualsWithUrls: VisualWithUrl[] = await Promise.all(
-    visualRows.map(async (v) => {
-      const { data } = await supabase.storage.from("visuals").createSignedUrl(v.file_path, 60 * 30);
-      return { ...v, fileUrl: data?.signedUrl ?? null };
-    })
-  );
+  const [uploadUrls, visualUrls] = await Promise.all([
+    signedUrls(supabase, "uploads", rows.flatMap((p) => [p.image_path, p.back_image_path])),
+    signedUrls(supabase, "visuals", visualRows.map((v) => v.file_path)),
+  ]);
+  const withUrls = rows.map((p) => ({
+    ...p,
+    imageUrl: uploadUrls.get(p.image_path) ?? null,
+    backImageUrl: (p.back_image_path && uploadUrls.get(p.back_image_path)) || null,
+  }));
+  const visualsWithUrls: VisualWithUrl[] = visualRows.map((v) => ({ ...v, fileUrl: visualUrls.get(v.file_path) ?? null }));
 
   return (
     <ProductsTable

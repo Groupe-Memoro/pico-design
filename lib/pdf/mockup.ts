@@ -1,4 +1,5 @@
 import sharp from "sharp";
+import type { OverlayOptions } from "sharp";
 import { mmToPx } from "./units";
 import { coverCropToBuffer } from "./crop";
 import { rasterizeLogoToPng } from "./logo";
@@ -58,7 +59,7 @@ export async function generateProductMockupPng(
     imageRotation
   );
 
-  const composites: sharp.OverlayOptions[] = [];
+  const composites: OverlayOptions[] = [];
   if (logoImage && template.logo_width_mm > 0) {
     const logoWidthPx = Math.max(1, Math.round(mmToPx(template.logo_width_mm, dpi)));
     const rawLogoPng = await rasterizeLogoToPng(logoImage, logoWidthPx);

@@ -1,4 +1,5 @@
 import sharp from "sharp";
+import type { OverlayOptions } from "sharp";
 import { DEFAULT_LOGO_SHADOW, type LogoShadowSettings } from "../logoShadowSettings";
 
 // Les réglages de l'ombre (flou, distance, angle, opacité) viennent du produit,
@@ -75,7 +76,7 @@ export async function logoOverlay(
   top: number,
   canvasWidth: number,
   canvasHeight: number
-): Promise<sharp.OverlayOptions> {
+): Promise<OverlayOptions> {
   if (!shadow) return { input: logoPng, left, top };
 
   const { png, pad } = await addDropShadow(logoPng, shadow);

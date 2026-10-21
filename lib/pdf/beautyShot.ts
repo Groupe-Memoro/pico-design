@@ -1,4 +1,5 @@
 import sharp from "sharp";
+import type { Blend, OverlayOptions } from "sharp";
 import { XMLParser } from "fast-xml-parser";
 import { coverCropToBuffer } from "./crop";
 import { rasterizeLogoToPng } from "./logo";
@@ -181,7 +182,7 @@ export function parseBeautyShotXml(xml: string): BeautyShotConfig {
   };
 }
 
-export function extensionForMimeType(mimeType: string): string {
+function extensionForMimeType(mimeType: string): string {
   if (mimeType === "image/jpeg" || mimeType === "image/jpg") return "jpg";
   if (mimeType === "image/webp") return "webp";
   return "png";
@@ -439,7 +440,7 @@ async function buildDesignForZone(
   const withLayers = await compositeLayers(page, layers, pageWidthPx, pageHeightPx, printDpi);
   const trimmed = await extractCentered(withLayers, pageWidthPx, pageHeightPx, trimWidthPx, trimHeightPx);
 
-  const composites: sharp.OverlayOptions[] = [];
+  const composites: OverlayOptions[] = [];
   if (logoImage && template.logo_width_mm > 0) {
     const mmToPx = (mm: number) => Math.round((mm / 25.4) * printDpi);
     const logoWidthPx = Math.max(1, mmToPx(template.logo_width_mm));
@@ -563,7 +564,7 @@ export async function generateBeautyShotMockupPng(
   // son masque.
   const perspective = config.zones.length > 1 || config.zones.some((z) => z.quad && !isAxisAligned(z.quad));
   const quadZones = perspective ? config.zones.filter((z) => z.quad) : [];
-  let designComposites: sharp.OverlayOptions[];
+  let designComposites: OverlayOptions[];
   if (quadZones.length > 0) {
     designComposites = await renderQuadZones(template, quadZones, canvasWidth, canvasHeight, side, (w, h) =>
       buildDesignForZone(template, sourceImage, logoImage, w, h, positionX, positionY, logoShadow, zoom, imageRotation, layers, 0.5, 0.5, 1)
@@ -648,10 +649,10 @@ export async function generateBeautyShotMockupPng(
       .toBuffer({ resolveWithObject: true });
     return { data, raw: { width: info.width, height: info.height, channels: info.channels } };
   };
-  const scene: sharp.OverlayOptions[] = [];
+  const scene: OverlayOptions[] = [];
   for (const underlay of config.underlays) {
     const layer = await fitted(underlay.assetName, "cover");
-    if (layer) scene.push({ input: layer.data, raw: layer.raw, blend: underlay.blendMode as sharp.Blend });
+    if (layer) scene.push({ input: layer.data, raw: layer.raw, blend: underlay.blendMode as Blend });
   }
   if (config.backgroundAssetName) {
     const layer = await fitted(config.backgroundAssetName, "cover");
@@ -673,7 +674,7 @@ export async function generateBeautyShotMockupPng(
         .raw()
         .toBuffer();
     }
-    scene.push({ input: data, raw: layer.raw, blend: overlay.blendMode as sharp.Blend });
+    scene.push({ input: data, raw: layer.raw, blend: overlay.blendMode as Blend });
   }
 
   const { data: composed, info } = await sharp({
@@ -708,7 +709,7 @@ async function renderQuadZones(
   canvasHeight: number,
   side: "front" | "back",
   printAt: (widthPx: number, heightPx: number) => Promise<Buffer>
-): Promise<sharp.OverlayOptions[]> {
+): Promise<OverlayOptions[]> {
   const ordered = [...zones].sort(
     (a, b) => a.quad!.reduce((n, p) => n + p.x, 0) - b.quad!.reduce((n, p) => n + p.x, 0)
   );

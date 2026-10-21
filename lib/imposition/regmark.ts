@@ -7,8 +7,8 @@
 
 export type RegCorner = "top-left" | "top-right" | "bottom-left" | "bottom-right";
 
-export const REG_MARK_ARM_MM = 6;
-export const REG_MARK_STROKE_MM = 0.68;
+const REG_MARK_ARM_MM = 6;
+const REG_MARK_STROKE_MM = 0.68;
 
 export interface MmRect {
   x: number;

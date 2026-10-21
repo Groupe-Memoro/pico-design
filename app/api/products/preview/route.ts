@@ -8,6 +8,7 @@ import {
   createAdminSupabaseClient,
 } from "@/lib/supabase/server";
 import { grantAllows } from "@/lib/publicDesign";
+import { publicUploadError } from "@/lib/uploadLimits";
 import { MAX_MOSAIC_SIDE, isValidMosaicGrid } from "@/lib/design/mosaicGrid";
 import { resolveProductImage } from "@/lib/pdf/productSource";
 import { generateTemplatePreviewPng } from "@/lib/pdf/preview";
@@ -54,6 +55,9 @@ export async function POST(request: Request) {
   if (!user) {
     const limit = await checkRateLimit("preview", request);
     if (!limit.allowed) return tooManyRequests("preview");
+    // Même plafond de taille que les autres routes publiques de l'outil.
+    const tooBig = publicUploadError(formData);
+    if (tooBig) return NextResponse.json({ error: tooBig }, { status: 413 });
   }
   const db = user ? supabase : createAdminSupabaseClient();
   const file = formData.get("image");

@@ -12,7 +12,7 @@ export interface ImportedStudent {
 }
 
 // Minuscules, sans accents ni ponctuation : « Gagné-Bélanger » = « gagne belanger ».
-export function normalize(value: string): string {
+function normalize(value: string): string {
   return value
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")

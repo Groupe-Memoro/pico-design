@@ -3,12 +3,12 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { LogoShape } from "../types";
 import { DEFAULT_LOGO_COLOR, isValidLogoColor } from "../logoColors";
 
-export { LOGO_COLOR_PALETTE, isValidLogoColor } from "../logoColors";
+export { isValidLogoColor } from "../logoColors";
 
 // Fichiers "forme neutre" du bucket Storage "assets" — recolorés
 // dynamiquement selon la couleur choisie (voir recolorSvg ci-dessous),
 // donc un seul fichier par forme suffit peu importe la couleur finale.
-export const LOGO_SHAPE_FILES: Record<LogoShape, string> = {
+const LOGO_SHAPE_FILES: Record<LogoShape, string> = {
   logo: "pico-noir.svg",
   pastille: "cercle-noir.svg",
 };
@@ -22,7 +22,7 @@ export function isSvg(buffer: Buffer): boolean {
 // mot-symbole et du cercle de la pastille). Pour la pastille, la lettre à
 // l'intérieur a sa propre couleur verrouillée en CSS (classe .cls-1) :
 // `secondaryColor`, si fourni, la remplace aussi.
-export function recolorSvg(svg: Buffer, hexColor: string, secondaryHexColor?: string): Buffer {
+function recolorSvg(svg: Buffer, hexColor: string, secondaryHexColor?: string): Buffer {
   const color = isValidLogoColor(hexColor) ? hexColor : DEFAULT_LOGO_COLOR;
   let text = svg.toString("utf8");
   text = text.replace(/<svg([^>]*)>/, (_match, attrs: string) => {

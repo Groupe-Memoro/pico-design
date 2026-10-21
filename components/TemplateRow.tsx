@@ -9,6 +9,7 @@ import { templateSizeLabel } from "@/lib/templateLabel";
 export default function TemplateRow({
   template,
   skuCode,
+  impositionProfileName = null,
   selected,
   onToggleSelect,
   onPreview,
@@ -18,6 +19,8 @@ export default function TemplateRow({
 }: {
   template: TemplateWithOverlayUrl;
   skuCode: string | null;
+  // Profil d'imposition du modèle (mise en production automatique), s'il en a un.
+  impositionProfileName?: string | null;
   selected: boolean;
   onToggleSelect: () => void;
   onPreview: (template: Template) => void;
@@ -87,6 +90,20 @@ export default function TemplateRow({
       <td className="p-4 font-mono text-xs text-neutral-500">{skuCode ?? "—"}</td>
       <td className="p-4 text-neutral-700">
         {templateSizeLabel(template, true, "×")}
+      </td>
+      {/* Profil d'imposition associé (mise en production automatique). */}
+      <td className="p-4 text-center">
+        {impositionProfileName ? (
+          <span
+            className="inline-flex"
+            title={`Profil d'imposition : ${impositionProfileName}`}
+            aria-label={`Profil d'imposition : ${impositionProfileName}`}
+          >
+            <CheckIcon className="h-4 w-4 text-green-600" />
+          </span>
+        ) : (
+          <span className="text-neutral-300" aria-label="Aucun profil d'imposition">—</span>
+        )}
       </td>
       <td className="p-4 text-right">
         <div className="flex justify-end gap-1">

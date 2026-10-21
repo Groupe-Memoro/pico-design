@@ -24,11 +24,6 @@ function secret(): string | null {
   return key && key.length >= 16 ? key : null;
 }
 
-/** Le mode public est-il configuré sur ce déploiement ? */
-export function publicDesignEnabled(): boolean {
-  return secret() !== null;
-}
-
 function sign(payload: string, key: string): string {
   return createHmac("sha256", key).update(payload).digest("base64url");
 }

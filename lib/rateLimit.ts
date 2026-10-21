@@ -14,7 +14,7 @@ import { createAdminSupabaseClient } from "@/lib/supabase/server";
  * protège, pas l'équipe.
  */
 
-export const LIMITS = {
+const LIMITS = {
   // Le plus coûteux : pleine résolution, recto et verso.
   pdf: { max: 20, windowSeconds: 3600 },
   // Enregistrement d'un design : écrit en base et dans le stockage.
@@ -37,7 +37,7 @@ export type LimitBucket = keyof typeof LIMITS;
  * Adresse du demandeur. Derrière Vercel, l'adresse réelle est en tête de
  * `x-forwarded-for` ; la connexion elle-même vient toujours du proxy.
  */
-export function clientIp(request: Request): string {
+function clientIp(request: Request): string {
   const forwarded = request.headers.get("x-forwarded-for");
   if (forwarded) return forwarded.split(",")[0].trim();
   return request.headers.get("x-real-ip") ?? "inconnue";

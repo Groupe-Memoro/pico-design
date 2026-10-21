@@ -1,4 +1,5 @@
 import sharp from "sharp";
+import type { OverlayOptions } from "sharp";
 import { coverCropToBuffer } from "./crop";
 import type { ThemeSlot, ThemeSlotAdjust, ThemeTextZone } from "../types";
 import { themeZoneText } from "../themeText";
@@ -38,7 +39,7 @@ export async function composeThemeImage(
   // posés par-dessus le graphisme ; `dpi` convertit leurs tailles en mm.
   text: { zones: ThemeTextZone[]; texts: (string | null | undefined)[]; dpi: number } | null = null
 ): Promise<Buffer> {
-  const composites: sharp.OverlayOptions[] = [];
+  const composites: OverlayOptions[] = [];
 
   if (backgroundImage) {
     const backgroundResized = await sharp(backgroundImage)

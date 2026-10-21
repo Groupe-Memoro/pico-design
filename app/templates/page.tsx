@@ -1,6 +1,7 @@
 import { createServerSupabaseClient, requireUser } from "@/lib/supabase/server";
 import TemplatesTable, { type TemplateWithOverlayUrl } from "@/components/TemplatesTable";
 import type { Category, Sku, Template } from "@/lib/types";
+import { signedUrls } from "@/lib/storageUrls";
 
 export default async function TemplatesPage() {
   await requireUser();
@@ -15,19 +16,16 @@ export default async function TemplatesPage() {
 
   const rows = (templates as Template[]) ?? [];
 
-  async function signedUrl(path: string | null) {
-    if (!path) return null;
-    const { data } = await supabase.storage.from("overlays").createSignedUrl(path, 60 * 30);
-    return data?.signedUrl ?? null;
-  }
 
   // Plus de téléchargement/parsing du XML de chaque modèle ici : les
   // mockups se configurent dans leur propre écran (TemplateMockupsManager),
   // qui charge ce dont il a besoin à l'ouverture. Ça évitait un aller-retour
   // de stockage par modèle à chaque affichage de la liste.
-  const withOverlayUrls: TemplateWithOverlayUrl[] = await Promise.all(
-    rows.map(async (t) => ({ ...t, overlayUrl: await signedUrl(t.overlay_path) }))
-  );
+  const urls = await signedUrls(supabase, "overlays", rows.map((t) => t.overlay_path));
+  const withOverlayUrls: TemplateWithOverlayUrl[] = rows.map((t) => ({
+    ...t,
+    overlayUrl: (t.overlay_path && urls.get(t.overlay_path)) || null,
+  }));
 
   return (
     <TemplatesTable

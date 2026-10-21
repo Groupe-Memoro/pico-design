@@ -5,7 +5,7 @@
 import type { CutterMachine } from "./machines";
 import type { FlipEdge, PieceOrientation } from "./layout";
 
-export const MAX_NAME_LENGTH = 120;
+const MAX_NAME_LENGTH = 120;
 
 // Un fichier de l'imposition : un produit Pico (son PDF vit déjà dans le
 // stockage des produits) ou un PDF téléversé, gardé sous impositions/<id>/sources/.

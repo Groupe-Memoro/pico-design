@@ -1,6 +1,7 @@
 import { createServerSupabaseClient, requireUser } from "@/lib/supabase/server";
 import ThemesTable from "@/components/ThemesTable";
 import type { Template, Theme } from "@/lib/types";
+import { signedUrls } from "@/lib/storageUrls";
 
 export default async function ThemesPage() {
   await requireUser();
@@ -11,15 +12,13 @@ export default async function ThemesPage() {
   ]);
 
   const rows = (themes as Theme[]) ?? [];
-  const withOverlayUrls = await Promise.all(
-    rows.map(async (t) => {
-      const [{ data }, background] = await Promise.all([
-        supabase.storage.from("overlays").createSignedUrl(t.overlay_path, 60 * 30),
-        t.background_path ? supabase.storage.from("overlays").createSignedUrl(t.background_path, 60 * 30) : null,
-      ]);
-      return { ...t, overlayUrl: data?.signedUrl ?? null, backgroundUrl: background?.data?.signedUrl ?? null };
-    })
-  );
+  // Adresses signées en un lot (une requête, pas deux par thème).
+  const urls = await signedUrls(supabase, "overlays", rows.flatMap((t) => [t.overlay_path, t.background_path]));
+  const withOverlayUrls = rows.map((t) => ({
+    ...t,
+    overlayUrl: urls.get(t.overlay_path) ?? null,
+    backgroundUrl: (t.background_path && urls.get(t.background_path)) || null,
+  }));
 
   return <ThemesTable themes={withOverlayUrls} templates={(templates as Template[]) ?? []} />;
 }

@@ -1,5 +1,6 @@
 import { createHash } from "crypto";
 import sharp from "sharp";
+import type { Sharp } from "sharp";
 import { pdfToPng } from "pdf-to-png-converter";
 import { PDFArray, PDFDict, PDFDocument, PDFName, PDFNumber, PDFRawStream, decodePDFRawStream } from "pdf-lib";
 
@@ -140,7 +141,7 @@ async function extractSingleImagePage(buffer: Buffer, pageNumber: number): Promi
   const filter = dict.lookup(PDFName.of("Filter"));
   const filters = filter instanceof PDFArray ? filter.asArray() : filter ? [filter] : [];
   const names = filters.map((x) => String(x));
-  let source: sharp.Sharp;
+  let source: Sharp;
   if (names.length >= 1 && names[names.length - 1] === "/DCTDecode") {
     // Un JPEG ordinaire, éventuellement compressé une seconde fois.
     const bytes = names.length === 1 ? image.contents : decodePDFRawStream(image).decode();
