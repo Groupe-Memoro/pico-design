@@ -22,6 +22,8 @@ const SHADOW_CONTROLS: { key: keyof LogoShadowSettings; label: string; unit: str
   { key: "opacity", label: "Opacité", unit: "%" },
 ];
 
+const LAST_CATEGORY_KEY = "pico:product-form-category";
+
 const LOGO_SHAPES: { value: LogoShape; label: string }[] = [
   { value: "logo", label: "Logo" },
   { value: "pastille", label: "Pastille" },
@@ -38,6 +40,7 @@ export default function ProductForm({
   onSuccess,
   onBusyChange,
   onProgressChange,
+  initialCategoryId = "",
 }: {
   templates: Template[];
   categories: Category[];
@@ -50,12 +53,29 @@ export default function ProductForm({
   onBusyChange?: (busy: boolean) => void;
   // Création de plusieurs produits : la progression, pour le voile de la fenêtre.
   onProgressChange?: (progress: { done: number; total: number } | null) => void;
+  // Création : catégorie dont les modèles sont seuls affichés d'emblée (le
+  // filtre de la page Produits, sinon la dernière choisie).
+  initialCategoryId?: string;
 }) {
   const isEditing = Boolean(product);
   const [name, setName] = useState(product?.name ?? "");
   const [nameTouched, setNameTouched] = useState(isEditing);
   const [templateId, setTemplateId] = useState(product?.template_id ?? templates[0]?.id ?? "");
+  const [presetCategoryId, setPresetCategoryId] = useState(() => {
+    if (isEditing) return "";
+    let id = initialCategoryId;
+    if (!id) {
+      try {
+        id = localStorage.getItem(LAST_CATEGORY_KEY) ?? "";
+      } catch {
+        // Stockage indisponible (navigation privée) : pas de présélection.
+      }
+    }
+    return templates.some((t) => t.category_id === id) ? id : "";
+  });
   const [selectedTemplateIds, setSelectedTemplateIds] = useState<string[]>([]);
+  // Modèles affichés à la création : ceux de la catégorie filtrée, ou tous.
+  const visibleTemplates = presetCategoryId ? templates.filter((t) => t.category_id === presetCategoryId) : templates;
   const [collectionId, setCollectionId] = useState(product?.collection_id ?? "");
   const [front, setFront] = useState<ImageSourceValue>({
     sourceMode: product?.visual_mode ?? "upload",
@@ -249,8 +269,23 @@ export default function ProductForm({
 
   function toggleAllTemplates() {
     setSelectedTemplateIds((prev) =>
-      prev.length === templates.length ? [] : templates.map((t) => t.id)
+      prev.length === visibleTemplates.length ? [] : visibleTemplates.map((t) => t.id)
     );
+  }
+
+  // Menu « Catégorie » : n'affiche que ses modèles. Les modèles cochés
+  // ailleurs sont décochés — on ne crée pas de produit pour un modèle caché.
+  function presetCategory(categoryId: string) {
+    setPresetCategoryId(categoryId);
+    if (categoryId) {
+      const ids = new Set(templates.filter((t) => t.category_id === categoryId).map((t) => t.id));
+      setSelectedTemplateIds((prev) => prev.filter((id) => ids.has(id)));
+    }
+    try {
+      localStorage.setItem(LAST_CATEGORY_KEY, categoryId);
+    } catch {
+      // Sans stockage, la présélection n'est simplement pas retenue.
+    }
   }
 
   function toggleCategoryTemplates(categoryId: string) {
@@ -523,17 +558,32 @@ export default function ProductForm({
                 </span>
               )}
             </label>
+            <select
+              value={presetCategoryId}
+              onChange={(e) => presetCategory(e.target.value)}
+              aria-label="Filtrer par catégorie"
+              className="ml-auto mr-3 rounded border border-neutral-300 px-2 py-1 text-xs"
+            >
+              <option value="">Toutes les catégories</option>
+              {categories
+                .filter((c) => templates.some((t) => t.category_id === c.id))
+                .map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+            </select>
             <button
               type="button"
               onClick={toggleAllTemplates}
               className="text-xs text-neutral-500 underline hover:text-pico-black"
             >
-              {selectedTemplateIds.length === templates.length ? "Tout désélectionner" : "Tout sélectionner"}
+              {selectedTemplateIds.length === visibleTemplates.length ? "Tout désélectionner" : "Tout sélectionner"}
             </button>
           </div>
           <div className="mt-1 max-h-64 space-y-3 overflow-y-auto rounded border border-neutral-300 p-3">
             {categories.map((category) => {
-              const items = templates.filter((t) => t.category_id === category.id);
+              const items = visibleTemplates.filter((t) => t.category_id === category.id);
               if (items.length === 0) return null;
               const categoryAllSelected = items.every((t) => selectedTemplateIds.includes(t.id));
               return (

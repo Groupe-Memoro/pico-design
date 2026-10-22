@@ -316,6 +316,7 @@ export default function ProductsTable({
             onSuccess={handleSuccess}
             onBusyChange={setFormBusy}
             onProgressChange={setFormProgress}
+            initialCategoryId={categoryId}
           />
         </Modal>
       )}
