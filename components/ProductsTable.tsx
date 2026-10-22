@@ -241,6 +241,8 @@ export default function ProductsTable({
         </button>
       </BulkActionsBar>
 
+      <Pagination page={currentPage} pageSize={PAGE_SIZE} total={filtered.length} onChange={changePage} className="mb-3" />
+
       {filtered.length === 0 ? (
         <p className="rounded-xl border border-neutral-200 bg-white p-4 text-sm text-neutral-500">
           Aucun produit ne correspond.

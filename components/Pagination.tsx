@@ -11,11 +11,14 @@ export default function Pagination({
   pageSize,
   total,
   onChange,
+  className = "mt-4",
 }: {
   page: number;
   pageSize: number;
   total: number;
   onChange: (page: number) => void;
+  // Marge selon la place : sous le tableau (défaut) ou au-dessus.
+  className?: string;
 }) {
   const pageCount = Math.ceil(total / pageSize);
   if (pageCount <= 1) return null;
@@ -29,7 +32,7 @@ export default function Pagination({
 
   const button = "flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-sm";
   return (
-    <nav className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm" aria-label="Pagination">
+    <nav className={`${className} flex flex-wrap items-center justify-between gap-3 text-sm`} aria-label="Pagination">
       <span className="text-neutral-500">
         {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} sur {total}
       </span>
