@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import ProductTableRow from "@/components/ProductTableRow";
 import ProductForm from "@/components/ProductForm";
 import ProductMockupModal from "@/components/ProductMockupModal";
 import ShopifyExportModal from "@/components/ShopifyExportModal";
+import Pagination from "@/components/Pagination";
 import CollectionsManager from "@/components/CollectionsManager";
 import Modal from "@/components/Modal";
 import BulkActionsBar from "@/components/BulkActionsBar";
@@ -35,6 +36,8 @@ function SortIcon() {
     </svg>
   );
 }
+
+const PAGE_SIZE = 100;
 
 type ModalState =
   | { mode: "create" }
@@ -97,6 +100,18 @@ export default function ProductsTable({
       .filter((p) => p.name.toLowerCase().includes(search.trim().toLowerCase()))
       .sort((a, b) => (sortDir === "asc" ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name)));
   }, [products, search, categoryId, collectionId, sortDir]);
+
+  // Pagination : 100 par page ; un filtre ou un tri ramène à la première.
+  const [page, setPage] = useState(1);
+  useEffect(() => setPage(1), [search, categoryId, collectionId, sortDir]);
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  const pageItems = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  function changePage(next: number) {
+    setPage(next);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
 
   function handleSuccess() {
     setModal(null);
@@ -238,8 +253,8 @@ export default function ProductsTable({
                 <th className="w-10 p-4">
                   <input
                     type="checkbox"
-                    checked={filtered.length > 0 && filtered.every((p) => selection.selected.has(p.id))}
-                    onChange={() => selection.toggleAll(filtered.map((p) => p.id))}
+                    checked={pageItems.length > 0 && pageItems.every((p) => selection.selected.has(p.id))}
+                    onChange={() => selection.toggleAll(pageItems.map((p) => p.id))}
                   />
                 </th>
                 <th className="p-4">Image</th>
@@ -260,7 +275,7 @@ export default function ProductsTable({
               </tr>
             </thead>
             <tbody>
-              {filtered.map((p) => (
+              {pageItems.map((p) => (
                 <ProductTableRow
                   key={p.id}
                   product={p}
@@ -285,6 +300,7 @@ export default function ProductsTable({
           </table>
         </div>
       )}
+      <Pagination page={currentPage} pageSize={PAGE_SIZE} total={filtered.length} onChange={changePage} />
 
       {modal?.mode === "collections" && (
         <Modal title="Gérer les collections" onClose={() => setModal(null)}>

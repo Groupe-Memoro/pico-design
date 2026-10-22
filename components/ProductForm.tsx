@@ -22,6 +22,27 @@ const SHADOW_CONTROLS: { key: keyof LogoShadowSettings; label: string; unit: str
   { key: "opacity", label: "Opacité", unit: "%" },
 ];
 
+// Saturation passagère de Supabase (connexions du stockage épuisées, visuel
+// illisible un instant, erreur 5xx) : le produit n'a pas été enregistré,
+// on peut donc le renvoyer sans risque de doublon.
+const TRANSIENT_ERROR = /too many connections|impossible de télécharger|timeout|timed out|fetch failed|ECONNRESET/i;
+const RETRY_DELAYS_MS = [1500, 4000, 8000];
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function postProductWithRetry(body: FormData) {
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch("/api/products", { method: "POST", body }).catch(() => null);
+    const data = res ? await res.json().catch(() => ({})) : { error: "fetch failed" };
+    const transient = !res || res.status >= 500 || TRANSIENT_ERROR.test(String(data.error ?? ""));
+    if (res && (res.ok || !transient)) return { res, data };
+    if (attempt >= RETRY_DELAYS_MS.length) {
+      return { res: res ?? new Response(null, { status: 503 }), data: res ? data : { error: "Serveur injoignable." } };
+    }
+    await sleep(RETRY_DELAYS_MS[attempt]);
+  }
+}
+
 const LAST_CATEGORY_KEY = "pico:product-form-category";
 
 const LOGO_SHAPES: { value: LogoShape; label: string }[] = [
@@ -457,8 +478,7 @@ export default function ProductForm({
         setCreateProgress((p) => (p ? { done: p.done + 1, total: p.total } : { done: 1, total }));
         continue;
       }
-      const res = await fetch("/api/products", { method: "POST", body });
-      const data = await res.json().catch(() => ({}));
+      const { res, data } = await postProductWithRetry(body);
       if (!res.ok) {
         failures.push(`${templateName} : ${data.error ?? "erreur inconnue"}`);
       } else {
@@ -466,6 +486,9 @@ export default function ProductForm({
         for (const w of (data.warnings ?? []) as string[]) pageWarnings.push(`${templateName} : ${w}`);
       }
       setCreateProgress((p) => (p ? { done: p.done + 1, total: p.total } : { done: 1, total }));
+      // Un souffle entre deux produits : le stockage de Supabase a peu de
+      // connexions, et chaque création en ouvre plusieurs.
+      await sleep(300);
     }
 
     setLoading(false);
