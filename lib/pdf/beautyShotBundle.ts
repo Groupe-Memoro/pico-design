@@ -51,7 +51,11 @@ export function loadBeautyShotBundle(storage: Storage, xmlPath: string): Promise
 }
 
 async function fetchBeautyShotBundle(storage: Storage, xmlPath: string): Promise<LoadedBundle> {
-  const xmlRes = await storage.from("overlays").download(xmlPath);
+  // Contourne le cache du CDN de Supabase (une heure) : un bundle remplacé
+  // par l'équipe doit apparaître tout de suite. Le cache mémoire ci-dessus
+  // évite déjà de retélécharger à chaque rendu.
+  const fresh = { cacheNonce: String(Date.now()) };
+  const xmlRes = await storage.from("overlays").download(xmlPath, fresh);
   if (!xmlRes.data) throw new Error("Impossible de charger le XML du mockup.");
   const config = parseBeautyShotXml(await xmlRes.data.text());
 
@@ -59,7 +63,7 @@ async function fetchBeautyShotBundle(storage: Storage, xmlPath: string): Promise
   const entries = await Promise.all(
     usedAssetNames(config).map(async (name) => {
       const path = beautyShotAssetPath(folder, name, mimeTypeForAsset(config, name));
-      const { data } = await storage.from("overlays").download(path);
+      const { data } = await storage.from("overlays").download(path, fresh);
       return [name, data ? Buffer.from(await data.arrayBuffer()) : null] as const;
     })
   );
