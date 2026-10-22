@@ -1,3 +1,4 @@
+import sharp from "sharp";
 import type { createServerSupabaseClient } from "../supabase/server";
 import {
   beautyShotAssetPath,
@@ -68,7 +69,38 @@ async function fetchBeautyShotBundle(storage: Storage, xmlPath: string): Promise
     throw new Error(`Fichiers manquants pour le mockup : ${missing.join(", ")}.`);
   }
 
-  return { config, assets: new Map(entries.map(([name, buf]) => [name, buf as Buffer])) };
+  const assets = new Map(entries.map(([name, buf]) => [name, buf as Buffer]));
+  return { config: await fitConfigToAssets(config, assets), assets };
+}
+
+/**
+ * Taille de scène du XML confrontée aux images : certains bundles annoncent
+ * une scène plus large que leurs images (iPhone 15 : 1465 px dans le XML,
+ * 1346 px pour le fond et le masque). Le fond, rogné pour couvrir la scène,
+ * et le masque, étiré, ne tombaient alors plus l'un sur l'autre. Les images
+ * font foi : la scène prend la taille du fond (ou du masque) et le mesh est
+ * mis à la même échelle.
+ */
+async function fitConfigToAssets(config: BeautyShotConfig, assets: Map<string, Buffer>): Promise<BeautyShotConfig> {
+  const reference = assets.get(config.backgroundAssetName ?? "") ?? assets.get(config.maskAssetName ?? "");
+  if (!reference) return config;
+  const { width, height } = await sharp(reference).metadata();
+  if (!width || !height || (width === config.width && height === config.height)) return config;
+  const sx = width / config.width;
+  const sy = height / config.height;
+  return {
+    ...config,
+    width,
+    height,
+    zones: config.zones.map((z) => ({
+      ...z,
+      left: z.left * sx,
+      top: z.top * sy,
+      width: z.width * sx,
+      height: z.height * sy,
+      quad: z.quad?.map((p) => ({ x: p.x * sx, y: p.y * sy })) as typeof z.quad,
+    })),
+  };
 }
 
 /**

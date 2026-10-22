@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { Template } from "@/lib/types";
 import type { TemplateWithOverlayUrl } from "@/components/TemplatesTable";
-import { CheckIcon, CopyIcon, EyeIcon, FilePenIcon, LayersIcon, ShopifyIcon, SpinnerIcon, TrashIcon } from "@/components/icons";
+import { CheckIcon, CopyIcon, LinkIcon, EyeIcon, FilePenIcon, LayersIcon, ShopifyIcon, SpinnerIcon, TrashIcon } from "@/components/icons";
 import { templateSizeLabel } from "@/lib/templateLabel";
 
 export default function TemplateRow({
@@ -99,7 +99,7 @@ export default function TemplateRow({
             title={`Profil d'imposition : ${impositionProfileName}`}
             aria-label={`Profil d'imposition : ${impositionProfileName}`}
           >
-            <CheckIcon className="h-4 w-4 text-green-600" />
+            <LinkIcon className="h-4 w-4 text-green-600" />
           </span>
         ) : (
           <span className="text-neutral-300" aria-label="Aucun profil d'imposition">—</span>

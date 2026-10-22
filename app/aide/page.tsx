@@ -239,27 +239,46 @@ const PRODUCT_BLOCK = String.raw`{%- comment -%}
 
 const READY_PRODUCT_BLOCK = String.raw`{%- comment -%}
   Pico Design : produit déjà fait, vendu tel quel (sans passer par l'outil).
-  Ajoute l'id du produit Pico (métachamp custom.pico_product, copié depuis
-  Pico Design > Produits) à l'article mis au panier : la commande arrive dans
-  Pico Design avec le PDF du produit. Sans id, ce bloc ne fait rien.
+  Ajoute l'id du produit Pico à l'article mis au panier : la commande arrive
+  dans Pico Design avec le PDF du produit. L'id vient du métachamp
+  custom.pico_product (produit seul), ou de custom.pico_variants (JSON : nom
+  de la variante → id, posé par l'export Shopify de Pico Design) pour un
+  produit à variantes. Sans id, ce bloc ne fait rien.
 {%- endcomment -%}
 {%- assign pico_product = product.metafields.custom.pico_product.value -%}
-{%- if pico_product != blank -%}
+{%- assign pico_variants = product.metafields.custom.pico_variants.value -%}
+{%- if pico_product != blank or pico_variants != blank -%}
 <script>
   (function () {
-    var ID = {{ pico_product | json }};
+    var SINGLE = {{ pico_product | json }};
+    // Id Pico de chaque variante, par id de variante Shopify.
+    var BY_VARIANT = {
+      {%- for v in product.variants -%}
+        {%- assign pico_id = pico_variants[v.title] -%}
+        {%- if pico_id != blank -%}{{ v.id | json }}: {{ pico_id | json }},{%- endif -%}
+      {%- endfor -%}
+      "": ""
+    };
+    function idFor(form) {
+      var variant = form.querySelector('[name="id"]');
+      return (variant && BY_VARIANT[variant.value]) || SINGLE || "";
+    }
     function apply() {
       document.querySelectorAll('form[action*="/cart/add"]').forEach(function (form) {
-        if (form.querySelector('input[name="properties[_pico_product]"]')) return;
-        var input = document.createElement("input");
-        input.type = "hidden";
-        input.name = "properties[_pico_product]";
-        input.value = ID;
-        form.appendChild(input);
+        var input = form.querySelector('input[name="properties[_pico_product]"]');
+        if (!input) {
+          input = document.createElement("input");
+          input.type = "hidden";
+          input.name = "properties[_pico_product]";
+          form.appendChild(input);
+        }
+        input.value = idFor(form);
       });
     }
     apply();
-    // Certains thèmes recréent le formulaire (changement de variante) : on repasse.
+    // Changement de variante, ou thème qui recrée le formulaire : on repasse.
+    document.addEventListener("change", apply, true);
+    document.addEventListener("submit", apply, true);
     new MutationObserver(apply).observe(document.body, { childList: true, subtree: true });
   })();
 </script>
@@ -590,6 +609,14 @@ export default async function AidePage() {
         <CodeBlock label="Bloc Liquid personnalisé — produit déjà fait" code={READY_PRODUCT_BLOCK} />
         <p>
           Les webhooks de commande (étape 6) suffisent : dans Commandes, la ligne propose le PDF du produit.
+        </p>
+        <p>
+          <strong>Plusieurs produits d&apos;un coup, avec variantes :</strong> dans Pico Design → Produits, cochez les
+          produits puis <strong>Exporter pour Shopify</strong>. Le fichier CSV crée un produit Shopify par collection
+          (une variante par format), avec les mockups et les SKU, en brouillon. Avant le premier import, ajoutez une
+          seconde définition de métachamp de produit : nom <K>Variantes Pico</K>, clé <K>custom.pico_variants</K>, type{" "}
+          <strong>JSON</strong>. Le bloc Liquid ci-dessus s&apos;en sert pour retrouver le produit Pico de la variante
+          choisie. Shopify : Produits → Importer → choisir le fichier.
         </p>
       </Section>
 

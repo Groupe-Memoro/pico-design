@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import ProductTableRow from "@/components/ProductTableRow";
 import ProductForm from "@/components/ProductForm";
 import ProductMockupModal from "@/components/ProductMockupModal";
+import ShopifyExportModal from "@/components/ShopifyExportModal";
 import CollectionsManager from "@/components/CollectionsManager";
 import Modal from "@/components/Modal";
 import BulkActionsBar from "@/components/BulkActionsBar";
@@ -40,6 +41,7 @@ type ModalState =
   | { mode: "edit"; product: ProductWithTemplate }
   | { mode: "collections" }
   | { mode: "mockup"; product: ProductWithTemplate }
+  | { mode: "shopify"; productIds: string[] }
   | null;
 
 export default function ProductsTable({
@@ -67,6 +69,8 @@ export default function ProductsTable({
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [modal, setModal] = useState<ModalState>(null);
   const [formBusy, setFormBusy] = useState(false);
+  // Création de plusieurs produits : « Création des produits 3/40 » dans le voile.
+  const [formProgress, setFormProgress] = useState<{ done: number; total: number } | null>(null);
   const selection = useSelection();
   const [bulkDeleting, setBulkDeleting] = useState(false);
 
@@ -212,7 +216,15 @@ export default function ProductsTable({
         deleting={bulkDeleting}
         onDelete={handleBulkDelete}
         onClear={selection.clear}
-      />
+      >
+        <button
+          type="button"
+          onClick={() => setModal({ mode: "shopify", productIds: [...selection.selected] })}
+          className="rounded-lg border border-pico-maroon bg-white px-3 py-1.5 text-pico-maroon hover:bg-pico-cream"
+        >
+          Exporter pour Shopify
+        </button>
+      </BulkActionsBar>
 
       {filtered.length === 0 ? (
         <p className="rounded-xl border border-neutral-200 bg-white p-4 text-sm text-neutral-500">
@@ -291,6 +303,7 @@ export default function ProductsTable({
           onClose={() => setModal(null)}
           wide
           busy={formBusy}
+          busyDetail={formProgress ? `Création des produits ${formProgress.done}/${formProgress.total}` : null}
         >
           <ProductForm
             templates={templates}
@@ -302,8 +315,13 @@ export default function ProductsTable({
             currentBackImageUrl={modal.mode === "edit" ? modal.product.backImageUrl : null}
             onSuccess={handleSuccess}
             onBusyChange={setFormBusy}
+            onProgressChange={setFormProgress}
           />
         </Modal>
+      )}
+
+      {modal?.mode === "shopify" && (
+        <ShopifyExportModal productIds={modal.productIds} onClose={() => setModal(null)} />
       )}
 
       {modal?.mode === "mockup" && (

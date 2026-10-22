@@ -375,6 +375,36 @@ async function extractCentered(
     .toBuffer();
 }
 
+/**
+ * Masque ramené à la zone du mesh. Un masque à la taille de la scène (le cas
+ * des bundles exportés) est découpé à l'emplacement de la zone : l'étirer
+ * sur un mesh plus étroit que la scène (ex. 1370 px sur 1453) décalait le
+ * produit — le visuel débordait aux coins et dans l'ouverture de la caméra.
+ * Un masque d'une autre taille est, comme avant, étiré sur la zone.
+ */
+async function maskForZone(
+  mask: Buffer,
+  zone: { left: number; top: number; width: number; height: number },
+  canvasWidth: number,
+  canvasHeight: number
+): Promise<Buffer> {
+  const zoneWidth = Math.round(zone.width);
+  const zoneHeight = Math.round(zone.height);
+  const meta = await sharp(mask).metadata();
+  const sceneSized = meta.width === canvasWidth && meta.height === canvasHeight;
+  const sizedToZone = meta.width === zoneWidth && meta.height === zoneHeight;
+  const image =
+    sceneSized && !sizedToZone
+      ? sharp(mask).extract({
+          left: Math.round(zone.left),
+          top: Math.round(zone.top),
+          width: Math.min(zoneWidth, canvasWidth - Math.round(zone.left)),
+          height: Math.min(zoneHeight, canvasHeight - Math.round(zone.top)),
+        })
+      : sharp(mask);
+  return image.resize(zoneWidth, zoneHeight, { fit: "fill" }).ensureAlpha().png(FAST_PNG).toBuffer();
+}
+
 async function buildDesignForZone(
   template: Template,
   // null = pas de visuel de fond choisi (voir coverCropToBuffer) — un
@@ -618,16 +648,7 @@ export async function generateBeautyShotMockupPng(
     const maskBuffer = config.maskAssetName ? assets.get(config.maskAssetName) : null;
     const maskedDesign = maskBuffer
       ? await sharp(design)
-          .composite([
-            {
-              input: await sharp(maskBuffer)
-                .resize(zoneWidth, zoneHeight, { fit: "fill" })
-                .ensureAlpha()
-                .png(FAST_PNG)
-                .toBuffer(),
-              blend: "dest-in",
-            },
-          ])
+          .composite([{ input: await maskForZone(maskBuffer, zone, canvasWidth, canvasHeight), blend: "dest-in" }])
           .png(FAST_PNG)
           .toBuffer()
       : design;

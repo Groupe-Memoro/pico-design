@@ -8,12 +8,15 @@ export default function BulkActionsBar({
   deleting,
   onDelete,
   onClear,
+  children,
 }: {
   count: number;
   label: string;
   deleting: boolean;
   onDelete: () => void;
   onClear: () => void;
+  // Actions propres à la page, avant « Supprimer ».
+  children?: React.ReactNode;
 }) {
   if (count === 0) return null;
 
@@ -31,6 +34,7 @@ export default function BulkActionsBar({
         >
           Annuler
         </button>
+        {children}
         <button
           type="button"
           onClick={onDelete}

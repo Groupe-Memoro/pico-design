@@ -10,6 +10,7 @@ export default function Modal({
   wide,
   full,
   busy,
+  busyDetail = null,
 }: {
   title: string;
   onClose: () => void;
@@ -23,6 +24,9 @@ export default function Modal({
   // l'impression que l'app a planté, et qu'une fermeture accidentelle
   // pendant l'envoi laisse l'utilisateur dans le doute sur le résultat.
   busy?: boolean;
+  // Précision affichée à côté de « Enregistrement en cours... » (ex.
+  // « Création des produits 3/40 »).
+  busyDetail?: string | null;
 }) {
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -63,7 +67,10 @@ export default function Modal({
         {busy && (
           <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-2xl bg-white/85 backdrop-blur-[1px]">
             <SpinnerIcon className="h-6 w-6 text-pico-maroon" />
-            <p className="text-sm font-medium text-neutral-600">Enregistrement en cours...</p>
+            <p className="text-sm font-medium text-neutral-600">
+              Enregistrement en cours...
+              {busyDetail && <span className="ml-2 font-semibold text-pico-maroon">{busyDetail}</span>}
+            </p>
           </div>
         )}
       </div>
