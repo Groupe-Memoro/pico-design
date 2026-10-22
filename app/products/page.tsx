@@ -3,6 +3,7 @@ import ProductsTable, { type ProductWithTemplate } from "@/components/ProductsTa
 import type { VisualWithUrl } from "@/components/VisualsGrid";
 import type { Category, ProductCollection, Template, Visual } from "@/lib/types";
 import { signedUrls } from "@/lib/storageUrls";
+import { selectAll } from "@/lib/supabase/selectAll";
 
 export default async function ProductsPage() {
   await requireUser();
@@ -15,12 +16,17 @@ export default async function ProductsPage() {
     { data: productCollections },
     { data: mockupRows },
   ] = await Promise.all([
-    supabase
-      .from("products")
-      .select(
-        "*, template:templates(name, category_id, width_mm, height_mm, fold, mask_path, shading_path, beauty_shot_xml_path)"
-      )
-      .order("name", { ascending: true }),
+    // Tous les produits, au-delà des 1000 lignes d'une requête.
+    selectAll((from, to) =>
+      supabase
+        .from("products")
+        .select(
+          "*, template:templates(name, category_id, width_mm, height_mm, fold, mask_path, shading_path, beauty_shot_xml_path)"
+        )
+        .order("name", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, to)
+    ).then((data) => ({ data })),
     supabase.from("templates").select("*").order("name", { ascending: true }),
     supabase.from("categories").select("*").order("sort_order", { ascending: true }),
     supabase.from("visuals").select("*").order("name", { ascending: true }),

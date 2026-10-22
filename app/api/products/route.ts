@@ -10,18 +10,20 @@ import { generateAndStoreProductPdf } from "@/lib/pdf/productPdf";
 import { parsePositionValue } from "@/lib/pdf/crop";
 import type { LogoShape, Template, VisualMode } from "@/lib/types";
 import { storageFileName } from "@/lib/storageName";
+import { selectAll } from "@/lib/supabase/selectAll";
 
 export const runtime = "nodejs"; // sharp/pdf-lib ont besoin du runtime Node, pas Edge.
 
 export async function GET() {
   const supabase = createServerSupabaseClient();
-  const { data, error } = await supabase
-    .from("products")
-    .select("*")
-    .order("name", { ascending: true });
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ products: data });
+  try {
+    const products = await selectAll((from, to) =>
+      supabase.from("products").select("*").order("name", { ascending: true }).order("id", { ascending: true }).range(from, to)
+    );
+    return NextResponse.json({ products });
+  } catch (err) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Erreur." }, { status: 500 });
+  }
 }
 
 export async function POST(request: Request) {

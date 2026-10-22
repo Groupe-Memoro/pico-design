@@ -1,4 +1,5 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { selectAll } from "@/lib/supabase/selectAll";
 import type { FormatOption, ProductOption } from "@/components/ImpositionTool";
 import { templateLabel } from "@/lib/templateLabel";
 import { productDisplayName } from "@/lib/imposition/productLabel";
@@ -42,11 +43,15 @@ export async function loadImpositionToolData() {
       supabase.from("templates").select("*").order("name", { ascending: true }),
       supabase.from("categories").select("*").order("sort_order", { ascending: true }),
       // Seuls les produits dont le PDF a déjà été généré peuvent être imposés.
-      supabase
-        .from("products")
-        .select("id, name, template_id, rotated, image_path, visual_id")
-        .not("pdf_path", "is", null)
-        .order("name", { ascending: true }),
+      selectAll((from, to) =>
+        supabase
+          .from("products")
+          .select("id, name, template_id, rotated, image_path, visual_id")
+          .not("pdf_path", "is", null)
+          .order("name", { ascending: true })
+          .order("id", { ascending: true })
+          .range(from, to)
+      ).then((data) => ({ data })),
       supabase.from("visuals").select("id, name"),
       // Profils d'imposition (voir 0078), appliqués et enregistrés depuis l'outil.
       supabase.from("imposition_profiles").select("*").order("name", { ascending: true }),
