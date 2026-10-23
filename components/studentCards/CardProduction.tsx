@@ -3,10 +3,10 @@
 import { useMemo, useState } from "react";
 import Modal from "@/components/Modal";
 import { DownloadIcon, SpinnerIcon } from "@/components/icons";
-import { decodeCsv, parseCsv, type CsvData } from "@/lib/studentCards/csv";
-import { parseXlsx } from "@/lib/studentCards/xlsx";
+import type { CsvData } from "@/lib/studentCards/csv";
+import { parseDataFile } from "@/lib/studentCards/dataFile";
 import { PhotoIndex, collectPhotos, shrinkPhoto } from "@/lib/studentCards/photos";
-import { zoneText, type CardZone } from "@/lib/studentCards/types";
+import { zoneText, type CardZone, type DataVocab } from "@/lib/studentCards/types";
 
 // Un lot envoyé au rendu : sous la limite de taille d'une requête (4,5 Mo),
 // photos allégées comprises.
@@ -21,16 +21,21 @@ interface Result {
 }
 
 /**
- * Production des cartes : le CSV des élèves, leurs photos (ZIP ou fichiers,
- * en plusieurs fois au besoin), puis le PDF — une carte par page, recto et
+ * Production : le fichier des lignes (élèves, clients…), leurs photos (ZIP
+ * ou fichiers, en plusieurs fois au besoin), puis le PDF — une page par face, recto et
  * verso à la suite. Le rendu se fait par lots ; le navigateur assemble.
  */
 export default function CardProduction({
   templateId,
+  apiBase,
   templateName,
+  vocab,
   zones,
   data,
   onData,
+  dataFile,
+  onRemoveData,
+  loadingData,
   photos,
   onPhotos,
   photoColumn,
@@ -40,10 +45,19 @@ export default function CardProduction({
   beforeGenerate,
 }: {
   templateId: string;
+  // « /api/student-cards » ou « /api/data-templates ».
+  apiBase: string;
   templateName: string;
+  vocab: DataVocab;
   zones: CardZone[];
   data: CsvData | null;
-  onData: (data: CsvData) => void;
+  // Nouveau fichier déposé : ses données, et le fichier (enregistré avec le document).
+  onData: (data: CsvData, file: File) => void;
+  // Fichier conservé avec le document : son nom, s'il est déjà enregistré ou
+  // le sera au prochain enregistrement, et de quoi le retirer.
+  dataFile: { name: string; pending: boolean } | null;
+  onRemoveData: () => void;
+  loadingData: boolean;
   photos: PhotoIndex;
   onPhotos: (photos: PhotoIndex) => void;
   photoColumn: string;
@@ -66,7 +80,7 @@ export default function CardProduction({
     return `Ligne ${i + 2}${name ? ` (${name})` : ""}`;
   };
 
-  // Élèves sans photo jumelée.
+  // Lignes sans photo jumelée.
   const missingPhotos = useMemo(() => {
     if (!data || !needsPhoto) return [];
     return data.rows.flatMap((row, i) => (photos.find(row, photoColumn || null) ? [] : [labelOf(row, i)]));
@@ -76,23 +90,11 @@ export default function CardProduction({
   async function loadCsv(file: File | null) {
     if (!file) return;
     setError(null);
-    if (/\.xls$/i.test(file.name)) {
-      setError("L'ancien format Excel (.xls) n'est pas lu : enregistrez le fichier en .xlsx ou en CSV.");
-      return;
-    }
-    let parsed: CsvData;
     try {
-      const bytes = await file.arrayBuffer();
-      parsed = /\.xlsx$/i.test(file.name) ? parseXlsx(bytes) : parseCsv(decodeCsv(bytes));
+      onData(parseDataFile(await file.arrayBuffer(), file.name), file);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Fichier illisible.");
-      return;
     }
-    if (parsed.columns.length === 0 || parsed.rows.length === 0) {
-      setError("Ce fichier ne contient aucune ligne d'élève (la première ligne doit donner les colonnes).");
-      return;
-    }
-    onData(parsed);
   }
 
   async function addPhotos(files: File[]) {
@@ -126,7 +128,7 @@ export default function CardProduction({
       const flush = async () => {
         if (batch.cards.length === 0) return;
         batch.form.append("cards", JSON.stringify(batch.cards));
-        const res = await fetch(`/api/student-cards/${templateId}/render`, { method: "POST", body: batch.form });
+        const res = await fetch(`${apiBase}/${templateId}/render`, { method: "POST", body: batch.form });
         if (!res.ok) {
           const json = await res.json().catch(() => ({}));
           throw new Error(json.error ?? "Le rendu a échoué.");
@@ -172,7 +174,7 @@ export default function CardProduction({
       }
       const blob = new Blob([new Uint8Array(await merged.save())], { type: "application/pdf" });
       const first = data.rows[indexes[0]];
-      const suffix = onlyPreview ? `essai ${firstText ? zoneText(firstText, first) : indexes[0] + 2}` : `${indexes.length} cartes`;
+      const suffix = onlyPreview ? `essai ${firstText ? zoneText(firstText, first) : indexes[0] + 2}` : `${indexes.length} ${vocab.pages}`;
       if (result) URL.revokeObjectURL(result.url);
       setResult({
         url: URL.createObjectURL(blob),
@@ -190,10 +192,10 @@ export default function CardProduction({
   const busy = progress !== null;
   return (
     <section className="space-y-3 rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
-      <h2 className="text-sm font-semibold text-pico-black">Produire les cartes</h2>
+      <h2 className="text-sm font-semibold text-pico-black">Produire les {vocab.pages}</h2>
 
       <div className="space-y-1">
-        <span className="block text-xs font-medium text-neutral-500">1. Fichier des élèves (Excel ou CSV)</span>
+        <span className="block text-xs font-medium text-neutral-500">1. Fichier des {vocab.rows} (Excel ou CSV)</span>
         <input
           type="file"
           accept=".csv,.txt,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -204,9 +206,28 @@ export default function CardProduction({
           }}
           className="w-full text-xs"
         />
+        {loadingData && <p className="text-xs text-neutral-600">Lecture du fichier enregistré…</p>}
+        {dataFile && (
+          <div className="flex items-center justify-between gap-2 rounded-lg bg-neutral-50 px-2 py-1.5 text-xs">
+            <span className="min-w-0 truncate text-neutral-700">
+              {dataFile.name}{" "}
+              <span className={dataFile.pending ? "text-amber-700" : "text-green-700"}>
+                {dataFile.pending ? "· sera conservé à l'enregistrement" : "· conservé avec le modèle"}
+              </span>
+            </span>
+            <button
+              type="button"
+              onClick={onRemoveData}
+              disabled={busy}
+              className="shrink-0 text-neutral-500 underline hover:text-red-600"
+            >
+              Retirer
+            </button>
+          </div>
+        )}
         {data ? (
           <p className="text-xs text-neutral-600">
-            {data.rows.length} élève{data.rows.length > 1 ? "s" : ""} · colonnes : {data.columns.join(", ")}
+            {data.rows.length} {data.rows.length > 1 ? vocab.rows : vocab.row} · colonnes : {data.columns.join(", ")}
           </p>
         ) : (
           <p className="text-xs text-neutral-500">
@@ -223,7 +244,7 @@ export default function CardProduction({
 
       {needsPhoto && (
         <div className="space-y-1 border-t border-neutral-100 pt-3">
-          <span className="block text-xs font-medium text-neutral-500">2. Photos des élèves</span>
+          <span className="block text-xs font-medium text-neutral-500">2. Photos</span>
           <label className="block text-xs text-neutral-600">
             Colonne qui désigne la photo
             <select
@@ -252,14 +273,14 @@ export default function CardProduction({
           />
           <p className="text-xs text-neutral-500">
             Un ZIP, des photos, ou les deux, en plusieurs fois au besoin. Chaque photo est jumelée par son nom de
-            fichier : le numéro de l&apos;élève (123456.jpg) ou le nom donné dans la colonne.
+            fichier : un numéro (123456.jpg) ou le nom donné dans la colonne choisie.
           </p>
           {loadingPhotos && <p className="text-xs text-neutral-600">Ouverture des photos…</p>}
           {photos.size > 0 && (
             <div className="flex items-center justify-between gap-2 text-xs">
               <span className="text-neutral-600">
                 {photos.size} photo{photos.size > 1 ? "s" : ""}
-                {data && ` · ${data.rows.length - missingPhotos.length} / ${data.rows.length} élèves jumelés`}
+                {data && ` · ${data.rows.length - missingPhotos.length} / ${data.rows.length} ${vocab.rows} avec photo`}
               </span>
               <button
                 type="button"
@@ -276,7 +297,7 @@ export default function CardProduction({
           {data && missingPhotos.length > 0 && (photos.size > 0 || photoColumn) && (
             <details className="text-xs text-amber-700">
               <summary className="cursor-pointer">
-                {missingPhotos.length} élève{missingPhotos.length > 1 ? "s" : ""} sans photo (carte sans photo)
+                {missingPhotos.length} {missingPhotos.length > 1 ? vocab.rows : vocab.row} sans photo (zone photo laissée vide)
               </summary>
               <ul className="mt-1 max-h-32 list-disc overflow-y-auto pl-5">
                 {missingPhotos.slice(0, 100).map((m) => (
@@ -298,10 +319,10 @@ export default function CardProduction({
         >
           {busy && <SpinnerIcon className="h-4 w-4" />}
           {busy
-            ? `Cartes ${progress.done} / ${progress.total}…`
+            ? `${vocab.pages.charAt(0).toUpperCase()}${vocab.pages.slice(1)} ${progress.done} / ${progress.total}…`
             : data
-              ? `Produire ${data.rows.length} carte${data.rows.length > 1 ? "s" : ""}`
-              : "Produire les cartes"}
+              ? `Produire ${data.rows.length} ${data.rows.length > 1 ? vocab.pages : vocab.page}`
+              : `Produire les ${vocab.pages}`}
         </button>
         <button
           type="button"
@@ -309,14 +330,14 @@ export default function CardProduction({
           disabled={busy || !data || zones.length === 0}
           className="w-full rounded-lg border border-neutral-300 px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
         >
-          Essai : l&apos;élève affiché seulement
+          Essai : {vocab.Row.toLowerCase()} {previewIndex + 1} seulement
         </button>
-        {!data && <p className="text-xs text-neutral-500">Chargez d&apos;abord le fichier des élèves (Excel ou CSV).</p>}
+        {!data && <p className="text-xs text-neutral-500">Chargez d&apos;abord le fichier des {vocab.rows} (Excel ou CSV).</p>}
       </div>
 
       {result && (
         <Modal
-          title={`${result.count} carte${result.count > 1 ? "s" : ""} prête${result.count > 1 ? "s" : ""}`}
+          title={`${result.count} ${result.count > 1 ? vocab.pages : vocab.page} prête${result.count > 1 ? "s" : ""}`}
           onClose={() => {
             URL.revokeObjectURL(result.url);
             setResult(null);

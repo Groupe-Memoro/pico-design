@@ -81,6 +81,7 @@ export async function loadImpositionToolData() {
       name: templateLabel(t.name, t.two_sided),
       category: categoryName.get(t.category_id) ?? "Autres",
       bleedMm: t.bleed_mm,
+      twoSided: t.two_sided,
       rank: categoryRank.get(t.category_id) ?? categoryRows.length,
       ...pageSize(t, false),
     }))

@@ -53,6 +53,9 @@ export interface ImpositionConfig {
   custom: { widthMm: number; heightMm: number; bleedMm: number };
   orientation: PieceOrientation;
   flip: FlipEdge;
+  // Fichiers de plusieurs pages : recto-verso (pages 1-2, 3-4…) ou recto seul
+  // (une pièce par page). Absent : impositions d'avant (page 1, page 2 au dos).
+  sourcePages?: "duplex" | "simplex";
   sources: SavedSource[];
 }
 

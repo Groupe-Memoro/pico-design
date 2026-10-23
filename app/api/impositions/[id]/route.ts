@@ -5,7 +5,7 @@ import { saveImposition } from "@/lib/imposition/persist";
 import { imposedPdfPath, sourcesDir, type SavedImposition } from "@/lib/imposition/saved";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300; // plusieurs feuilles (fichier de plusieurs pages)
 
 async function currentUser() {
   const supabase = createServerSupabaseClient();

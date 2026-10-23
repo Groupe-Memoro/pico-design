@@ -1,4 +1,4 @@
-import { BarcodeIcon, BookIcon, CalendarIcon, IdCardIcon, Grid3x3Icon, ImageIcon, StickerIcon, BadgeIcon, MonitorCogIcon, PaintbrushVerticalIcon, PencilRulerIcon, RocketIcon, ShopifyIcon, TagIcon, UsersIcon } from "@/components/icons";
+import { BarcodeIcon, BookIcon, CalendarIcon, FileSpreadsheetIcon, IdCardIcon, Grid3x3Icon, ImageIcon, StickerIcon, BadgeIcon, MonitorCogIcon, PaintbrushVerticalIcon, PencilRulerIcon, RocketIcon, ShopifyIcon, TagIcon, UsersIcon } from "@/components/icons";
 
 // Liste centrale des pages de nav / tuiles du tableau de bord, pour que les
 // deux restent synchronisées sur le même ordre (voir `resolveMenuOrder`) et
@@ -11,6 +11,7 @@ export type MenuKey =
   | "albums"
   | "agendas"
   | "studentCards"
+  | "dataTemplates"
   | "themes"
   | "products"
   | "design"
@@ -59,6 +60,12 @@ export const MENU_ITEMS: Record<
     title: "Agendas scolaires",
     icon: CalendarIcon,
     gradient: "from-sky-400 to-cyan-600",
+  },
+  dataTemplates: {
+    href: "/donnees-variables",
+    title: "Données variables",
+    icon: FileSpreadsheetIcon,
+    gradient: "from-emerald-400 to-teal-600",
   },
   studentCards: {
     href: "/cartes-etudiantes",
@@ -128,7 +135,7 @@ export const MENU_ITEMS: Record<
 // glisser-déposer déplace un lien À L'INTÉRIEUR de son groupe, jamais d'un
 // groupe à l'autre, sans quoi le regroupement ne tiendrait pas.
 const MENU_GROUPS: MenuKey[][] = [
-  ["products", "templates", "skus", "imposition"],
+  ["products", "templates", "dataTemplates", "skus", "imposition"],
   ["themes", "visuals", "illustrations"],
   ["stickers", "albums", "agendas", "studentCards"],
   ["design", "orders", "settings"],

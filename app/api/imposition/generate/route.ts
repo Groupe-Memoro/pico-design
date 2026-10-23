@@ -4,7 +4,7 @@ import { ImpositionError, buildImposition } from "@/lib/imposition/build";
 import { formatInches } from "@/lib/imposition/presets";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300; // plusieurs feuilles (fichier de plusieurs pages)
 
 function errorResponse(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });

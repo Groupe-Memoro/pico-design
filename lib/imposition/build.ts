@@ -168,9 +168,16 @@ export async function buildImposition(
 
   const sources: ImpositionSource[] = [];
   const built: BuiltSource[] = [];
+  // Fichiers de plusieurs pages : recto-verso (pages 1-2, 3-4…) ou recto seul
+  // (une pièce par page). Absent : comme avant, page 1 et page 2 au dos.
+  const sourcePages = formData.get("sourcePages");
   for (const spec of specs) {
     const loaded = await loadSource(spec, formData, storedPrefix, { supabase, admin });
-    sources.push(loaded.source);
+    if (sourcePages === "duplex" || sourcePages === "simplex") {
+      sources.push(...(await expandPages(loaded.source, sourcePages === "duplex")));
+    } else {
+      sources.push(loaded.source);
+    }
     built.push(loaded.built);
   }
 
@@ -297,10 +304,12 @@ export async function buildImposition(
       flip,
       pieceBleedMm,
     };
-    // Plusieurs feuilles (mise en production) : les copies remplissent les
-    // emplacements feuille après feuille, réunies dans un seul PDF.
-    if (formData.get("multiSheet") === "1") {
-      const perSheet = impositionLayout(base).layout.cells.length;
+    // Plusieurs feuilles (mise en production, ou plus de pièces que
+    // d'emplacements) : les copies remplissent les emplacements feuille après
+    // feuille, réunies dans un seul PDF.
+    const perSheet = impositionLayout(base).layout.cells.length;
+    const pieceCount = sources.reduce((n, s) => n + s.copies, 0);
+    if (formData.get("multiSheet") === "1" || pieceCount > perSheet) {
       const queue = sources.map((s) => ({ ...s }));
       const merged = await PDFDocument.create();
       let sheetCount = 0;
@@ -327,6 +336,29 @@ export async function buildImposition(
   } catch (err) {
     throw new ImpositionError(err instanceof Error ? err.message : "Erreur lors de l'imposition.");
   }
+}
+
+/**
+ * Un PDF de plusieurs pages en pièces : une par page (recto seul), ou une
+ * par paire de pages (recto-verso : 1-2, 3-4… ; une dernière page impaire
+ * n'a pas de verso). Chaque pièce reprend le nombre de copies du fichier.
+ */
+async function expandPages(source: ImpositionSource, duplex: boolean): Promise<ImpositionSource[]> {
+  let count: number;
+  try {
+    count = (await PDFDocument.load(source.pdf, { updateMetadata: false })).getPageCount();
+  } catch {
+    throw new ImpositionError(`« ${source.name} » n'est pas un PDF lisible.`);
+  }
+  if (count <= 1) return [{ ...source, backPage: null }];
+  const step = duplex ? 2 : 1;
+  const pieces: ImpositionSource[] = [];
+  for (let page = 0; page < count; page += step) {
+    const backPage = duplex && page + 1 < count ? page + 1 : null;
+    const label = backPage === null ? `p. ${page + 1}` : `p. ${page + 1}-${page + 2}`;
+    pieces.push({ ...source, name: `${source.name} (${label})`, page, backPage });
+  }
+  return pieces;
 }
 
 // Charge un fichier à imposer : un PDF téléversé (champ du formulaire), un PDF

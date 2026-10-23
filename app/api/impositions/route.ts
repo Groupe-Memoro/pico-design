@@ -5,7 +5,7 @@ import { ImpositionError } from "@/lib/imposition/build";
 import { saveImposition } from "@/lib/imposition/persist";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300; // plusieurs feuilles (fichier de plusieurs pages)
 
 // Enregistre une nouvelle imposition (nom, configuration et PDF).
 export async function POST(request: Request) {

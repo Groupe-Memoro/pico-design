@@ -55,6 +55,7 @@ function parseConfigBase(raw: unknown): Omit<ImpositionConfig, "sources"> {
     custom: { widthMm: num(custom.widthMm), heightMm: num(custom.heightMm), bleedMm: num(custom.bleedMm) },
     orientation: c.orientation === "normal" || c.orientation === "rotated" ? c.orientation : "auto",
     flip: c.flip === "short" ? "short" : "long",
+    ...(c.sourcePages === "duplex" || c.sourcePages === "simplex" ? { sourcePages: c.sourcePages } : {}),
   };
 }
 

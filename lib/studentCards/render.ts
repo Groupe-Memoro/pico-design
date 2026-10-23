@@ -18,9 +18,8 @@ import { mmToPt } from "@/lib/pdf/units";
 import { loadInstance, preloadFonts } from "@/lib/pdf/textLayer";
 import { fontOptionById } from "@/lib/design/fonts";
 import { detectMarksKind } from "@/lib/imposition/marks";
-import { fitFontMm } from "@/lib/stickers/types";
 import { barcodeGeometry, BarcodeError } from "./barcode";
-import { fillContent, zoneText, type CardSide, type CardZone, type StudentCardTemplate } from "./types";
+import { fillContent, fitCardFontMm, zoneText, type CardSide, type CardZone, type VariableDataPage } from "./types";
 
 // Cartes par requête : le navigateur envoie les élèves par lots (photos
 // comprises, sous la limite de taille d'une requête) et assemble les PDF.
@@ -81,22 +80,28 @@ function enterZone(page: PDFPage, zone: CardZone, cardHeightMm: number) {
   );
 }
 
-// Le texte en un seul chemin vectoriel, ajusté à la zone (même règle que les
-// autocollants : la plus grande taille qui tienne, sans dépasser la maximale).
+// Le texte en un seul chemin vectoriel, ajusté à la zone : la plus grande
+// taille qui tienne, sans dépasser la maximale. Aligné à gauche ou à droite,
+// le dessin des lettres touche le bord de la zone (l'approche de la première
+// et de la dernière lettre est retirée).
 function drawText(page: PDFPage, zone: CardZone, text: string, cardHeightMm: number) {
   const font = loadInstance(fontOptionById(zone.fontId), false, zone.bold);
   const run = font.layout(text);
   const advance = run.glyphs.reduce((sum, g) => sum + g.advanceWidth, 0);
-  const widthPerMm = advance / font.unitsPerEm;
+  const first = run.glyphs[0];
+  const last = run.glyphs[run.glyphs.length - 1];
+  const lsb = first ? first.bbox.minX : 0;
+  const rsb = last ? last.advanceWidth - last.bbox.maxX : 0;
+  const inkPerMm = Math.max(0, advance - lsb - rsb) / font.unitsPerEm;
   const heightPerMm = (font.ascent - font.descent) / font.unitsPerEm;
-  const sizePt = mmToPt(fitFontMm(zone, widthPerMm, heightPerMm));
+  const sizePt = mmToPt(fitCardFontMm(zone, inkPerMm, heightPerMm));
   const scale = sizePt / font.unitsPerEm;
 
   const boxW = mmToPt(contentSize(zone).width);
-  const textW = widthPerMm * sizePt;
-  const pad = boxW * 0.04;
-  const startX =
-    zone.align === "left" ? -boxW / 2 + pad : zone.align === "right" ? boxW / 2 - pad - textW : -textW / 2;
+  const inkW = inkPerMm * sizePt;
+  // Début du dessin (bord gauche de l'encre) par rapport au centre de la zone.
+  const inkStart = zone.align === "left" ? -boxW / 2 : zone.align === "right" ? boxW / 2 - inkW : -inkW / 2;
+  const startX = inkStart - lsb * scale;
   const baseline = ((font.ascent + font.descent) / 2 / font.unitsPerEm) * sizePt;
 
   let x = startX;
@@ -129,6 +134,40 @@ async function drawPhoto(out: PDFDocument, page: PDFPage, zone: CardZone, photo:
   page.pushOperators(popGraphicsState());
 }
 
+// Résolution maximale d'une image fixe dans le PDF.
+const IMAGE_DPI = 600;
+
+// Une image fixe (logo, signature…) intégrée une fois pour tout le PDF :
+// réduite à la résolution utile, transparence gardée (PNG), recadrée pour
+// couvrir sa zone si on l'a demandé.
+async function embedZoneImage(out: PDFDocument, zone: CardZone, bytes: Buffer): Promise<{ image: PDFImage; width: number; height: number }> {
+  const size = contentSize(zone);
+  const px = (mm: number) => Math.max(1, Math.round((mm / 25.4) * IMAGE_DPI));
+  let pipeline = sharp(bytes).rotate();
+  pipeline =
+    zone.fit === "cover"
+      ? pipeline.resize(px(size.width), px(size.height), { fit: "cover" })
+      : pipeline.resize(px(size.width), px(size.height), { fit: "inside", withoutEnlargement: true });
+  const meta = await sharp(bytes).metadata();
+  const png = meta.hasAlpha || meta.format === "png";
+  const buffer = png ? await pipeline.png().toBuffer() : await pipeline.jpeg({ quality: 92 }).toBuffer();
+  const image = png ? await out.embedPng(buffer) : await out.embedJpg(buffer);
+  return { image, width: image.width, height: image.height };
+}
+
+// L'image dans sa zone : entière et centrée (« contain »), ou la remplissant.
+function drawZoneImage(page: PDFPage, zone: CardZone, img: { image: PDFImage; width: number; height: number }, cardHeightMm: number) {
+  const size = contentSize(zone);
+  const boxW = mmToPt(size.width);
+  const boxH = mmToPt(size.height);
+  const scale = zone.fit === "cover" ? 1 : Math.min(boxW / img.width, boxH / img.height);
+  const w = zone.fit === "cover" ? boxW : img.width * scale;
+  const h = zone.fit === "cover" ? boxH : img.height * scale;
+  enterZone(page, zone, cardHeightMm);
+  page.drawImage(img.image, { x: -w / 2, y: -h / 2, width: w, height: h });
+  page.pushOperators(popGraphicsState());
+}
+
 function drawBarcode(page: PDFPage, zone: CardZone, value: string, cardHeightMm: number) {
   const size = contentSize(zone);
   const g = barcodeGeometry(zone.barcodeType, value, size.width, size.height, zone.showText);
@@ -153,14 +192,17 @@ function drawBarcode(page: PDFPage, zone: CardZone, value: string, cardHeightMm:
 }
 
 /**
- * Les cartes des élèves, recto puis verso (si le modèle en a un) pour chacun.
+ * Les pages des lignes (cartes d'élèves, ou tout gabarit à données
+ * variables), recto puis verso (si le modèle en a un) pour chacun.
  * Une valeur qu'un code-barres ne peut pas coder, ou une photo illisible,
  * n'arrête pas le lot : la carte sort sans, et c'est signalé dans `warnings`.
  */
 export async function renderStudentCards(
-  template: StudentCardTemplate,
+  template: VariableDataPage,
   backgrounds: { front: Uint8Array | null; back: Uint8Array | null },
-  cards: CardInput[]
+  cards: CardInput[],
+  // Images fixes des zones, par chemin (voir CardZone.imagePath).
+  images: Map<string, Buffer> = new Map()
 ): Promise<{ pdf: Buffer; warnings: string[] }> {
   const textZones = template.zones.filter((z) => z.kind === "text");
   await preloadFonts(textZones.map((z) => ({ fontId: z.fontId, bold: z.bold })));
@@ -174,6 +216,17 @@ export async function renderStudentCards(
     back: template.two_sided ? await embedBackground(out, backgrounds.back, "du verso") : null,
   };
   const warnings: string[] = [];
+  // Images fixes : intégrées une fois, posées sur chaque carte.
+  const zoneImages = new Map<string, { image: PDFImage; width: number; height: number }>();
+  for (const zone of template.zones) {
+    const bytes = zone.kind === "image" && zone.imagePath ? images.get(zone.imagePath) : undefined;
+    if (!bytes) continue;
+    try {
+      zoneImages.set(zone.id, await embedZoneImage(out, zone, bytes));
+    } catch {
+      warnings.push("Une image du modèle est illisible : elle n'apparaît pas.");
+    }
+  }
 
   for (const card of cards) {
     for (const side of sides) {
@@ -184,7 +237,10 @@ export async function renderStudentCards(
       else if (background) page.drawImage(background.image, full);
 
       for (const zone of template.zones.filter((z) => z.side === side)) {
-        if (zone.kind === "text") {
+        if (zone.kind === "image") {
+          const img = zoneImages.get(zone.id);
+          if (img) drawZoneImage(page, zone, img, H);
+        } else if (zone.kind === "text") {
           const text = zoneText(zone, card.row);
           if (text) drawText(page, zone, text, H);
         } else if (zone.kind === "photo") {

@@ -1,5 +1,6 @@
-// Fonds des cartes étudiantes (recto, verso) dans le bucket privé
-// "student-cards", sous <id du modèle>/.
+// Fonds des pages à données variables (recto, verso) : cartes étudiantes
+// dans le bucket privé "student-cards", gabarits dans "data-templates", sous
+// <id du document>/.
 
 import type { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { detectMarksKind } from "@/lib/imposition/marks";
@@ -24,7 +25,8 @@ export async function applyCardBackgrounds(
   storage: Storage,
   templateId: string,
   form: FormData,
-  current: Columns
+  current: Columns,
+  bucket = STUDENT_CARDS_BUCKET
 ): Promise<Columns> {
   const changes: Columns = {};
   for (const side of CARD_SIDES) {
@@ -37,13 +39,13 @@ export async function applyCardBackgrounds(
       if (!kind) throw new CardAssetError(`Fond du ${CARD_SIDE_LABELS[side].toLowerCase()} : PDF, PNG ou JPEG attendu.`);
       const path = `${templateId}/${side}.${kind}`;
       const { error } = await storage
-        .from(STUDENT_CARDS_BUCKET)
+        .from(bucket)
         .upload(path, bytes, { contentType: CONTENT_TYPES[kind], upsert: true });
       if (error) throw new CardAssetError(`Enregistrement de « ${file.name} » impossible : ${error.message}`);
-      if (previous && previous !== path) await storage.from(STUDENT_CARDS_BUCKET).remove([previous]);
+      if (previous && previous !== path) await storage.from(bucket).remove([previous]);
       changes[column] = path;
     } else if (form.get(`remove_${side}`) === "true" && previous) {
-      await storage.from(STUDENT_CARDS_BUCKET).remove([previous]);
+      await storage.from(bucket).remove([previous]);
       changes[column] = null;
     }
   }

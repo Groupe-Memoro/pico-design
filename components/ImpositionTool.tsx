@@ -40,6 +40,8 @@ export interface FormatOption {
   bleedMm: number;
   widthMm: number;
   heightMm: number;
+  // Le modèle est recto-verso : un PDF de plusieurs pages se lit par paires.
+  twoSided?: boolean;
 }
 
 export interface ProductOption {
@@ -63,7 +65,16 @@ interface SourceItem {
   // Taille de la page du PDF (mm), null tant qu'elle n'est pas lue.
   widthMm: number | null;
   heightMm: number | null;
+  // Nombre de pages du PDF (null : pas encore lu, ou un produit).
+  pageCount?: number | null;
   copies: number;
+}
+
+// Pièces tirées d'un fichier : une par page (recto seul), une par paire de
+// pages (recto-verso), une seule pour un PDF d'une page ou un produit.
+function piecesOf(item: SourceItem, duplex: boolean): number {
+  const pages = item.pageCount ?? 1;
+  return pages > 1 ? (duplex ? Math.ceil(pages / 2) : pages) : 1;
 }
 
 const CUSTOM = "custom";
@@ -86,14 +97,14 @@ function matchesPiece(item: SourceItem, pieceW: number, pieceH: number): boolean
   );
 }
 
-// Lit la taille de la 1re page d'un PDF téléversé (pdf-lib chargé à la demande :
-// il ne sert que sur cette page).
-async function readPdfPageSizeMm(file: File): Promise<{ widthMm: number; heightMm: number } | null> {
+// Lit la taille de la 1re page d'un PDF téléversé, et son nombre de pages
+// (pdf-lib chargé à la demande : il ne sert que sur cette page).
+async function readPdfPageSizeMm(file: File): Promise<{ widthMm: number; heightMm: number; pageCount: number } | null> {
   try {
     const { PDFDocument } = await import("pdf-lib");
     const doc = await PDFDocument.load(await file.arrayBuffer());
     const { width, height } = doc.getPage(0).getSize();
-    return { widthMm: width / MM_TO_PT, heightMm: height / MM_TO_PT };
+    return { widthMm: width / MM_TO_PT, heightMm: height / MM_TO_PT, pageCount: doc.getPageCount() };
   } catch {
     return null;
   }
@@ -187,6 +198,8 @@ export default function ImpositionTool({
   // fichiers, qu'un remplacement laisse à la même adresse.
   const [assetVersion, setAssetVersion] = useState(0);
   const [orientation, setOrientation] = useState<PieceOrientation>(cfg?.orientation ?? "auto");
+  // Lecture des fichiers de plusieurs pages ; null = selon le modèle choisi.
+  const [sourcePages, setSourcePages] = useState<"duplex" | "simplex" | null>(cfg?.sourcePages ?? null);
   const [flip, setFlip] = useState<FlipEdge>(cfg?.flip ?? "long");
   // Profils d'imposition : la liste (mise à jour sur place) et celui appliqué.
   const [profiles, setProfiles] = useState<ImpositionProfile[]>(initialProfiles);
@@ -262,6 +275,7 @@ export default function ImpositionTool({
         storedPath: src.path,
         widthMm: product?.widthMm ?? src.widthMm,
         heightMm: product?.heightMm ?? src.heightMm,
+        pageCount: src.pageCount ?? null,
         copies: src.copies,
       };
     })
@@ -434,11 +448,19 @@ export default function ImpositionTool({
   const layout = isDuplo ? (activeDuplo?.layout ?? null) : cutterLayout;
 
   const cellCount = layout?.cells.length ?? 0;
-  const { assignment, overflow } = useMemo(
-    () => assignCells(items, cellCount),
-    [items, cellCount]
+  // Fichiers de plusieurs pages : lus par paires (recto-verso) ou page par
+  // page. Par défaut, selon le modèle choisi.
+  const multiPage = items.some((i) => (i.pageCount ?? 1) > 1);
+  const pagesDuplex = (sourcePages ?? (format?.twoSided ? "duplex" : "simplex")) === "duplex";
+  // Chaque fichier compte pour toutes ses pièces ; au-delà d'une feuille, les
+  // suivantes s'enchaînent dans le même PDF.
+  const pieceItems = useMemo(
+    () => items.map((i) => ({ ...i, copies: i.copies * piecesOf(i, pagesDuplex) })),
+    [items, pagesDuplex]
   );
-  const totalCopies = items.reduce((sum, i) => sum + i.copies, 0);
+  const { assignment } = useMemo(() => assignCells(pieceItems, cellCount), [pieceItems, cellCount]);
+  const totalCopies = pieceItems.reduce((sum, i) => sum + i.copies, 0);
+  const sheetCount = cellCount > 0 ? Math.max(1, Math.ceil(totalCopies / cellCount)) : 1;
 
   // Les formats arrivent déjà triés par catégorie : on les regroupe en gardant l'ordre.
   const formatGroups = formats.reduce<{ category: string; formats: FormatOption[] }[]>((groups, f) => {
@@ -458,10 +480,10 @@ export default function ImpositionTool({
   function addItem(partial: Omit<SourceItem, "key" | "copies">) {
     setItems((current) => {
       const used = current.reduce((sum, i) => sum + i.copies, 0);
-      return [
-        ...current,
-        { ...partial, key: `item-${nextKey.current++}`, copies: Math.max(1, cellCount - used) },
-      ];
+      // Un fichier de plusieurs pages : un exemplaire de chaque page ; sinon de
+      // quoi remplir la feuille.
+      const copies = (partial.pageCount ?? 1) > 1 ? 1 : Math.max(1, cellCount - used);
+      return [...current, { ...partial, key: `item-${nextKey.current++}`, copies }];
     });
   }
 
@@ -498,6 +520,7 @@ export default function ImpositionTool({
         file,
         widthMm: size?.widthMm ?? null,
         heightMm: size?.heightMm ?? null,
+        pageCount: size?.pageCount ?? null,
       });
     }
     if (fileInput.current) fileInput.current.value = "";
@@ -598,9 +621,7 @@ export default function ImpositionTool({
           : "Ce format ne rentre pas dans la zone utile de la feuille."
         : items.length === 0
           ? "Ajoutez au moins un fichier."
-          : overflow > 0
-            ? `Trop de copies : ${overflow} de plus que les ${cellCount} emplacements.`
-            : mismatched.length > 0
+          : mismatched.length > 0
               ? `La taille de « ${mismatched[0].name} » ne correspond pas au format.`
               : null;
   const problem = isDocument ? docProblem : piecesProblem;
@@ -787,6 +808,7 @@ export default function ImpositionTool({
     body.append("orientation", orientation);
     body.append("flip", flip);
     body.append("pieceBleedMm", String(piece.bleedMm));
+    if (multiPage) body.append("sourcePages", pagesDuplex ? "duplex" : "simplex");
     if (saved) body.append("impositionId", saved.id);
     body.append(
       "config",
@@ -802,10 +824,17 @@ export default function ImpositionTool({
         custom: { widthMm: customWidth, heightMm: customHeight, bleedMm: customBleed },
         orientation,
         flip,
+        ...(multiPage ? { sourcePages: pagesDuplex ? "duplex" : "simplex" } : {}),
       })
     );
     const specs = items.map((item, index) => {
-      const shown = { name: item.name, widthMm: item.widthMm, heightMm: item.heightMm, copies: item.copies };
+      const shown = {
+        name: item.name,
+        widthMm: item.widthMm,
+        heightMm: item.heightMm,
+        copies: item.copies,
+        ...(item.pageCount ? { pageCount: item.pageCount } : {}),
+      };
       const itemStaged = item.file ? stagedPaths.current.get(item.file) : undefined;
       if (item.kind === "upload" && item.file && itemStaged) return { kind: "staged", path: itemStaged, ...shown };
       if (item.kind === "upload" && item.file) {
@@ -1374,6 +1403,19 @@ export default function ImpositionTool({
             <h2 className="text-sm font-semibold text-pico-black">Fichiers à imposer</h2>
 
             {items.length === 0 && <p className="text-sm text-neutral-500">Aucun fichier pour l&apos;instant.</p>}
+            {multiPage && (
+              <label className="block text-xs text-neutral-600">
+                Fichiers de plusieurs pages
+                <select
+                  value={pagesDuplex ? "duplex" : "simplex"}
+                  onChange={(e) => setSourcePages(e.target.value as "duplex" | "simplex")}
+                  className="mt-1 w-full rounded border border-neutral-300 px-2 py-1.5 text-sm"
+                >
+                  <option value="simplex">Recto seul — une pièce par page</option>
+                  <option value="duplex">Recto-verso — pages 1-2, 3-4… (recto, puis son verso)</option>
+                </select>
+              </label>
+            )}
             <ul className="space-y-2">
               {items.map((item, index) => {
                 const ok = matchesPiece(item, piece.widthMm, piece.heightMm);
@@ -1395,6 +1437,8 @@ export default function ImpositionTool({
                           {item.widthMm !== null && item.heightMm !== null
                             ? ` · ${sizeLabel(item.widthMm, item.heightMm)}`
                             : ""}
+                          {(item.pageCount ?? 1) > 1 &&
+                            ` · ${item.pageCount} pages → ${piecesOf(item, pagesDuplex)} pièce${piecesOf(item, pagesDuplex) > 1 ? "s" : ""}`}
                           {!ok && " — taille différente du format"}
                         </p>
                       </div>
@@ -1408,7 +1452,9 @@ export default function ImpositionTool({
                       </button>
                     </div>
                     <div className="mt-2 flex items-center gap-2">
-                      <label className="text-xs text-neutral-500">Copies sur la feuille</label>
+                      <label className="text-xs text-neutral-500">
+                        {(item.pageCount ?? 1) > 1 ? "Exemplaires de chaque page" : "Copies"}
+                      </label>
                       <input
                         type="number"
                         min={1}
@@ -1494,8 +1540,13 @@ export default function ImpositionTool({
               {!isDocument && layout && cellCount > 0 && (
                 <p className="text-sm text-neutral-600">
                   <strong>{cellCount}</strong> pièces par feuille ({layout.cols} × {layout.rows}
-                  {layout.rotated ? ", pivotées" : ""}) · {Math.min(totalCopies, cellCount)} placée
-                  {Math.min(totalCopies, cellCount) > 1 ? "s" : ""}
+                  {layout.rotated ? ", pivotées" : ""}) · {totalCopies} pièce{totalCopies > 1 ? "s" : ""}
+                  {sheetCount > 1 && (
+                    <>
+                      {" "}
+                      sur <strong>{sheetCount} feuilles</strong> (aperçu de la 1re)
+                    </>
+                  )}
                 </p>
               )}
             </div>

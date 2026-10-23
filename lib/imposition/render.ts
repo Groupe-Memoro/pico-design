@@ -34,6 +34,12 @@ export interface ImpositionSource {
   name: string;
   pdf: Uint8Array;
   copies: number;
+  // Pages du PDF qui font cette pièce (index à partir de 0). Absentes : la
+  // page 1 au recto et, s'il y en a une, la page 2 au verso. `backPage: null`
+  // = recto seul. Un PDF de plusieurs pages devient ainsi plusieurs pièces
+  // (voir expandPages dans build.ts).
+  page?: number;
+  backPage?: number | null;
 }
 
 export type MarksKind = "pdf" | "png" | "jpg";
@@ -145,19 +151,37 @@ function close(a: number, b: number): boolean {
   return Math.abs(a - b) <= PAGE_SIZE_TOLERANCE_MM;
 }
 
+// PDF sources déjà lus et pages déjà intégrées, pour un même PDF de sortie :
+// les pièces tirées d'un même fichier de plusieurs pages ne le relisent pas,
+// et une page n'est intégrée qu'une fois, même posée plusieurs fois.
+interface SourceCache {
+  docs: Map<Uint8Array, PDFDocument>;
+  embedded: Map<Uint8Array, Map<number, PDFEmbeddedPage>>;
+}
+
 async function prepareSource(
   out: PDFDocument,
   source: ImpositionSource,
   pieceWidth: number,
-  pieceHeight: number
+  pieceHeight: number,
+  cache: SourceCache = { docs: new Map(), embedded: new Map() }
 ): Promise<PreparedSource> {
-  let doc: PDFDocument;
-  try {
-    doc = await PDFDocument.load(source.pdf);
-  } catch {
-    throw new Error(`« ${source.name} » n'est pas un PDF lisible.`);
+  let doc = cache.docs.get(source.pdf);
+  if (!doc) {
+    try {
+      doc = await PDFDocument.load(source.pdf);
+    } catch {
+      throw new Error(`« ${source.name} » n'est pas un PDF lisible.`);
+    }
+    cache.docs.set(source.pdf, doc);
   }
-  const pages = doc.getPages();
+  const all = doc.getPages();
+  const frontIndex = source.page ?? 0;
+  const backIndex = source.backPage === undefined ? (all.length > 1 ? 1 : null) : source.backPage;
+  if (frontIndex >= all.length || (backIndex !== null && backIndex >= all.length)) {
+    throw new Error(`« ${source.name} » n'a pas de page ${Math.max(frontIndex, backIndex ?? 0) + 1}.`);
+  }
+  const pages = backIndex === null ? [all[frontIndex]] : [all[frontIndex], all[backIndex]];
   if (pages.length === 0) throw new Error(`« ${source.name} » ne contient aucune page.`);
 
   // pdf-lib intègre les pages sans tenir compte de /Rotate : on refuse plutôt
@@ -188,9 +212,23 @@ async function prepareSource(
     }
   }
 
-  const indices = pages.length > 1 ? [0, 1] : [0];
-  const embedded = await out.embedPdf(doc, indices);
-  return { name: source.name, front: embedded[0], back: embedded[1] ?? null, pageWidth: w, pageHeight: h };
+  let byIndex = cache.embedded.get(source.pdf);
+  if (!byIndex) cache.embedded.set(source.pdf, (byIndex = new Map()));
+  const embed = async (index: number) => {
+    let page = byIndex!.get(index);
+    if (!page) {
+      [page] = await out.embedPdf(doc!, [index]);
+      byIndex!.set(index, page);
+    }
+    return page;
+  };
+  return {
+    name: source.name,
+    front: await embed(frontIndex),
+    back: backIndex === null ? null : await embed(backIndex),
+    pageWidth: w,
+    pageHeight: h,
+  };
 }
 
 // Dessine `page` à sa taille réelle dans une cellule (coordonnées en points,
@@ -490,8 +528,9 @@ export async function imposeToPdf(input: ImposeInput): Promise<ImposeResult> {
 
   const out = await PDFDocument.create();
   const prepared: PreparedSource[] = [];
+  const cache: SourceCache = { docs: new Map(), embedded: new Map() };
   for (const source of input.sources) {
-    prepared.push(await prepareSource(out, source, input.pieceWidth, input.pieceHeight));
+    prepared.push(await prepareSource(out, source, input.pieceWidth, input.pieceHeight, cache));
   }
 
   const sheetWidthPt = mmToPt(input.sheetWidth);

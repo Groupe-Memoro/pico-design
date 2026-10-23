@@ -8,12 +8,17 @@ export type CardSide = "front" | "back";
 export const CARD_SIDES: CardSide[] = ["front", "back"];
 export const CARD_SIDE_LABELS: Record<CardSide, string> = { front: "Recto", back: "Verso" };
 
-export type CardZoneKind = "text" | "photo" | "barcode";
+export type CardZoneKind = "text" | "photo" | "barcode" | "image";
 export const CARD_ZONE_LABELS: Record<CardZoneKind, string> = {
   text: "Texte",
   photo: "Photo",
   barcode: "Code-barres",
+  image: "Image",
 };
+
+// Image fixe d'une zone (logo, signature…) : dans le bucket du document, sous
+// <id>/images/ (voir lib/variableData/handlers.ts).
+export const ZONE_IMAGE_PATH = /^[0-9a-f-]{36}\/images\/[\w-]+\.(png|jpg)$/i;
 
 export type ZoneAlign = "left" | "center" | "right";
 export type ZoneRotation = 0 | 90 | 180 | 270;
@@ -62,6 +67,10 @@ export interface CardZone {
   // Code-barres
   barcodeType: BarcodeType;
   showText: boolean;
+  // Image fixe : le fichier, et comment il remplit la zone (entière, ou
+  // recadrée pour la couvrir).
+  imagePath: string | null;
+  fit: "contain" | "cover";
 }
 
 // Colonnes et une ligne du dernier CSV : l'éditeur montre l'aperçu sans qu'on
@@ -87,6 +96,23 @@ export interface StudentCardTemplate {
   updated_at: string;
   created_by: string | null;
 }
+
+// Ce qu'il faut au rendu d'une page à données variables : son format (fond
+// perdu compris, s'il y en a), ses faces et ses zones. Une carte étudiante
+// comme un gabarit bâti sur un modèle (voir 0080_data_templates.sql).
+export type VariableDataPage = Pick<StudentCardTemplate, "width_mm" | "height_mm" | "two_sided" | "zones">;
+
+// Mots de l'interface selon le document : des élèves et des cartes, ou des
+// lignes et des pages (un gabarit à données variables).
+export interface DataVocab {
+  row: string;
+  rows: string;
+  Row: string;
+  page: string;
+  pages: string;
+}
+export const STUDENT_VOCAB: DataVocab = { row: "élève", rows: "élèves", Row: "Élève", page: "carte", pages: "cartes" };
+export const DATA_VOCAB: DataVocab = { row: "ligne", rows: "lignes", Row: "Ligne", page: "page", pages: "pages" };
 
 // Formats proposés à la création : la carte de crédit (CR80), à l'horizontale
 // ou à la verticale.
@@ -130,6 +156,22 @@ export function contentColumns(content: string): string[] {
   return Array.from(content.matchAll(/\{([^{}]+)\}/g), (m) => m[1].trim());
 }
 
+/**
+ * Taille du texte (mm) dans une zone : la plus grande qui tienne, sans
+ * dépasser maxFontMm. Sans marge intérieure : aligné à gauche ou à droite, le
+ * texte touche le bord de la zone. `inkWidthPerMm` : largeur du dessin des
+ * lettres pour 1 mm de corps (sans l'approche de la première et de la
+ * dernière), `heightPerMm` : hauteur ascendante → descendante.
+ */
+export function fitCardFontMm(zone: CardZone, inkWidthPerMm: number, heightPerMm: number): number {
+  const turned = zone.rotation % 180 !== 0;
+  const boxW = turned ? zone.height : zone.width;
+  const boxH = turned ? zone.width : zone.height;
+  const byWidth = inkWidthPerMm > 0 ? boxW / inkWidthPerMm : zone.maxFontMm;
+  const byHeight = heightPerMm > 0 ? boxH / heightPerMm : zone.maxFontMm;
+  return Math.max(MIN_FONT_MM, Math.min(zone.maxFontMm, byWidth, byHeight));
+}
+
 export function zoneText(zone: CardZone, row: Record<string, string>): string {
   const text = fillContent(zone.content, row);
   return zone.uppercase ? text.toLocaleUpperCase("fr-CA") : text;
@@ -156,6 +198,8 @@ export function newCardZone(partial: Partial<CardZone> = {}): CardZone {
     maxFontMm: 4,
     barcodeType: "code128",
     showText: true,
+    imagePath: null,
+    fit: "contain",
     ...partial,
   };
 }
@@ -169,7 +213,7 @@ export function parseCardZones(raw: unknown, cardW: number, cardH: number): Card
     const x = n(z.x), y = n(z.y), w = n(z.width), h = n(z.height), max = n(z.maxFontMm);
     if (![x, y, w, h].every((v) => !Number.isNaN(v))) return null;
     if (w <= 0 || h <= 0 || x < 0 || y < 0 || x + w > cardW + 0.01 || y + h > cardH + 0.01) return null;
-    const kind: CardZoneKind = z.kind === "photo" || z.kind === "barcode" ? z.kind : "text";
+    const kind: CardZoneKind = z.kind === "photo" || z.kind === "barcode" || z.kind === "image" ? z.kind : "text";
     zones.push({
       id: typeof z.id === "string" && z.id.length <= 64 ? z.id : `zone-${zones.length + 1}`,
       side: z.side === "back" ? "back" : "front",
@@ -185,6 +229,8 @@ export function parseCardZones(raw: unknown, cardW: number, cardH: number): Card
       maxFontMm: Number.isNaN(max) ? 4 : Math.min(50, Math.max(MIN_FONT_MM, max)),
       barcodeType: isBarcodeType(z.barcodeType) ? z.barcodeType : "code128",
       showText: z.showText !== false,
+      imagePath: kind === "image" && typeof z.imagePath === "string" && ZONE_IMAGE_PATH.test(z.imagePath) ? z.imagePath : null,
+      fit: z.fit === "cover" ? "cover" : "contain",
     });
   }
   return zones;
