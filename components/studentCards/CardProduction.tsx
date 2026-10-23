@@ -1,0 +1,351 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import Modal from "@/components/Modal";
+import { DownloadIcon, SpinnerIcon } from "@/components/icons";
+import { decodeCsv, parseCsv, type CsvData } from "@/lib/studentCards/csv";
+import { parseXlsx } from "@/lib/studentCards/xlsx";
+import { PhotoIndex, collectPhotos, shrinkPhoto } from "@/lib/studentCards/photos";
+import { zoneText, type CardZone } from "@/lib/studentCards/types";
+
+// Un lot envoyé au rendu : sous la limite de taille d'une requête (4,5 Mo),
+// photos allégées comprises.
+const MAX_BATCH_BYTES = 3_200_000;
+const MAX_BATCH_CARDS = 60;
+
+interface Result {
+  url: string;
+  filename: string;
+  count: number;
+  warnings: string[];
+}
+
+/**
+ * Production des cartes : le CSV des élèves, leurs photos (ZIP ou fichiers,
+ * en plusieurs fois au besoin), puis le PDF — une carte par page, recto et
+ * verso à la suite. Le rendu se fait par lots ; le navigateur assemble.
+ */
+export default function CardProduction({
+  templateId,
+  templateName,
+  zones,
+  data,
+  onData,
+  photos,
+  onPhotos,
+  photoColumn,
+  onPhotoColumn,
+  previewIndex,
+  missingColumns,
+  beforeGenerate,
+}: {
+  templateId: string;
+  templateName: string;
+  zones: CardZone[];
+  data: CsvData | null;
+  onData: (data: CsvData) => void;
+  photos: PhotoIndex;
+  onPhotos: (photos: PhotoIndex) => void;
+  photoColumn: string;
+  onPhotoColumn: (column: string) => void;
+  previewIndex: number;
+  missingColumns: string[];
+  beforeGenerate: () => Promise<boolean>;
+}) {
+  const [photoFiles, setPhotoFiles] = useState<File[]>([]);
+  const [loadingPhotos, setLoadingPhotos] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [result, setResult] = useState<Result | null>(null);
+
+  const needsPhoto = zones.some((z) => z.kind === "photo");
+  const firstText = zones.find((z) => z.kind === "text" && z.content);
+  const labelOf = (row: Record<string, string>, i: number) => {
+    const name = firstText ? zoneText(firstText, row) : "";
+    // Ligne du fichier : l'en-tête est la ligne 1.
+    return `Ligne ${i + 2}${name ? ` (${name})` : ""}`;
+  };
+
+  // Élèves sans photo jumelée.
+  const missingPhotos = useMemo(() => {
+    if (!data || !needsPhoto) return [];
+    return data.rows.flatMap((row, i) => (photos.find(row, photoColumn || null) ? [] : [labelOf(row, i)]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, photos, photoColumn, needsPhoto, zones]);
+
+  async function loadCsv(file: File | null) {
+    if (!file) return;
+    setError(null);
+    if (/\.xls$/i.test(file.name)) {
+      setError("L'ancien format Excel (.xls) n'est pas lu : enregistrez le fichier en .xlsx ou en CSV.");
+      return;
+    }
+    let parsed: CsvData;
+    try {
+      const bytes = await file.arrayBuffer();
+      parsed = /\.xlsx$/i.test(file.name) ? parseXlsx(bytes) : parseCsv(decodeCsv(bytes));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Fichier illisible.");
+      return;
+    }
+    if (parsed.columns.length === 0 || parsed.rows.length === 0) {
+      setError("Ce fichier ne contient aucune ligne d'élève (la première ligne doit donner les colonnes).");
+      return;
+    }
+    onData(parsed);
+  }
+
+  async function addPhotos(files: File[]) {
+    if (files.length === 0) return;
+    setLoadingPhotos(true);
+    setError(null);
+    try {
+      const found = await collectPhotos(files);
+      if (found.length === 0) setError("Aucune image trouvée (JPEG, PNG ou WebP, ou un ZIP qui en contient).");
+      const all = [...photoFiles, ...found];
+      setPhotoFiles(all);
+      onPhotos(new PhotoIndex(all));
+    } catch {
+      setError("Impossible d'ouvrir ce ZIP.");
+    } finally {
+      setLoadingPhotos(false);
+    }
+  }
+
+  async function generate(onlyPreview: boolean) {
+    if (!data) return;
+    setError(null);
+    if (!(await beforeGenerate())) return;
+    const indexes = onlyPreview ? [previewIndex] : data.rows.map((_, i) => i);
+    setProgress({ done: 0, total: indexes.length });
+    const chunks: ArrayBuffer[] = [];
+    const warnings: string[] = [];
+    try {
+      let batch: { form: FormData; cards: unknown[]; bytes: number } = { form: new FormData(), cards: [], bytes: 0 };
+      let done = 0;
+      const flush = async () => {
+        if (batch.cards.length === 0) return;
+        batch.form.append("cards", JSON.stringify(batch.cards));
+        const res = await fetch(`/api/student-cards/${templateId}/render`, { method: "POST", body: batch.form });
+        if (!res.ok) {
+          const json = await res.json().catch(() => ({}));
+          throw new Error(json.error ?? "Le rendu a échoué.");
+        }
+        const header = res.headers.get("X-Card-Warnings");
+        const shown = header ? (JSON.parse(decodeURIComponent(header)) as string[]) : [];
+        warnings.push(...shown);
+        const total = Number(res.headers.get("X-Card-Warning-Count") ?? 0);
+        if (total > shown.length) warnings.push(`… et ${total - shown.length} autre(s) avertissement(s) dans ce lot.`);
+        chunks.push(await res.arrayBuffer());
+        done += batch.cards.length;
+        setProgress({ done, total: indexes.length });
+        batch = { form: new FormData(), cards: [], bytes: 0 };
+      };
+      for (const i of indexes) {
+        const row = data.rows[i];
+        const label = labelOf(row, i);
+        const file = needsPhoto ? photos.find(row, photoColumn || null) : null;
+        let photoField: string | null = null;
+        if (file) {
+          try {
+            const small = await shrinkPhoto(file);
+            if (batch.bytes + small.size > MAX_BATCH_BYTES) await flush();
+            photoField = `photo${batch.cards.length}`;
+            batch.form.append(photoField, small, `${photoField}.jpg`);
+            batch.bytes += small.size;
+          } catch {
+            warnings.push(`${label} : photo illisible (${file.name}).`);
+          }
+        }
+        batch.cards.push({ row, photo: photoField, label });
+        if (batch.cards.length >= MAX_BATCH_CARDS) await flush();
+      }
+      await flush();
+
+      // Les lots en un seul PDF, dans l'ordre du fichier.
+      const { PDFDocument } = await import("pdf-lib");
+      const merged = await PDFDocument.create();
+      for (const bytes of chunks) {
+        const doc = await PDFDocument.load(bytes);
+        const pages = await merged.copyPages(doc, doc.getPageIndices());
+        pages.forEach((p) => merged.addPage(p));
+      }
+      const blob = new Blob([new Uint8Array(await merged.save())], { type: "application/pdf" });
+      const first = data.rows[indexes[0]];
+      const suffix = onlyPreview ? `essai ${firstText ? zoneText(firstText, first) : indexes[0] + 2}` : `${indexes.length} cartes`;
+      if (result) URL.revokeObjectURL(result.url);
+      setResult({
+        url: URL.createObjectURL(blob),
+        filename: `${templateName} - ${suffix}.pdf`.replace(/[\\/:*?"<>|]+/g, " "),
+        count: indexes.length,
+        warnings,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "La production a échoué.");
+    } finally {
+      setProgress(null);
+    }
+  }
+
+  const busy = progress !== null;
+  return (
+    <section className="space-y-3 rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
+      <h2 className="text-sm font-semibold text-pico-black">Produire les cartes</h2>
+
+      <div className="space-y-1">
+        <span className="block text-xs font-medium text-neutral-500">1. Fichier des élèves (Excel ou CSV)</span>
+        <input
+          type="file"
+          accept=".csv,.txt,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          disabled={busy}
+          onChange={(e) => {
+            loadCsv(e.target.files?.[0] ?? null);
+            e.target.value = "";
+          }}
+          className="w-full text-xs"
+        />
+        {data ? (
+          <p className="text-xs text-neutral-600">
+            {data.rows.length} élève{data.rows.length > 1 ? "s" : ""} · colonnes : {data.columns.join(", ")}
+          </p>
+        ) : (
+          <p className="text-xs text-neutral-500">
+            Un classeur Excel (.xlsx, première feuille) ou un CSV (« ; » ou « , »). La première ligne donne les noms
+            des colonnes.
+          </p>
+        )}
+        {missingColumns.length > 0 && (
+          <p className="text-xs text-amber-700">
+            Colonnes utilisées par les zones mais absentes du fichier : {missingColumns.join(", ")}.
+          </p>
+        )}
+      </div>
+
+      {needsPhoto && (
+        <div className="space-y-1 border-t border-neutral-100 pt-3">
+          <span className="block text-xs font-medium text-neutral-500">2. Photos des élèves</span>
+          <label className="block text-xs text-neutral-600">
+            Colonne qui désigne la photo
+            <select
+              value={photoColumn}
+              onChange={(e) => onPhotoColumn(e.target.value)}
+              className="mt-1 w-full rounded border border-neutral-300 px-2 py-1.5 text-sm"
+            >
+              <option value="">— Choisir —</option>
+              {(data?.columns ?? (photoColumn ? [photoColumn] : [])).map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </label>
+          <input
+            type="file"
+            multiple
+            accept="image/jpeg,image/png,image/webp,.zip,application/zip"
+            disabled={busy || loadingPhotos}
+            onChange={(e) => {
+              addPhotos(Array.from(e.target.files ?? []));
+              e.target.value = "";
+            }}
+            className="w-full text-xs"
+          />
+          <p className="text-xs text-neutral-500">
+            Un ZIP, des photos, ou les deux, en plusieurs fois au besoin. Chaque photo est jumelée par son nom de
+            fichier : le numéro de l&apos;élève (123456.jpg) ou le nom donné dans la colonne.
+          </p>
+          {loadingPhotos && <p className="text-xs text-neutral-600">Ouverture des photos…</p>}
+          {photos.size > 0 && (
+            <div className="flex items-center justify-between gap-2 text-xs">
+              <span className="text-neutral-600">
+                {photos.size} photo{photos.size > 1 ? "s" : ""}
+                {data && ` · ${data.rows.length - missingPhotos.length} / ${data.rows.length} élèves jumelés`}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setPhotoFiles([]);
+                  onPhotos(new PhotoIndex([]));
+                }}
+                className="text-neutral-500 underline hover:text-pico-black"
+              >
+                Retirer les photos
+              </button>
+            </div>
+          )}
+          {data && missingPhotos.length > 0 && (photos.size > 0 || photoColumn) && (
+            <details className="text-xs text-amber-700">
+              <summary className="cursor-pointer">
+                {missingPhotos.length} élève{missingPhotos.length > 1 ? "s" : ""} sans photo (carte sans photo)
+              </summary>
+              <ul className="mt-1 max-h-32 list-disc overflow-y-auto pl-5">
+                {missingPhotos.slice(0, 100).map((m) => (
+                  <li key={m}>{m}</li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </div>
+      )}
+
+      <div className="space-y-2 border-t border-neutral-100 pt-3">
+        {error && <p className="text-xs text-red-600">{error}</p>}
+        <button
+          type="button"
+          onClick={() => generate(false)}
+          disabled={busy || !data || zones.length === 0}
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-pico-maroon px-4 py-2.5 text-sm font-medium text-white hover:bg-pico-maroon-dark disabled:opacity-50"
+        >
+          {busy && <SpinnerIcon className="h-4 w-4" />}
+          {busy
+            ? `Cartes ${progress.done} / ${progress.total}…`
+            : data
+              ? `Produire ${data.rows.length} carte${data.rows.length > 1 ? "s" : ""}`
+              : "Produire les cartes"}
+        </button>
+        <button
+          type="button"
+          onClick={() => generate(true)}
+          disabled={busy || !data || zones.length === 0}
+          className="w-full rounded-lg border border-neutral-300 px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
+        >
+          Essai : l&apos;élève affiché seulement
+        </button>
+        {!data && <p className="text-xs text-neutral-500">Chargez d&apos;abord le fichier des élèves (Excel ou CSV).</p>}
+      </div>
+
+      {result && (
+        <Modal
+          title={`${result.count} carte${result.count > 1 ? "s" : ""} prête${result.count > 1 ? "s" : ""}`}
+          onClose={() => {
+            URL.revokeObjectURL(result.url);
+            setResult(null);
+          }}
+          wide
+        >
+          <iframe src={result.url} title="Cartes" className="h-[60vh] w-full rounded border border-neutral-200" />
+          {result.warnings.length > 0 && (
+            <details className="mt-3 text-sm text-amber-700" open={result.warnings.length <= 5}>
+              <summary className="cursor-pointer">
+                {result.warnings.length} avertissement{result.warnings.length > 1 ? "s" : ""}
+              </summary>
+              <ul className="mt-1 max-h-40 list-disc overflow-y-auto pl-5 text-xs">
+                {result.warnings.map((w, i) => (
+                  <li key={i}>{w}</li>
+                ))}
+              </ul>
+            </details>
+          )}
+          <a
+            href={result.url}
+            download={result.filename}
+            className="mt-4 flex items-center justify-center gap-2 rounded-lg bg-pico-maroon px-4 py-2 text-sm font-medium text-white hover:bg-pico-maroon-dark"
+          >
+            <DownloadIcon className="h-4 w-4" />
+            Télécharger le PDF
+          </a>
+        </Modal>
+      )}
+    </section>
+  );
+}

@@ -1,4 +1,4 @@
-import { BarcodeIcon, BookIcon, CalendarIcon, Grid3x3Icon, ImageIcon, StickerIcon, BadgeIcon, MonitorCogIcon, PaintbrushVerticalIcon, PencilRulerIcon, RocketIcon, ShopifyIcon, TagIcon, UsersIcon } from "@/components/icons";
+import { BarcodeIcon, BookIcon, CalendarIcon, IdCardIcon, Grid3x3Icon, ImageIcon, StickerIcon, BadgeIcon, MonitorCogIcon, PaintbrushVerticalIcon, PencilRulerIcon, RocketIcon, ShopifyIcon, TagIcon, UsersIcon } from "@/components/icons";
 
 // Liste centrale des pages de nav / tuiles du tableau de bord, pour que les
 // deux restent synchronisées sur le même ordre (voir `resolveMenuOrder`) et
@@ -10,6 +10,7 @@ export type MenuKey =
   | "stickers"
   | "albums"
   | "agendas"
+  | "studentCards"
   | "themes"
   | "products"
   | "design"
@@ -58,6 +59,12 @@ export const MENU_ITEMS: Record<
     title: "Agendas scolaires",
     icon: CalendarIcon,
     gradient: "from-sky-400 to-cyan-600",
+  },
+  studentCards: {
+    href: "/cartes-etudiantes",
+    title: "Cartes étudiantes",
+    icon: IdCardIcon,
+    gradient: "from-rose-400 to-pink-600",
   },
   themes: {
     href: "/themes",
@@ -123,7 +130,7 @@ export const MENU_ITEMS: Record<
 const MENU_GROUPS: MenuKey[][] = [
   ["products", "templates", "skus", "imposition"],
   ["themes", "visuals", "illustrations"],
-  ["stickers", "albums", "agendas"],
+  ["stickers", "albums", "agendas", "studentCards"],
   ["design", "orders", "settings"],
   ["users"],
 ];
