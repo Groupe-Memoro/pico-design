@@ -23,6 +23,7 @@ import {
 } from "@/lib/stickers/types";
 import FontPicker from "@/components/FontPicker";
 import { loadFont } from "@/lib/design/fontLoader";
+import { measureInk } from "@/lib/design/inkMeasure";
 
 const ASSET_HELP: Record<StickerAsset, string> = {
   artwork: "La planche du graphiste, sans le nom. Imprimée sous le texte.",
@@ -45,17 +46,12 @@ const round = (v: number) => Math.round(v * 10) / 10;
 // du navigateur (le serveur mesure avec fontkit : même règle d'ajustement,
 // voir fitFontMm, à quelques pour cent près).
 function useTextMeasure(fontsVersion: number) {
-  const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
   return useCallback(
     (zone: StickerZone, text: string) => {
-      if (!ctxRef.current) ctxRef.current = document.createElement("canvas").getContext("2d");
-      const ctx = ctxRef.current;
       const font = fontOptionById(zone.fontId);
-      if (!ctx) return { widthPerMm: text.length * 0.6, heightPerMm: 1.2 };
-      ctx.font = `${zone.bold ? font.weightBold : font.weightRegular} 100px "${font.family}"`;
-      const m = ctx.measureText(text);
-      const height = (m.fontBoundingBoxAscent ?? 90) + (m.fontBoundingBoxDescent ?? 25);
-      return { widthPerMm: m.width / 100, heightPerMm: height / 100 };
+      // Encre mesurée au pixel (voir measureInk) : fiable dans tous les navigateurs.
+      const ink = measureInk(`${zone.bold ? font.weightBold : font.weightRegular} "${font.family}"`, text, fontsVersion);
+      return { widthPerMm: ink.left + ink.right, heightPerMm: ink.height, left: ink.left, right: ink.right };
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [fontsVersion]
@@ -454,22 +450,26 @@ export default function StickerTemplateEditor({
                 const font = fontOptionById(z.fontId);
                 const turned = z.rotation % 180 !== 0;
                 const boxW = turned ? z.height : z.width;
-                const pad = boxW * 0.04;
-                const tx = z.align === "left" ? -boxW / 2 + pad : z.align === "right" ? boxW / 2 - pad : 0;
+                // Sans marge intérieure : le dessin des lettres touche le bord (ou est centré).
+                const tx =
+                  z.align === "left" ? -boxW / 2 + m.left * size : z.align === "right" ? boxW / 2 - m.right * size : ((m.left - m.right) / 2) * size;
                 return (
                   <g
                     key={`t-${z.id}`}
                     transform={`translate(${z.x + z.width / 2} ${z.y + z.height / 2}) rotate(${z.rotation})`}
                     pointerEvents="none"
                   >
+                    {/* Mis en page à 100, puis réduit : à la taille réelle, Safari
+                        arrondit la police et le texte n'atteint plus le bord. */}
                     <text
-                      x={tx}
+                      x={(tx * 100) / size}
                       y={0}
+                      transform={`scale(${size / 100})`}
                       fontFamily={`"${font.family}"`}
                       fontWeight={z.bold ? font.weightBold : font.weightRegular}
-                      fontSize={size}
+                      fontSize={100}
                       fill={z.color}
-                      textAnchor={z.align === "left" ? "start" : z.align === "right" ? "end" : "middle"}
+                      textAnchor="start"
                       dominantBaseline="central"
                     >
                       {text}

@@ -30,6 +30,7 @@ import {
 import type { CsvData } from "@/lib/studentCards/csv";
 import { PhotoIndex } from "@/lib/studentCards/photos";
 import { parseDataFile } from "@/lib/studentCards/dataFile";
+import { measureInk } from "@/lib/design/inkMeasure";
 import { alignBoxes, boundsOf, edgesX, edgesY, snapAxis, type AlignMode, type Box, type UserGuide } from "@/lib/variableData/snap";
 import CardProduction from "@/components/studentCards/CardProduction";
 
@@ -54,20 +55,12 @@ const SNAP_PX = 6;
 // fitCardFontMm). `left`/`right` : où l'encre commence et finit par rapport au
 // point de départ, pour coller le texte au bord de sa zone.
 function useTextMeasure(fontsVersion: number) {
-  const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
   return useCallback(
     (zone: CardZone, text: string) => {
-      if (!ctxRef.current) ctxRef.current = document.createElement("canvas").getContext("2d");
-      const ctx = ctxRef.current;
       const font = fontOptionById(zone.fontId);
-      if (!ctx) return { widthPerMm: text.length * 0.6, heightPerMm: 1.2, left: 0, right: text.length * 0.6 };
-      ctx.font = `${zone.bold ? font.weightBold : font.weightRegular} 100px "${font.family}"`;
-      ctx.textAlign = "left";
-      const m = ctx.measureText(text);
-      const height = (m.fontBoundingBoxAscent ?? 90) + (m.fontBoundingBoxDescent ?? 25);
-      const left = m.actualBoundingBoxLeft ?? 0;
-      const right = m.actualBoundingBoxRight ?? m.width;
-      return { widthPerMm: (left + right) / 100, heightPerMm: height / 100, left: left / 100, right: right / 100 };
+      // Encre mesurée au pixel (voir measureInk) : fiable dans tous les navigateurs.
+      const ink = measureInk(`${zone.bold ? font.weightBold : font.weightRegular} "${font.family}"`, text, fontsVersion);
+      return { widthPerMm: ink.left + ink.right, heightPerMm: ink.height, left: ink.left, right: ink.right };
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [fontsVersion]
@@ -978,12 +971,15 @@ export default function VariableDataEditor({
                   z.align === "left" ? -cw / 2 + m.left * size : z.align === "right" ? cw / 2 - m.right * size : ((m.left - m.right) / 2) * size;
                 return (
                   <g key={`c-${z.id}`} transform={transform} pointerEvents="none">
+                    {/* Mis en page à 100, puis réduit : à la taille réelle (2-3 unités),
+                        Safari arrondit la police et le texte n'atteint plus le bord. */}
                     <text
-                      x={tx}
+                      x={(tx * 100) / size}
                       y={0}
+                      transform={`scale(${size / 100})`}
                       fontFamily={`"${font.family}"`}
                       fontWeight={z.bold ? font.weightBold : font.weightRegular}
-                      fontSize={size}
+                      fontSize={100}
                       fill={z.color}
                       textAnchor="start"
                       dominantBaseline="central"

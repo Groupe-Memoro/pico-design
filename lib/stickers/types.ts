@@ -66,18 +66,17 @@ export interface StickerTemplate {
 // Plus petite taille de texte imprimée (mm) : en dessous, un nom trop long
 // déborde plutôt que de devenir illisible — l'aperçu le montre.
 const MIN_FONT_MM = 1.5;
-// Marge intérieure de la zone, de chaque côté, en part de sa largeur.
-const SIDE_PADDING = 0.04;
 
 /**
  * Taille du texte (mm) dans une zone : la plus grande qui tienne, sans
- * dépasser maxFontMm. `widthPerMm` est la largeur du texte pour 1 mm de corps,
+ * dépasser maxFontMm, sans marge intérieure (le texte peut toucher les bords
+ * de la zone). `widthPerMm` est la largeur du dessin des lettres pour 1 mm de corps,
  * `heightPerMm` sa hauteur (ascendante à descendante) pour 1 mm : mesurées
  * par fontkit au serveur, par le canevas du navigateur à l'écran.
  */
 export function fitFontMm(zone: StickerZone, widthPerMm: number, heightPerMm: number): number {
   const turned = zone.rotation % 180 !== 0;
-  const boxW = (turned ? zone.height : zone.width) * (1 - SIDE_PADDING * 2);
+  const boxW = turned ? zone.height : zone.width;
   const boxH = turned ? zone.width : zone.height;
   const byWidth = widthPerMm > 0 ? boxW / widthPerMm : zone.maxFontMm;
   const byHeight = heightPerMm > 0 ? boxH / heightPerMm : zone.maxFontMm;

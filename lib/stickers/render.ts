@@ -48,9 +48,16 @@ function measureZoneText(zone: StickerZone, text: string) {
   const font = loadInstance(fontOptionById(zone.fontId), false, zone.bold);
   const run = font.layout(text);
   const advance = run.glyphs.reduce((sum, g) => sum + g.advanceWidth, 0);
+  // Approche de la première et de la dernière lettre : retirée, pour que le
+  // dessin des lettres touche le bord de la zone.
+  const first = run.glyphs[0];
+  const last = run.glyphs[run.glyphs.length - 1];
+  const lsb = first ? first.bbox.minX : 0;
+  const rsb = last ? last.advanceWidth - last.bbox.maxX : 0;
   return {
     font,
-    widthPerMm: advance / font.unitsPerEm,
+    widthPerMm: Math.max(0, advance - lsb - rsb) / font.unitsPerEm,
+    lsbPerMm: lsb / font.unitsPerEm,
     heightPerMm: (font.ascent - font.descent) / font.unitsPerEm,
     ascentPerMm: font.ascent / font.unitsPerEm,
     descentPerMm: font.descent / font.unitsPerEm,
@@ -71,11 +78,11 @@ function drawZoneText(page: PDFPage, zone: StickerZone, name: string, layout: St
 
   const turned = zone.rotation % 180 !== 0;
   const boxW = mmToPt(turned ? zone.height : zone.width);
-  const textW = m.widthPerMm * sizePt;
-  const pad = boxW * 0.04;
-  // Départ de la ligne, par rapport au centre de la zone (axe du texte).
-  const startX =
-    zone.align === "left" ? -boxW / 2 + pad : zone.align === "right" ? boxW / 2 - pad - textW : -textW / 2;
+  const inkW = m.widthPerMm * sizePt;
+  // Début du dessin des lettres par rapport au centre de la zone (sans marge
+  // intérieure), puis départ de la ligne (avant l'approche de la 1re lettre).
+  const inkStart = zone.align === "left" ? -boxW / 2 : zone.align === "right" ? boxW / 2 - inkW : -inkW / 2;
+  const startX = inkStart - m.lsbPerMm * sizePt;
   // Ligne de base : le bloc ascendante-descendante centré verticalement (Y vers le bas).
   const baseline = ((m.ascentPerMm + m.descentPerMm) / 2) * sizePt;
 
