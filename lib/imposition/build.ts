@@ -38,12 +38,21 @@ export class ImpositionError extends Error {
 // Un fichier à imposer, tel qu'envoyé par l'écran : un produit Pico, un PDF
 // téléversé (dans le champ `field` de la requête) ou un PDF déjà enregistré
 // avec l'imposition qu'on modifie (`path`).
+// Fichier de verso joint à un fichier (dos commun des cartes d'affaires…) :
+// téléversé, déposé dans le stockage, ou déjà enregistré avec l'imposition.
+export type BackRef = { name?: string } & (
+  | { kind: "upload"; field: string }
+  | { kind: "staged"; path: string }
+  | { kind: "stored"; path: string }
+);
+
 export type SourceSpec = {
   copies: number;
   name?: string;
   widthMm?: number | null;
   heightMm?: number | null;
   pageCount?: number | null;
+  back?: BackRef | null;
 } & (
   | { kind: "product"; productId: string }
   | { kind: "upload"; field: string }
@@ -58,6 +67,8 @@ export interface BuiltSource {
   name: string;
   // Octets du PDF pour un fichier téléversé ou déjà enregistré (à ranger avec l'imposition).
   bytes: Uint8Array | null;
+  // Verso joint : ses octets et son nom (à ranger aussi).
+  back?: { bytes: Uint8Array; name: string } | null;
 }
 
 export interface BuiltImposition {
@@ -173,12 +184,15 @@ export async function buildImposition(
   const sourcePages = formData.get("sourcePages");
   for (const spec of specs) {
     const loaded = await loadSource(spec, formData, storedPrefix, { supabase, admin });
-    if (sourcePages === "duplex" || sourcePages === "simplex") {
-      sources.push(...(await expandPages(loaded.source, sourcePages === "duplex")));
+    const back = spec.back ? await loadBack(spec.back, spec.name || loaded.built.name, formData, storedPrefix, admin) : null;
+    const source: ImpositionSource = back ? { ...loaded.source, backPdf: back.bytes } : loaded.source;
+    if (sourcePages === "duplex" || sourcePages === "simplex" || back) {
+      // Avec un verso joint, les pages du fichier sont toutes des rectos.
+      sources.push(...(await expandPages(source, !back && sourcePages === "duplex")));
     } else {
-      sources.push(loaded.source);
+      sources.push(source);
     }
-    built.push(loaded.built);
+    built.push({ ...loaded.built, back });
   }
 
   // Ce qui dépend de la machine : la grille et les marques imprimées au recto.
@@ -344,11 +358,24 @@ export async function buildImposition(
  * n'a pas de verso). Chaque pièce reprend le nombre de copies du fichier.
  */
 async function expandPages(source: ImpositionSource, duplex: boolean): Promise<ImpositionSource[]> {
-  let count: number;
-  try {
-    count = (await PDFDocument.load(source.pdf, { updateMetadata: false })).getPageCount();
-  } catch {
-    throw new ImpositionError(`« ${source.name} » n'est pas un PDF lisible.`);
+  const pageCount = async (bytes: Uint8Array, label: string) => {
+    try {
+      return (await PDFDocument.load(bytes, { updateMetadata: false })).getPageCount();
+    } catch {
+      throw new ImpositionError(`${label} n'est pas un PDF lisible.`);
+    }
+  };
+  const count = await pageCount(source.pdf, `« ${source.name} »`);
+  // Verso joint : une seule page = le même dos pour toutes les pièces ;
+  // autant de pages que de pièces = un dos par pièce, dans l'ordre.
+  if (source.backPdf) {
+    const backCount = await pageCount(source.backPdf, `Le verso de « ${source.name} »`);
+    return Array.from({ length: count }, (_, page) => ({
+      ...source,
+      name: count > 1 ? `${source.name} (p. ${page + 1})` : source.name,
+      page,
+      backPage: backCount >= count ? page : 0,
+    }));
   }
   if (count <= 1) return [{ ...source, backPage: null }];
   const step = duplex ? 2 : 1;
@@ -359,6 +386,30 @@ async function expandPages(source: ImpositionSource, duplex: boolean): Promise<I
     pieces.push({ ...source, name: `${source.name} (${label})`, page, backPage });
   }
   return pieces;
+}
+
+// Charge le verso joint à un fichier, d'où qu'il vienne.
+async function loadBack(
+  ref: BackRef,
+  ofName: string,
+  formData: FormData,
+  storedPrefix: string | null,
+  admin: SupabaseClients["admin"]
+): Promise<{ bytes: Uint8Array; name: string }> {
+  const name = ref.name || `Verso de ${ofName}`;
+  if (ref.kind === "upload") {
+    const file = formData.get(ref.field);
+    if (!(file instanceof File) || file.size === 0) throw new ImpositionError(`Le verso de « ${ofName} » est manquant.`);
+    return { bytes: new Uint8Array(await file.arrayBuffer()), name: ref.name || file.name };
+  }
+  const allowed =
+    ref.kind === "staged"
+      ? STAGED_SOURCE_PATH.test(ref.path)
+      : Boolean(storedPrefix && ref.path.startsWith(storedPrefix) && STORED_SOURCE_PATH.test(ref.path));
+  if (typeof ref.path !== "string" || !allowed) throw new ImpositionError(`Verso de « ${ofName} » invalide.`);
+  const { data: file } = await admin.storage.from("imposition").download(ref.path);
+  if (!file) throw new ImpositionError(`Le verso de « ${ofName} » est introuvable : ajoutez-le de nouveau.`, 404);
+  return { bytes: new Uint8Array(await file.arrayBuffer()), name };
 }
 
 // Charge un fichier à imposer : un PDF téléversé (champ du formulaire), un PDF

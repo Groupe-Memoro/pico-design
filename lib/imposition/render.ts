@@ -40,6 +40,9 @@ export interface ImpositionSource {
   // (voir expandPages dans build.ts).
   page?: number;
   backPage?: number | null;
+  // Verso fourni à part (un fichier de verso joint) : `backPage` est alors une
+  // page de ce PDF-ci.
+  backPdf?: Uint8Array | null;
 }
 
 export type MarksKind = "pdf" | "png" | "jpg";
@@ -166,22 +169,32 @@ async function prepareSource(
   pieceHeight: number,
   cache: SourceCache = { docs: new Map(), embedded: new Map() }
 ): Promise<PreparedSource> {
-  let doc = cache.docs.get(source.pdf);
-  if (!doc) {
-    try {
-      doc = await PDFDocument.load(source.pdf);
-    } catch {
-      throw new Error(`« ${source.name} » n'est pas un PDF lisible.`);
+  const load = async (bytes: Uint8Array, label: string) => {
+    let loaded = cache.docs.get(bytes);
+    if (!loaded) {
+      try {
+        loaded = await PDFDocument.load(bytes);
+      } catch {
+        throw new Error(`${label} n'est pas un PDF lisible.`);
+      }
+      cache.docs.set(bytes, loaded);
     }
-    cache.docs.set(source.pdf, doc);
-  }
+    return loaded;
+  };
+  const doc = await load(source.pdf, `« ${source.name} »`);
+  // Le verso : dans un fichier joint, ou dans le fichier lui-même.
+  const backBytes = source.backPdf ?? source.pdf;
+  const backDoc = source.backPdf ? await load(source.backPdf, `Le verso de « ${source.name} »`) : doc;
   const all = doc.getPages();
+  const allBack = backDoc.getPages();
   const frontIndex = source.page ?? 0;
-  const backIndex = source.backPage === undefined ? (all.length > 1 ? 1 : null) : source.backPage;
-  if (frontIndex >= all.length || (backIndex !== null && backIndex >= all.length)) {
-    throw new Error(`« ${source.name} » n'a pas de page ${Math.max(frontIndex, backIndex ?? 0) + 1}.`);
+  const backIndex =
+    source.backPage === undefined ? (source.backPdf ? 0 : all.length > 1 ? 1 : null) : source.backPage;
+  if (frontIndex >= all.length) throw new Error(`« ${source.name} » n'a pas de page ${frontIndex + 1}.`);
+  if (backIndex !== null && backIndex >= allBack.length) {
+    throw new Error(`Le verso de « ${source.name} » n'a pas de page ${backIndex + 1}.`);
   }
-  const pages = backIndex === null ? [all[frontIndex]] : [all[frontIndex], all[backIndex]];
+  const pages = backIndex === null ? [all[frontIndex]] : [all[frontIndex], allBack[backIndex]];
   if (pages.length === 0) throw new Error(`« ${source.name} » ne contient aucune page.`);
 
   // pdf-lib intègre les pages sans tenir compte de /Rotate : on refuse plutôt
@@ -212,20 +225,20 @@ async function prepareSource(
     }
   }
 
-  let byIndex = cache.embedded.get(source.pdf);
-  if (!byIndex) cache.embedded.set(source.pdf, (byIndex = new Map()));
-  const embed = async (index: number) => {
-    let page = byIndex!.get(index);
+  const embed = async (bytes: Uint8Array, from: PDFDocument, index: number) => {
+    let byIndex = cache.embedded.get(bytes);
+    if (!byIndex) cache.embedded.set(bytes, (byIndex = new Map()));
+    let page = byIndex.get(index);
     if (!page) {
-      [page] = await out.embedPdf(doc!, [index]);
-      byIndex!.set(index, page);
+      [page] = await out.embedPdf(from, [index]);
+      byIndex.set(index, page);
     }
     return page;
   };
   return {
     name: source.name,
-    front: await embed(frontIndex),
-    back: backIndex === null ? null : await embed(backIndex),
+    front: await embed(source.pdf, doc, frontIndex),
+    back: backIndex === null ? null : await embed(backBytes, backDoc, backIndex),
     pageWidth: w,
     pageHeight: h,
   };

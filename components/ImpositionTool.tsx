@@ -67,6 +67,8 @@ interface SourceItem {
   heightMm: number | null;
   // Nombre de pages du PDF (null : pas encore lu, ou un produit).
   pageCount?: number | null;
+  // Verso joint (dos commun…) : un fichier nouveau, ou déjà enregistré.
+  back?: { file?: File; storedPath?: string; name: string; pageCount: number | null } | null;
   copies: number;
 }
 
@@ -74,7 +76,8 @@ interface SourceItem {
 // pages (recto-verso), une seule pour un PDF d'une page ou un produit.
 function piecesOf(item: SourceItem, duplex: boolean): number {
   const pages = item.pageCount ?? 1;
-  return pages > 1 ? (duplex ? Math.ceil(pages / 2) : pages) : 1;
+  // Avec un verso joint, chaque page du fichier est un recto.
+  return pages > 1 ? (duplex && !item.back ? Math.ceil(pages / 2) : pages) : 1;
 }
 
 const CUSTOM = "custom";
@@ -276,6 +279,7 @@ export default function ImpositionTool({
         widthMm: product?.widthMm ?? src.widthMm,
         heightMm: product?.heightMm ?? src.heightMm,
         pageCount: src.pageCount ?? null,
+        back: src.back ? { storedPath: src.back.path, name: src.back.name, pageCount: null } : null,
         copies: src.copies,
       };
     })
@@ -480,9 +484,9 @@ export default function ImpositionTool({
   function addItem(partial: Omit<SourceItem, "key" | "copies">) {
     setItems((current) => {
       const used = current.reduce((sum, i) => sum + i.copies, 0);
-      // Un fichier de plusieurs pages : un exemplaire de chaque page ; sinon de
-      // quoi remplir la feuille.
-      const copies = (partial.pageCount ?? 1) > 1 ? 1 : Math.max(1, cellCount - used);
+      // Un fichier de plusieurs pages : une feuille pleine de chaque page ;
+      // sinon de quoi remplir la feuille.
+      const copies = (partial.pageCount ?? 1) > 1 ? Math.max(1, cellCount) : Math.max(1, cellCount - used);
       return [...current, { ...partial, key: `item-${nextKey.current++}`, copies }];
     });
   }
@@ -533,8 +537,29 @@ export default function ImpositionTool({
   function fillItem(key: string) {
     setItems((current) => {
       const others = current.filter((i) => i.key !== key).reduce((sum, i) => sum + i.copies, 0);
-      return current.map((i) => (i.key === key ? { ...i, copies: Math.max(1, cellCount - others) } : i));
+      // Plusieurs pages : chaque page remplit sa feuille.
+      return current.map((i) =>
+        i.key === key
+          ? { ...i, copies: (i.pageCount ?? 1) > 1 ? Math.max(1, cellCount) : Math.max(1, cellCount - others) }
+          : i
+      );
     });
+  }
+
+  // Verso joint à un fichier : un PDF, ou une image mise au format.
+  async function setBackFile(key: string, file: File | null) {
+    if (!file) return;
+    try {
+      const pdf = isImageFile(file) ? await imageToPdf(file, piece.widthMm, piece.heightMm) : file;
+      const size = await readPdfPageSizeMm(pdf);
+      if (size && !matchesPiece({ widthMm: size.widthMm, heightMm: size.heightMm } as SourceItem, piece.widthMm, piece.heightMm)) {
+        setError(`Le verso « ${file.name} » n'a pas la taille du format.`);
+        return;
+      }
+      updateItem(key, { back: { file: pdf, name: file.name, pageCount: size?.pageCount ?? null } });
+    } catch {
+      setError(`Impossible de lire le verso « ${file.name} ».`);
+    }
   }
 
   // Une image suit le format : si celui-ci change, on refait son PDF (et sa miniature).
@@ -638,7 +663,11 @@ export default function ImpositionTool({
   // toute requête de plus de 4,5 Mo : un document de plusieurs pages ne pouvait
   // pas passer dans le corps de la requête. Seul son chemin y voyage ensuite.
   async function stageFiles() {
-    const files = isDocument ? (docFile ? [docFile] : []) : items.flatMap((i) => (i.file ? [i.file] : []));
+    const files = isDocument
+      ? docFile
+        ? [docFile]
+        : []
+      : items.flatMap((i) => [i.file, i.back?.file].filter((f): f is File => Boolean(f)));
     const pending = files.filter((f) => !stagedPaths.current.has(f));
     if (pending.length === 0) return;
     setStaging(true);
@@ -828,12 +857,25 @@ export default function ImpositionTool({
       })
     );
     const specs = items.map((item, index) => {
+      // Verso joint : déposé dans le stockage, envoyé, ou déjà enregistré.
+      let back = null;
+      if (item.back?.file) {
+        const staged = stagedPaths.current.get(item.back.file);
+        if (staged) back = { kind: "staged", path: staged, name: item.back.name };
+        else {
+          body.append(`back${index}`, item.back.file);
+          back = { kind: "upload", field: `back${index}`, name: item.back.name };
+        }
+      } else if (item.back?.storedPath) {
+        back = { kind: "stored", path: item.back.storedPath, name: item.back.name };
+      }
       const shown = {
         name: item.name,
         widthMm: item.widthMm,
         heightMm: item.heightMm,
         copies: item.copies,
         ...(item.pageCount ? { pageCount: item.pageCount } : {}),
+        ...(back ? { back } : {}),
       };
       const itemStaged = item.file ? stagedPaths.current.get(item.file) : undefined;
       if (item.kind === "upload" && item.file && itemStaged) return { kind: "staged", path: itemStaged, ...shown };
@@ -1450,6 +1492,37 @@ export default function ImpositionTool({
                       >
                         <TrashIcon className="h-4 w-4" />
                       </button>
+                    </div>
+                    <div className="mt-2 flex items-center gap-2 text-xs">
+                      <span className="text-neutral-500">Verso</span>
+                      {item.back ? (
+                        <>
+                          <span className="min-w-0 flex-1 truncate text-neutral-700" title={item.back.name}>
+                            {item.back.name}
+                            {(item.back.pageCount ?? 1) > 1 ? ` · ${item.back.pageCount} pages` : ""}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => updateItem(item.key, { back: null })}
+                            className="text-neutral-500 underline hover:text-red-600"
+                          >
+                            Retirer
+                          </button>
+                        </>
+                      ) : (
+                        <label className="cursor-pointer text-neutral-600 underline hover:text-pico-black">
+                          Ajouter un fichier de verso
+                          <input
+                            type="file"
+                            accept={["application/pdf", ...IMAGE_TYPES].join(",")}
+                            className="hidden"
+                            onChange={(e) => {
+                              setBackFile(item.key, e.target.files?.[0] ?? null);
+                              e.target.value = "";
+                            }}
+                          />
+                        </label>
+                      )}
                     </div>
                     <div className="mt-2 flex items-center gap-2">
                       <label className="text-xs text-neutral-500">

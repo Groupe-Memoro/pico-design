@@ -20,6 +20,8 @@ export interface SavedSource {
   // Nombre de pages (document de plusieurs pages), pour rouvrir l'aperçu sans
   // relire le PDF. Absent pour les pièces.
   pageCount?: number | null;
+  // Verso joint (dos commun…), rangé avec l'imposition.
+  back?: { path: string; name: string } | null;
   copies: number;
 }
 

@@ -85,12 +85,28 @@ export async function saveImposition(
     const sources: SavedSource[] = [];
     for (const [i, source] of built.sources.entries()) {
       const { spec } = source;
+      // Verso joint : déjà enregistré (gardé tel quel), ou rangé maintenant.
+      let back: SavedSource["back"] = null;
+      if (source.back && spec.back) {
+        if (spec.back.kind === "stored") {
+          back = { path: spec.back.path, name: source.back.name };
+        } else {
+          const path = `${sourcesDir(id)}/${randomUUID().slice(0, 8)}-${i}-verso-${safeStorageName(source.back.name)}`;
+          const { error } = await admin.storage
+            .from(BUCKET)
+            .upload(path, source.back.bytes, { contentType: "application/pdf", upsert: false });
+          if (error) throw new ImpositionError(`Enregistrement du verso de « ${source.name} » impossible : ${error.message}`, 500);
+          uploaded.push(path);
+          back = { path, name: source.back.name };
+        }
+      }
       const shown = {
         name: (typeof spec.name === "string" && spec.name) || source.name,
         widthMm: Number.isFinite(Number(spec.widthMm)) && spec.widthMm != null ? Number(spec.widthMm) : null,
         heightMm: Number.isFinite(Number(spec.heightMm)) && spec.heightMm != null ? Number(spec.heightMm) : null,
         ...(Number.isInteger(spec.pageCount) && Number(spec.pageCount) > 0 ? { pageCount: Number(spec.pageCount) } : {}),
         copies: spec.copies,
+        ...(back ? { back } : {}),
       };
       if (spec.kind === "product") {
         sources.push({ kind: "product", productId: spec.productId, ...shown });
@@ -123,8 +139,10 @@ export async function saveImposition(
         .eq("id", id);
       if (error) throw new ImpositionError(error.message, 500);
       // Retire les PDF téléversés qui ne servent plus.
-      const keep = new Set(sources.flatMap((s) => (s.path ? [s.path] : [])));
-      const orphans = existing.config.sources.flatMap((s) => (s.path && !keep.has(s.path) ? [s.path] : []));
+      const keep = new Set(sources.flatMap((s) => [s.path, s.back?.path].filter((p): p is string => Boolean(p))));
+      const orphans = existing.config.sources
+        .flatMap((s) => [s.path, s.back?.path])
+        .filter((p): p is string => Boolean(p) && !keep.has(p!));
       if (orphans.length > 0) await admin.storage.from(BUCKET).remove(orphans);
     } else {
       const { error } = await supabase
@@ -137,7 +155,10 @@ export async function saveImposition(
     }
     // Les PDF déposés directement par le navigateur sont maintenant rangés
     // avec l'imposition : leur copie de dépôt ne sert plus.
-    const staged = built.sources.flatMap((s) => (s.spec.kind === "staged" ? [s.spec.path] : []));
+    const staged = built.sources.flatMap((s) => [
+      ...(s.spec.kind === "staged" ? [s.spec.path] : []),
+      ...(s.spec.back?.kind === "staged" ? [s.spec.back.path] : []),
+    ]);
     if (staged.length > 0) await admin.storage.from(BUCKET).remove(staged);
     return { id, name };
   } catch (err) {
