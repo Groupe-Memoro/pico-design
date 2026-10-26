@@ -21,7 +21,8 @@ import {
   type PieceOrientation,
 } from "@/lib/imposition/layout";
 import { DUPLO_MARKS, computeDuploLayout, computeDuploTwoPassLayout } from "@/lib/imposition/duplo";
-import { MAX_DOCUMENT_COPIES, leafAt, planDocument } from "@/lib/imposition/documentPlan";
+import { MAX_DOCUMENT_COPIES, leafAt, planDocument, planDocumentOn } from "@/lib/imposition/documentPlan";
+import { readDocumentInfo, type DocumentInfo } from "@/lib/imposition/documentInfo";
 import { regMarkRects, type MmRect } from "@/lib/imposition/regmark";
 import { formatInches, sheetLabel } from "@/lib/imposition/presets";
 import { IMAGE_TYPES, imageToPdf, isImageFile } from "@/lib/imposition/imageToPdf";
@@ -48,6 +49,8 @@ export interface ProductOption {
   id: string;
   name: string;
   templateId: string;
+  // Fond perdu du modèle, par côté (compris dans widthMm et heightMm).
+  bleedMm: number;
   widthMm: number;
   heightMm: number;
 }
@@ -217,52 +220,110 @@ export default function ImpositionTool({
   const docSaved = cfg?.mode === "document" ? cfg.sources[0] : undefined;
   const [docFile, setDocFile] = useState<File | null>(null);
   const [docStoredPath, setDocStoredPath] = useState<string | null>(docSaved?.path ?? null);
+  // Ou un produit Pico dont le PDF a plusieurs pages.
+  const [docProductId, setDocProductId] = useState(docSaved?.kind === "product" ? (docSaved.productId ?? "") : "");
+  const [docProductToAdd, setDocProductToAdd] = useState("");
   const [docName, setDocName] = useState(docSaved?.name ?? "");
   // Pages et format, lus dans le PDF déposé (ou repris de l'imposition enregistrée).
-  const [docInfo, setDocInfo] = useState<{ pageCount: number; widthMm: number; heightMm: number; mixed: boolean } | null>(
+  const [docInfo, setDocInfo] = useState<DocumentInfo | null>(
     docSaved?.pageCount && docSaved.widthMm && docSaved.heightMm
-      ? { pageCount: docSaved.pageCount, widthMm: docSaved.widthMm, heightMm: docSaved.heightMm, mixed: false }
+      ? { pageCount: docSaved.pageCount, widthMm: docSaved.widthMm, heightMm: docSaved.heightMm, mixed: false, bleedMm: null }
       : null
   );
+  // D'où vient le fond perdu affiché : lu dans le PDF, repris d'un modèle
+  // (celui du produit, ou celui qui a la taille des pages), ou saisi (ou
+  // enregistré) à la main.
+  const [docBleedSource, setDocBleedSource] = useState<{ from: "pdf" } | { from: "template"; name: string } | null>(null);
   const [docReading, setDocReading] = useState(false);
   const [docCopies, setDocCopies] = useState(docSaved?.copies ?? 1);
   const [docMargin, setDocMargin] = useState(cfg?.document?.marginMm ?? 5);
   const [docGutter, setDocGutter] = useState(cfg?.document?.gutterMm ?? 0);
   const [docBleed, setDocBleed] = useState(cfg?.document?.bleedMm ?? 0);
   const [docDuplex, setDocDuplex] = useState(cfg?.document?.duplex ?? false);
+  const [docCollated, setDocCollated] = useState(cfg?.document ? cfg.document.collated === true : true);
+  // Cartons : chaque page est une pièce à part (données variables).
+  const [docEachPage, setDocEachPage] = useState(cfg?.document?.eachPage === true);
+  // Découpe du document : massicot (traits de coupe) ou la découpeuse choisie.
+  const [docCutting, setDocCutting] = useState<"guillotine" | "machine">(cfg?.document?.cutting ?? "guillotine");
+  const docOnMachine = isDocument && docCutting === "machine";
   const [docCropMarks, setDocCropMarks] = useState(cfg?.document?.cropMarks ?? true);
   const [docUnit, setDocUnit] = useState<Unit>("mm");
   const [docSheetIndex, setDocSheetIndex] = useState(0);
   const docInput = useRef<HTMLInputElement>(null);
 
-  // Lit le nombre de pages et le format du PDF (pdf-lib chargé à la demande),
-  // et repère un document aux pages de formats différents.
+  // Modèle dont la page (fond perdu compris) a la taille de celle du
+  // document, dans un sens ou l'autre : le format choisi d'abord.
+  function formatMatching(info: DocumentInfo): FormatOption | null {
+    const near = (a: number, b: number) => Math.abs(a - b) <= 0.5;
+    const fits = (f: FormatOption) =>
+      f.bleedMm > 0 &&
+      ((near(f.widthMm, info.widthMm) && near(f.heightMm, info.heightMm)) ||
+        (near(f.widthMm, info.heightMm) && near(f.heightMm, info.widthMm)));
+    const chosen = formats.find((f) => f.id === formatId);
+    return chosen && fits(chosen) ? chosen : (formats.find(fits) ?? null);
+  }
+
+  // Le fond perdu suit le document : celui de sa TrimBox, sinon celui du
+  // modèle (du produit, ou qui a la taille des pages) ; sans rien de tout
+  // cela, la saisie reste telle quelle.
+  function applyDocBleed(info: DocumentInfo, template: { name: string; bleedMm: number } | null) {
+    const fallback = template ?? formatMatching(info);
+    if (info.bleedMm !== null) {
+      setDocBleed(info.bleedMm);
+      setDocBleedSource({ from: "pdf" });
+    } else if (fallback) {
+      setDocBleed(fallback.bleedMm);
+      setDocBleedSource({ from: "template", name: fallback.name });
+    } else {
+      setDocBleedSource(null);
+    }
+  }
+
+  // Lit le nombre de pages, le format et le fond perdu du PDF, et repère un
+  // document aux pages de formats différents.
   async function handleDocFile(file: File | null) {
     if (!file) return;
     setDocReading(true);
     setDocFile(file);
     setDocStoredPath(null);
+    setDocProductId("");
     setDocName(file.name);
     setDocSheetIndex(0);
     try {
-      const { PDFDocument } = await import("pdf-lib");
-      const doc = await PDFDocument.load(await file.arrayBuffer());
-      const pages = doc.getPages();
-      const first = pages[0]?.getSize();
-      if (!first) throw new Error();
-      const w = first.width / MM_TO_PT;
-      const h = first.height / MM_TO_PT;
-      const mixed = pages.some((p) => {
-        const sz = p.getSize();
-        return Math.abs(sz.width / MM_TO_PT - w) > 0.5 || Math.abs(sz.height / MM_TO_PT - h) > 0.5;
-      });
-      setDocInfo({ pageCount: pages.length, widthMm: w, heightMm: h, mixed });
+      const info = await readDocumentInfo(await file.arrayBuffer());
+      setDocInfo(info);
+      applyDocBleed(info, null);
     } catch {
       setDocInfo(null);
       setError("Ce fichier n'est pas un PDF lisible.");
     } finally {
       setDocReading(false);
       if (docInput.current) docInput.current.value = "";
+    }
+  }
+
+  // Un produit Pico comme document : son PDF est lu par le serveur.
+  async function handleDocProduct(productId: string) {
+    const product = products.find((p) => p.id === productId);
+    if (!product) return;
+    setDocReading(true);
+    setDocProductId(product.id);
+    setDocFile(null);
+    setDocStoredPath(null);
+    setDocName(product.name);
+    setDocSheetIndex(0);
+    try {
+      const res = await fetch(`/api/imposition/product-info?productId=${encodeURIComponent(product.id)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Impossible de lire le PDF du produit.");
+      setDocInfo(data as DocumentInfo);
+      const template = formats.find((f) => f.id === product.templateId);
+      applyDocBleed(data as DocumentInfo, { name: template?.name ?? product.name, bleedMm: product.bleedMm });
+    } catch (err) {
+      setDocInfo(null);
+      setError(err instanceof Error ? err.message : "Impossible de lire le PDF du produit.");
+    } finally {
+      setDocReading(false);
     }
   }
   const [items, setItems] = useState<SourceItem[]>(() =>
@@ -334,14 +395,16 @@ export default function ImpositionTool({
   const isDuplo = machine === "duplo";
   const activeCutter = isDuplo ? null : (cutters.find((c) => c.id === cutterId) ?? null);
   // La Graphtec imprime sur la feuille de son profil : ses marques et son gabarit y sont dessinés.
-  const sheet = isDocument
+  const sheet = isDocument && !docOnMachine
     ? (sheets.find((s) => s.id === sheetId) ?? null)
     : isDuplo
     ? (sheets.find((s) => s.id === sheetId) ?? null)
     : (sheets.find((s) => s.id === activeCutter?.sheet_id) ?? null);
   const format = formats.find((f) => f.id === formatId) ?? null;
-  const piece =
-    formatId === CUSTOM || !format
+  // Document à la découpeuse : la pièce est une page du document.
+  const piece = docOnMachine
+    ? { widthMm: docInfo?.widthMm ?? 0, heightMm: docInfo?.heightMm ?? 0, bleedMm: docBleed }
+    : formatId === CUSTOM || !format
       ? { widthMm: customWidth, heightMm: customHeight, bleedMm: customBleed }
       : { widthMm: format.widthMm, heightMm: format.heightMm, bleedMm: format.bleedMm };
 
@@ -475,6 +538,19 @@ export default function ImpositionTool({
   }, []);
 
   const availableProducts = products.filter((p) => formatId === CUSTOM || p.templateId === formatId);
+  // Produits imposables comme document, regroupés par format (dans l'ordre des formats).
+  const docProductGroups = useMemo(
+    () =>
+      [...formats, { id: "", name: "Autres" }]
+        .map((f) => ({
+          label: f.name,
+          products: products.filter((p) =>
+            f.id ? p.templateId === f.id : !formats.some((g) => g.id === p.templateId)
+          ),
+        }))
+        .filter((g) => g.products.length > 0),
+    [products, formats]
+  );
 
   function refreshPresets() {
     setAssetVersion((v) => v + 1);
@@ -612,7 +688,17 @@ export default function ImpositionTool({
   const docPlan = useMemo(
     () =>
       isDocument && sheet && docInfo
-        ? planDocument({
+        ? docOnMachine
+          ? layout && layout.cells.length > 0
+            ? planDocumentOn(layout, {
+                pageCount: docInfo.pageCount,
+                duplex: docDuplex,
+                copies: docCopies,
+                collated: docCollated,
+                eachPage: docEachPage,
+              })
+            : null
+          : planDocument({
             sheetWidth: sheet.width_mm,
             sheetHeight: sheet.height_mm,
             marginMm: docMargin,
@@ -622,21 +708,29 @@ export default function ImpositionTool({
             pageCount: docInfo.pageCount,
             duplex: docDuplex,
             copies: docCopies,
+            collated: docCollated,
+            eachPage: docEachPage,
           })
         : null,
-    [isDocument, sheet, docInfo, docMargin, docGutter, docDuplex, docCopies]
+    [isDocument, docOnMachine, layout, sheet, docInfo, docMargin, docGutter, docDuplex, docCopies, docCollated, docEachPage]
   );
-  const docProblem = !sheet
+  const docProblem = docOnMachine && machineProblem
+    ? machineProblem
+    : !sheet
     ? "Créez une feuille pour commencer."
-    : !docFile && !docStoredPath
-      ? "Ajoutez le PDF du document."
+    : !docFile && !docStoredPath && !docProductId
+      ? "Ajoutez le PDF du document ou choisissez un produit."
       : docReading
         ? "Lecture du PDF…"
         : docInfo?.mixed
           ? "Toutes les pages du PDF doivent avoir le même format."
-          : docPlan && docPlan.perSheet === 0
-            ? "Une page ne tient pas sur cette feuille avec ces marges : choisissez une feuille plus grande ou réduisez la marge."
-            : null;
+          : docOnMachine && docInfo && !docPlan
+            ? isDuplo
+              ? "Choisissez un job Duplo qui coupe le format de ces pages."
+              : "Les pages n'entrent pas dans la grille de ce profil de découpe."
+            : docPlan && docPlan.perSheet === 0
+              ? "Une page ne tient pas sur cette feuille avec ces marges : choisissez une feuille plus grande ou réduisez la marge."
+              : null;
 
   const piecesProblem = machineProblem
     ? machineProblem
@@ -700,16 +794,33 @@ export default function ImpositionTool({
 
   // Requête d'un document de plusieurs pages (voir buildDocumentImposition).
   function buildDocumentBody(): FormData | null {
-    if (!sheet || (!docFile && !docStoredPath)) return null;
+    if (!sheet || (!docFile && !docStoredPath && !docProductId)) return null;
+    if (docOnMachine && (!docInfo || (!activeDuplo && !activeCutter))) return null;
     const body = new FormData();
     body.append("mode", "document");
     body.append("sheetId", sheet.id);
     body.append("machine", machine);
     body.append("flip", flip);
+    if (docOnMachine) {
+      // Grille et marques de la découpeuse : la pièce est une page du document.
+      body.append("cutting", "machine");
+      if (activeDuplo) body.append("duploJobId", activeDuplo.job.id);
+      if (activeDuplo2) {
+        body.append("duploJob2Id", activeDuplo2.id);
+        body.append("duploJob2Turn", duploJob2Turn);
+      }
+      if (activeCutter) body.append("cutterId", activeCutter.id);
+      body.append("pieceWidthMm", String(piece.widthMm));
+      body.append("pieceHeightMm", String(piece.heightMm));
+      body.append("pieceBleedMm", String(piece.bleedMm));
+      body.append("orientation", orientation);
+    }
     body.append("marginMm", String(docMargin));
     body.append("gutterMm", String(docGutter));
     body.append("bleedMm", String(docBleed));
     body.append("duplex", String(docDuplex));
+    body.append("collated", String(docCollated));
+    body.append("eachPage", String(docEachPage));
     body.append("cropMarks", String(docCropMarks));
     if (saved) body.append("impositionId", saved.id);
     body.append(
@@ -717,11 +828,22 @@ export default function ImpositionTool({
       JSON.stringify({
         version: 1,
         mode: "document",
-        document: { marginMm: docMargin, gutterMm: docGutter, bleedMm: docBleed, duplex: docDuplex, cropMarks: docCropMarks },
+        document: {
+          marginMm: docMargin,
+          gutterMm: docGutter,
+          bleedMm: docBleed,
+          duplex: docDuplex,
+          collated: docCollated,
+          eachPage: docEachPage,
+          cutting: docCutting,
+          cropMarks: docCropMarks,
+        },
         sheetId: sheet.id,
         machine,
-        duploJobId: "",
-        cutterId: "",
+        duploJobId: docOnMachine ? (activeDuplo?.job.id ?? "") : "",
+        duploJob2Id: docOnMachine ? (activeDuplo2?.id ?? "") : "",
+        duploJob2Turn,
+        cutterId: docOnMachine ? (activeCutter?.id ?? "") : "",
         formatId,
         custom: { widthMm: customWidth, heightMm: customHeight, bleedMm: customBleed },
         orientation,
@@ -736,7 +858,9 @@ export default function ImpositionTool({
       copies: docCopies,
     };
     const docStaged = docFile ? stagedPaths.current.get(docFile) : undefined;
-    if (docFile && docStaged) {
+    if (docProductId) {
+      body.append("sources", JSON.stringify([{ kind: "product", productId: docProductId, ...shown }]));
+    } else if (docFile && docStaged) {
       body.append("sources", JSON.stringify([{ kind: "staged", path: docStaged, ...shown }]));
     } else if (docFile) {
       body.append("file0", docFile);
@@ -1064,7 +1188,7 @@ export default function ImpositionTool({
             </div>
             )}
 
-            {(isDuplo || isDocument) && (
+            {(isDocument ? !docOnMachine || isDuplo : isDuplo) && (
               <div>
                 <div className="flex items-center justify-between">
                   <label className={labelClass}>Feuille</label>
@@ -1128,14 +1252,21 @@ export default function ImpositionTool({
               </div>
             )}
 
-            {!isDocument && (
             <div>
               <label className={labelClass}>Découpeuse</label>
               <select
-                value={machine}
-                onChange={(e) => setMachine(e.target.value as CutterMachine)}
+                value={isDocument && !docOnMachine ? "guillotine" : machine}
+                onChange={(e) => {
+                  if (e.target.value === "guillotine") {
+                    setDocCutting("guillotine");
+                    return;
+                  }
+                  if (isDocument) setDocCutting("machine");
+                  setMachine(e.target.value as CutterMachine);
+                }}
                 className={selectClass}
               >
+                {isDocument && <option value="guillotine">Massicot (traits de coupe)</option>}
                 {MACHINES.map((m) => (
                   <option key={m} value={m}>
                     {MACHINE_LABELS[m]}
@@ -1143,9 +1274,8 @@ export default function ImpositionTool({
                 ))}
               </select>
             </div>
-            )}
 
-            {!isDuplo && !isDocument && (
+            {!isDuplo && (!isDocument || docOnMachine) && (
               <div>
                 <div className="flex items-center justify-between">
                   <label className={labelClass}>Profil de découpe</label>
@@ -1179,7 +1309,7 @@ export default function ImpositionTool({
               </div>
             )}
 
-            {isDuplo && !isDocument && (
+            {isDuplo && (!isDocument || docOnMachine) && (
               <div>
                 <div className="flex items-center justify-between">
                   <label className={labelClass}>Job Duplo</label>
@@ -1357,54 +1487,48 @@ export default function ImpositionTool({
             {isDocument && (
               <div className="space-y-4">
                 <div>
-                  <label className={labelClass}>Document (PDF, toutes les pages)</label>
-                  <input
-                    ref={docInput}
-                    type="file"
-                    accept="application/pdf"
-                    onChange={(e) => handleDocFile(e.target.files?.[0] ?? null)}
-                    className="mt-1 block w-full text-sm"
-                  />
-                  {(docFile || docStoredPath) && (
-                    <p className={`mt-1 text-xs ${docInfo?.mixed ? "text-red-600" : "text-neutral-500"}`}>
-                      {docName}
-                      {docReading
-                        ? " · lecture…"
-                        : docInfo
-                          ? ` · ${docInfo.pageCount} page${docInfo.pageCount > 1 ? "s" : ""} · ${sizeLabel(docInfo.widthMm, docInfo.heightMm)}${
-                              docInfo.mixed ? " — pages de formats différents" : ""
-                            }`
-                          : ""}
-                    </p>
-                  )}
+                  <label className={labelClass}>Contenu du fichier</label>
+                  <select
+                    value={docEachPage ? "pieces" : "document"}
+                    onChange={(e) => setDocEachPage(e.target.value === "pieces")}
+                    className={selectClass}
+                  >
+                    <option value="document">Document — les pages forment un exemplaire</option>
+                    <option value="pieces">Cartons — chaque page est une pièce (données variables)</option>
+                  </select>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className={labelClass}>Exemplaires</label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={MAX_DOCUMENT_COPIES}
-                      step={1}
-                      value={docCopies}
-                      onChange={(e) =>
-                        setDocCopies(Math.min(MAX_DOCUMENT_COPIES, Math.max(1, Math.floor(Number(e.target.value)) || 1)))
-                      }
-                      className={selectClass}
-                    />
-                  </div>
-                  <div>
-                    <label className={labelClass}>Impression</label>
-                    <select
-                      value={docDuplex ? "duplex" : "simplex"}
-                      onChange={(e) => setDocDuplex(e.target.value === "duplex")}
-                      className={selectClass}
-                    >
-                      <option value="simplex">Recto seul</option>
-                      <option value="duplex">Recto-verso</option>
-                    </select>
-                  </div>
+                <div>
+                  <label className={labelClass}>Impression</label>
+                  <select
+                    value={docDuplex ? "duplex" : "simplex"}
+                    onChange={(e) => setDocDuplex(e.target.value === "duplex")}
+                    className={selectClass}
+                  >
+                    <option value="simplex">Recto seul</option>
+                    <option value="duplex">Recto-verso</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className={labelClass}>Ordre des feuilles</label>
+                  <select
+                    value={docCollated ? "collated" : "stack"}
+                    onChange={(e) => setDocCollated(e.target.value === "collated")}
+                    className={selectClass}
+                  >
+                    {docEachPage ? (
+                      <>
+                        <option value="collated">À la suite — les cartons feuille après feuille</option>
+                        <option value="stack">Couper et empiler — les cartons dans l&apos;ordre après la coupe</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="collated">Assemblé — les feuilles d&apos;un exemplaire, à imprimer N fois</option>
+                        <option value="stack">Couper et empiler — tous les exemplaires dans le PDF</option>
+                      </>
+                    )}
+                  </select>
                 </div>
 
                 {docDuplex && (
@@ -1417,28 +1541,163 @@ export default function ImpositionTool({
                   </div>
                 )}
 
+                {docOnMachine && (
+                  <div>
+                    <label className={labelClass}>Sens des pages</label>
+                    <select
+                      value={orientation}
+                      onChange={(e) => setOrientation(e.target.value as PieceOrientation)}
+                      className={selectClass}
+                    >
+                      <option value="auto">Auto (le plus de pages)</option>
+                      <option value="normal">Normal</option>
+                      <option value="rotated">Pivoté de 90°</option>
+                    </select>
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className={labelClass}>Marges et coupe</span>
+                    <span className={labelClass}>{docOnMachine ? "Fond perdu" : "Marges et coupe"}</span>
                     <UnitToggle unit={docUnit} onChange={setDocUnit} />
                   </div>
                   <div className="grid grid-cols-3 gap-3">
-                    <MeasureField key={`dm-${docUnit}`} label="Marge de la feuille" valueMm={docMargin} unit={docUnit} onChange={setDocMargin} />
-                    <MeasureField key={`dg-${docUnit}`} label="Espacement" valueMm={docGutter} unit={docUnit} onChange={setDocGutter} />
-                    <MeasureField key={`db-${docUnit}`} label="Fond perdu (par côté)" valueMm={docBleed} unit={docUnit} onChange={setDocBleed} />
+                    {!docOnMachine && (
+                      <>
+                        <MeasureField key={`dm-${docUnit}`} label="Marge de la feuille" valueMm={docMargin} unit={docUnit} onChange={setDocMargin} />
+                        <MeasureField key={`dg-${docUnit}`} label="Espacement" valueMm={docGutter} unit={docUnit} onChange={setDocGutter} />
+                      </>
+                    )}
+                    <MeasureField
+                      key={`db-${docUnit}`}
+                      label="Fond perdu (par côté)"
+                      valueMm={docBleed}
+                      unit={docUnit}
+                      onChange={(v) => {
+                        setDocBleed(v);
+                        setDocBleedSource(null);
+                      }}
+                    />
                   </div>
                   <p className="text-xs text-neutral-500">
-                    Le fond perdu est celui déjà compris dans les pages du PDF (0 s&apos;il n&apos;y en a pas) : les traits
-                    de coupe tombent à cette distance du bord de chaque page.
+                    Le fond perdu est celui déjà compris dans les pages du PDF (0 s&apos;il n&apos;y en a pas) :{" "}
+                    {docOnMachine
+                      ? "la découpeuse coupe à cette distance du bord de chaque page."
+                      : "les traits de coupe tombent à cette distance du bord de chaque page."}
+                    {docBleedSource?.from === "pdf" && " Valeur lue dans le PDF (TrimBox)."}
+                    {docBleedSource?.from === "template" && ` Valeur reprise du modèle « ${docBleedSource.name} ».`}
                   </p>
-                  <label className="flex items-center gap-2 text-sm text-neutral-700">
-                    <input type="checkbox" checked={docCropMarks} onChange={(e) => setDocCropMarks(e.target.checked)} />
-                    Traits de coupe dans la marge
-                  </label>
+                  {!docOnMachine && (
+                    <label className="flex items-center gap-2 text-sm text-neutral-700">
+                      <input type="checkbox" checked={docCropMarks} onChange={(e) => setDocCropMarks(e.target.checked)} />
+                      Traits de coupe dans la marge
+                    </label>
+                  )}
                 </div>
               </div>
             )}
           </section>
+
+          {isDocument && (
+          <section className="space-y-3 rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
+            <h2 className="text-sm font-semibold text-pico-black">Fichiers à imposer</h2>
+
+            {!docFile && !docStoredPath && !docProductId ? (
+              <p className="text-sm text-neutral-500">Aucun fichier pour l&apos;instant.</p>
+            ) : (
+              <div className="rounded-lg border border-neutral-200 p-2.5">
+                <div className="flex items-start gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{docName}</p>
+                    <p className={`text-xs ${docInfo?.mixed ? "text-red-600" : "text-neutral-500"}`}>
+                      {docProductId ? "Produit" : "PDF téléversé"}
+                      {docReading
+                        ? " · lecture…"
+                        : docInfo
+                          ? ` · ${sizeLabel(docInfo.widthMm, docInfo.heightMm)} · ${docInfo.pageCount} page${docInfo.pageCount > 1 ? "s" : ""}${
+                              docEachPage && docPlan ? ` → ${docPlan.leavesPerCopy} carton${docPlan.leavesPerCopy > 1 ? "s" : ""}` : ""
+                            }${
+                              docInfo.mixed ? " — pages de formats différents" : ""
+                            }`
+                          : ""}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDocFile(null);
+                      setDocStoredPath(null);
+                      setDocProductId("");
+                      setDocName("");
+                      setDocInfo(null);
+                      setDocBleedSource(null);
+                    }}
+                    aria-label="Retirer"
+                    className="rounded-lg p-1 text-neutral-400 hover:bg-red-50 hover:text-red-600"
+                  >
+                    <TrashIcon className="h-4 w-4" />
+                  </button>
+                </div>
+                <div className="mt-2 flex items-center gap-2">
+                  <label className="text-xs text-neutral-500">
+                    {docEachPage ? "Exemplaires de chaque carton" : "Exemplaires"}
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={MAX_DOCUMENT_COPIES}
+                    step={1}
+                    value={docCopies}
+                    onChange={(e) =>
+                      setDocCopies(Math.min(MAX_DOCUMENT_COPIES, Math.max(1, Math.floor(Number(e.target.value)) || 1)))
+                    }
+                    className="w-20 rounded border border-neutral-300 px-2 py-1 text-sm"
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-2 border-t border-neutral-100 pt-3">
+              <div className="flex gap-2">
+                <select
+                  value={docProductToAdd}
+                  onChange={(e) => setDocProductToAdd(e.target.value)}
+                  className="min-w-0 flex-1 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm"
+                >
+                  <option value="">{products.length === 0 ? "Aucun produit avec PDF" : "Choisir un produit…"}</option>
+                  {docProductGroups.map((group) => (
+                    <optgroup key={group.label} label={group.label}>
+                      {group.products.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleDocProduct(docProductToAdd);
+                    setDocProductToAdd("");
+                  }}
+                  disabled={!docProductToAdd}
+                  className="rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-50 disabled:opacity-40"
+                >
+                  {docFile || docStoredPath || docProductId ? "Remplacer" : "Ajouter"}
+                </button>
+              </div>
+              <input
+                ref={docInput}
+                type="file"
+                accept="application/pdf"
+                onChange={(e) => handleDocFile(e.target.files?.[0] ?? null)}
+                className="block w-full text-sm"
+              />
+              <p className="text-xs text-neutral-500">Un seul document, PDF de toutes les pages.</p>
+            </div>
+          </section>
+          )}
 
           {!isDocument && (
           <section className="space-y-3 rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
@@ -1596,7 +1855,7 @@ export default function ImpositionTool({
               <label className="flex items-center gap-1.5 text-xs text-neutral-600">
                 <input type="checkbox" checked={showCuts} onChange={(e) => setShowCuts(e.target.checked)} />
                 <span className="inline-block h-0.5 w-4" style={{ backgroundColor: CUT_COLOR }} />
-                {isDocument ? "Coupes au massicot" : "Coupes de la découpeuse"}
+                {isDocument && !docOnMachine ? "Coupes au massicot" : "Coupes de la découpeuse"}
               </label>
               {activeCutter?.marks_path && (
                 <label className="flex items-center gap-1.5 text-xs text-neutral-600">
@@ -1633,6 +1892,32 @@ export default function ImpositionTool({
                   sheetIndex={Math.min(docSheetIndex, docPlan.sheets - 1)}
                   onSheetIndexChange={setDocSheetIndex}
                   bleedMm={showCuts ? docBleed : null}
+                  machineView={
+                    docOnMachine
+                      ? {
+                          hasBarcode: Boolean(activeDuplo && barcodeJobNos.includes(activeDuplo.job.job_no)),
+                          regRects:
+                            activeDuplo?.job.reg_mark && sheet
+                              ? regMarkRects(
+                                  DUPLO_MARKS.corner,
+                                  activeDuplo.job.side_mark_mm,
+                                  activeDuplo.job.lead_mark_mm,
+                                  sheet.width_mm,
+                                  sheet.height_mm
+                                )
+                              : null,
+                          cutStyle: isDuplo ? "guillotine" : "contour",
+                          marksUrl:
+                            activeCutter?.marks_path && showMarks
+                              ? `/api/imposition/cutters/${activeCutter.id}/asset/marks?v=${assetVersion}`
+                              : null,
+                          guideUrl:
+                            activeCutter?.guide_path && showGuide
+                              ? `/api/imposition/cutters/${activeCutter.id}/asset/guide?v=${assetVersion}`
+                              : null,
+                        }
+                      : null
+                  }
                 />
               ) : (
                 <p className="text-sm text-neutral-500">{docProblem ?? "Ajoutez le PDF du document."}</p>
@@ -1680,7 +1965,7 @@ export default function ImpositionTool({
               </p>
             )}
             <p className="mt-3 text-xs text-neutral-500">
-              {isDocument ? (
+              {isDocument && !docOnMachine ? (
                 <>
                   Le numéro sur chaque pose est la page placée au recto ; en recto-verso, la page suivante est au dos.
                   Pointillés gris = zone utile (feuille moins marges). Traits orange = coupes au massicot, au bord de
@@ -1772,6 +2057,7 @@ function DocumentPreview({
   sheetIndex,
   onSheetIndexChange,
   bleedMm,
+  machineView,
 }: {
   sheet: ImpositionSheet;
   plan: ReturnType<typeof planDocument>;
@@ -1780,18 +2066,41 @@ function DocumentPreview({
   sheetIndex: number;
   onSheetIndexChange: (index: number) => void;
   bleedMm: number | null;
+  // Document passé à la découpeuse : ses marques, son repère et ses coupes.
+  machineView?: {
+    hasBarcode: boolean;
+    regRects: MmRect[] | null;
+    cutStyle: "guillotine" | "contour";
+    marksUrl: string | null;
+    guideUrl: string | null;
+  } | null;
 }) {
   // « Source » de chaque pose = la page placée au recto (son numéro s'affiche).
   const assignment = plan.layout.cells.map((_, slot) => leafAt(plan, sheetIndex, slot, duplex, pageCount)?.front ?? null);
-  const copies = Math.max(1, Math.round(plan.totalLeaves / Math.max(1, plan.leavesPerCopy)));
+  const copies = plan.copiesPerSet;
   return (
     <div className="space-y-3">
       <p className="text-sm text-neutral-600">
         <strong>{plan.perSheet}</strong> page{plan.perSheet > 1 ? "s" : ""} par feuille ({plan.layout.cols} ×{" "}
         {plan.layout.rows}
-        {plan.layout.rotated ? ", pivotées" : ""}) · <strong>{plan.sheets}</strong> feuille{plan.sheets > 1 ? "s" : ""} à
-        imprimer {duplex ? "en recto-verso" : "en recto seul"} · {copies} exemplaire{copies > 1 ? "s" : ""} de{" "}
-        {pageCount} page{pageCount > 1 ? "s" : ""}
+        {plan.layout.rotated ? ", pivotées" : ""}) · <strong>{plan.sheets}</strong> feuille{plan.sheets > 1 ? "s" : ""}{" "}
+        {duplex ? "en recto-verso" : "en recto seul"} ·{" "}
+        {plan.eachPage ? (
+          <>
+            {plan.leavesPerCopy} carton{plan.leavesPerCopy > 1 ? "s" : ""} × {copies} exemplaire{copies > 1 ? "s" : ""}
+          </>
+        ) : (
+          <>
+            {copies} exemplaire{copies > 1 ? "s" : ""} de {pageCount} page{pageCount > 1 ? "s" : ""}
+          </>
+        )}{" "}
+        dans le PDF
+        {plan.collated && !plan.eachPage && (
+          <>
+            {" "}
+            · à imprimer <strong>{plan.prints} fois</strong>
+          </>
+        )}
       </p>
       <div className="flex items-center justify-center gap-2 text-sm">
         <button
@@ -1822,12 +2131,12 @@ function DocumentPreview({
         assignment={assignment}
         images={[]}
         multiColor
-        hasBarcode={false}
-        regRects={null}
+        hasBarcode={machineView?.hasBarcode ?? false}
+        regRects={machineView?.regRects ?? null}
         bleedMm={bleedMm}
-        cutStyle="guillotine"
-        marksUrl={null}
-        guideUrl={null}
+        cutStyle={machineView?.cutStyle ?? "guillotine"}
+        marksUrl={machineView?.marksUrl ?? null}
+        guideUrl={machineView?.guideUrl ?? null}
       />
       {plan.perSheet > 1 && (
         <p className="rounded-lg bg-neutral-50 p-3 text-xs text-neutral-600">

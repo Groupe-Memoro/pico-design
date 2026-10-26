@@ -20,9 +20,9 @@ import { DUPLO_MARKS } from "@/lib/imposition/duplo";
 import { isMachine } from "@/lib/imposition/machines";
 import { detectMarksKind } from "@/lib/imposition/marks";
 import { imposeDocumentToPdf } from "@/lib/imposition/document";
-import { MAX_DOCUMENT_COPIES } from "@/lib/imposition/documentPlan";
+import { MAX_DOCUMENT_COPIES, leafAt, planDocumentOn } from "@/lib/imposition/documentPlan";
 import { STAGED_SOURCE_PATH, STORED_SOURCE_PATH, sourcesDir } from "@/lib/imposition/saved";
-import type { FlipEdge, PieceOrientation } from "@/lib/imposition/layout";
+import type { FlipEdge, Layout, PieceOrientation } from "@/lib/imposition/layout";
 import type { ImpositionCutter, ImpositionDuploJob, ImpositionSheet } from "@/lib/types";
 
 // Erreur à renvoyer telle quelle à l'utilisateur (message en français + code HTTP).
@@ -119,8 +119,11 @@ export async function buildImposition(
   const storedPrefix = /^[0-9a-f-]{36}$/i.test(impositionId) ? `${sourcesDir(impositionId)}/` : null;
 
   // Document de plusieurs pages (feuilles séparées, massicot) : ni format de
-  // pièce, ni machine — sa propre construction.
-  if (formData.get("mode") === "document") {
+  // pièce, ni machine — sa propre construction. Passé à la découpeuse, il suit
+  // le chemin des pièces (grille et marques de la machine), dans l'ordre du
+  // plan du document (voir documentPlacement).
+  const documentOnMachine = formData.get("mode") === "document" && formData.get("cutting") === "machine";
+  if (formData.get("mode") === "document" && !documentOnMachine) {
     return buildDocumentImposition(formData, sheetId, flip, storedPrefix, { supabase, admin });
   }
 
@@ -133,6 +136,12 @@ export async function buildImposition(
     throw new ImpositionError("Liste de fichiers invalide.");
   }
   if (!Array.isArray(specs) || specs.length === 0) throw new ImpositionError("Ajoutez au moins un fichier.");
+  if (documentOnMachine) {
+    if (specs.length !== 1) throw new ImpositionError("Ajoutez le PDF du document.");
+    if (specs[0].copies > MAX_DOCUMENT_COPIES) {
+      throw new ImpositionError(`Le nombre d'exemplaires doit être un entier de 1 à ${MAX_DOCUMENT_COPIES}.`);
+    }
+  }
   if (specs.some((s) => !Number.isInteger(s.copies) || s.copies < 1)) {
     throw new ImpositionError("Le nombre de copies doit être un entier d'au moins 1.");
   }
@@ -321,7 +330,18 @@ export async function buildImposition(
     // Plusieurs feuilles (mise en production, ou plus de pièces que
     // d'emplacements) : les copies remplissent les emplacements feuille après
     // feuille, réunies dans un seul PDF.
-    const perSheet = impositionLayout(base).layout.cells.length;
+    const machineLayout = impositionLayout(base).layout;
+    if (documentOnMachine) {
+      const merged = await PDFDocument.create();
+      const onSheets = await documentPlacement(sources[0], machineLayout, formData);
+      for (const onSheet of onSheets) {
+        const one = await imposeToPdf({ ...base, sources: onSheet });
+        const doc = await PDFDocument.load(one.pdf);
+        (await merged.copyPages(doc, doc.getPageIndices())).forEach((page) => merged.addPage(page));
+      }
+      return { pdf: Buffer.from(await merged.save()), sheet, duploJob, cutter, sources: built, sheetCount: onSheets.length };
+    }
+    const perSheet = machineLayout.cells.length;
     const pieceCount = sources.reduce((n, s) => n + s.copies, 0);
     if (formData.get("multiSheet") === "1" || pieceCount > perSheet) {
       const queue = sources.map((s) => ({ ...s }));
@@ -350,6 +370,42 @@ export async function buildImposition(
   } catch (err) {
     throw new ImpositionError(err instanceof Error ? err.message : "Erreur lors de l'imposition.");
   }
+}
+
+/**
+ * Un document passé à la découpeuse : les pièces de chaque feuille, pose par
+ * pose, selon le plan du document (assemblé, couper et empiler, ou cartons)
+ * calculé sur la grille de la machine.
+ */
+async function documentPlacement(source: ImpositionSource, layout: Layout, formData: FormData): Promise<ImpositionSource[][]> {
+  let pageCount: number;
+  try {
+    pageCount = (await PDFDocument.load(source.pdf, { updateMetadata: false })).getPageCount();
+  } catch {
+    throw new ImpositionError(`« ${source.name} » n'est pas un PDF lisible.`);
+  }
+  const duplex = formData.get("duplex") === "true";
+  const plan = planDocumentOn(layout, {
+    pageCount,
+    duplex,
+    copies: source.copies,
+    collated: formData.get("collated") === "true",
+    eachPage: formData.get("eachPage") === "true",
+  });
+  const sheets: ImpositionSource[][] = [];
+  for (let sheet = 0; sheet < plan.sheets; sheet++) {
+    const onSheet: ImpositionSource[] = [];
+    // Les poses vides sont toujours en fin de feuille : les pièces se suivent.
+    for (let slot = 0; slot < plan.perSheet; slot++) {
+      const leaf = leafAt(plan, sheet, slot, duplex, pageCount);
+      if (!leaf) break;
+      const last = onSheet[onSheet.length - 1];
+      if (last && last.page === leaf.front && last.backPage === leaf.back) last.copies += 1;
+      else onSheet.push({ ...source, copies: 1, page: leaf.front, backPage: leaf.back });
+    }
+    sheets.push(onSheet);
+  }
+  return sheets;
 }
 
 /**
@@ -526,6 +582,8 @@ async function buildDocumentImposition(
       duplex: formData.get("duplex") === "true",
       flip,
       copies,
+      collated: formData.get("collated") === "true",
+      eachPage: formData.get("eachPage") === "true",
       cropMarks: formData.get("cropMarks") !== "false",
     });
     return { pdf: result.pdf, sheet, duploJob: null, cutter: null, sources: [built] };

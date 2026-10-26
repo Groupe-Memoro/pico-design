@@ -2,11 +2,12 @@
 
 import { useMemo, useState } from "react";
 import Modal from "@/components/Modal";
-import { DownloadIcon, SpinnerIcon } from "@/components/icons";
+import { DownloadIcon, SpinnerIcon, TrashIcon } from "@/components/icons";
 import type { CsvData } from "@/lib/studentCards/csv";
 import { parseDataFile } from "@/lib/studentCards/dataFile";
 import { PhotoIndex, collectPhotos, shrinkPhoto } from "@/lib/studentCards/photos";
 import { zoneText, type CardZone, type DataVocab } from "@/lib/studentCards/types";
+import { MAX_SORT_KEYS, sortedRowIndexes, type SortKey } from "@/lib/studentCards/sort";
 
 // Un lot envoyé au rendu : sous la limite de taille d'une requête (4,5 Mo),
 // photos allégées comprises.
@@ -71,6 +72,16 @@ export default function CardProduction({
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [result, setResult] = useState<Result | null>(null);
+  // Ordre de production : jusqu'à trois colonnes (vide = ordre du fichier).
+  const [sortKeys, setSortKeys] = useState<SortKey[]>([]);
+  // Une colonne disparue (autre fichier chargé) ne trie plus rien.
+  const activeSort = useMemo(
+    () => sortKeys.filter((k) => k.column && data?.columns.includes(k.column)),
+    [sortKeys, data]
+  );
+  const order = useMemo(() => (data ? sortedRowIndexes(data.rows, activeSort) : []), [data, activeSort]);
+  const updateSortKey = (index: number, patch: Partial<SortKey>) =>
+    setSortKeys((keys) => keys.map((k, i) => (i === index ? { ...k, ...patch } : k)));
 
   const needsPhoto = zones.some((z) => z.kind === "photo");
   const firstText = zones.find((z) => z.kind === "text" && z.content);
@@ -118,7 +129,7 @@ export default function CardProduction({
     if (!data) return;
     setError(null);
     if (!(await beforeGenerate())) return;
-    const indexes = onlyPreview ? [previewIndex] : data.rows.map((_, i) => i);
+    const indexes = onlyPreview ? [previewIndex] : order;
     setProgress({ done: 0, total: indexes.length });
     const chunks: ArrayBuffer[] = [];
     const warnings: string[] = [];
@@ -164,7 +175,7 @@ export default function CardProduction({
       }
       await flush();
 
-      // Les lots en un seul PDF, dans l'ordre du fichier.
+      // Les lots en un seul PDF, dans l'ordre choisi (celui du fichier par défaut).
       const { PDFDocument } = await import("pdf-lib");
       const merged = await PDFDocument.create();
       for (const bytes of chunks) {
@@ -306,6 +317,78 @@ export default function CardProduction({
               </ul>
             </details>
           )}
+        </div>
+      )}
+
+      {data && (
+        <div className="space-y-2 border-t border-neutral-100 pt-3">
+          <span className="block text-xs font-medium text-neutral-500">
+            {needsPhoto ? "3" : "2"}. Ordre des {vocab.pages}
+          </span>
+          {sortKeys.length === 0 && <p className="text-xs text-neutral-500">Dans l&apos;ordre du fichier.</p>}
+          {sortKeys.map((key, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <span className="w-12 shrink-0 text-xs text-neutral-500">{i === 0 ? "Trier par" : "puis par"}</span>
+              <select
+                value={key.column}
+                onChange={(e) => updateSortKey(i, { column: e.target.value })}
+                disabled={busy}
+                aria-label={`Critère ${i + 1}`}
+                className="min-w-0 flex-1 rounded border border-neutral-300 px-2 py-1.5 text-sm"
+              >
+                <option value="">— Colonne —</option>
+                {data.columns.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+              <div className="flex shrink-0 overflow-hidden rounded-lg border border-neutral-300 text-xs">
+                {[false, true].map((descending) => (
+                  <button
+                    key={String(descending)}
+                    type="button"
+                    onClick={() => updateSortKey(i, { descending })}
+                    disabled={busy}
+                    title={descending ? "Décroissant (Z → A, 9 → 1)" : "Croissant (A → Z, 1 → 9)"}
+                    className={`px-2 py-1.5 ${
+                      key.descending === descending ? "bg-pico-black text-white" : "bg-white text-neutral-600 hover:bg-neutral-50"
+                    }`}
+                  >
+                    {descending ? "Z → A" : "A → Z"}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => setSortKeys((keys) => keys.filter((_, j) => j !== i))}
+                disabled={busy}
+                aria-label={`Retirer le critère ${i + 1}`}
+                className="shrink-0 rounded-lg p-1 text-neutral-400 hover:bg-red-50 hover:text-red-600"
+              >
+                <TrashIcon className="h-4 w-4" />
+              </button>
+            </div>
+          ))}
+          <div className="flex items-center justify-between gap-2 text-xs">
+            {sortKeys.length < MAX_SORT_KEYS ? (
+              <button
+                type="button"
+                onClick={() => setSortKeys((keys) => [...keys, { column: "", descending: false }])}
+                disabled={busy}
+                className="text-neutral-600 underline hover:text-pico-black"
+              >
+                {sortKeys.length === 0 ? "Trier selon une colonne" : "Ajouter un critère"}
+              </button>
+            ) : (
+              <span />
+            )}
+            {activeSort.length > 0 && data.rows.length > 0 && (
+              <span className="min-w-0 truncate text-neutral-500" title={labelOf(data.rows[order[0]], order[0])}>
+                1re : {labelOf(data.rows[order[0]], order[0])}
+              </span>
+            )}
+          </div>
         </div>
       )}
 

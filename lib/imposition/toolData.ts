@@ -91,7 +91,15 @@ export async function loadImpositionToolData() {
   const productOptions: ProductOption[] = ((products as ProductRow[]) ?? []).flatMap((p) => {
     const template = templateById.get(p.template_id);
     if (!template) return [];
-    return [{ id: p.id, name: productDisplayName(p, visualNames), templateId: p.template_id, ...pageSize(template, p.rotated) }];
+    return [
+      {
+        id: p.id,
+        name: productDisplayName(p, visualNames),
+        templateId: p.template_id,
+        bleedMm: template.bleed_mm,
+        ...pageSize(template, p.rotated),
+      },
+    ];
   });
 
   return {

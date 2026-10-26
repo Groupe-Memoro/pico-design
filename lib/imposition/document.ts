@@ -20,6 +20,10 @@ export interface DocumentImposeInput {
   duplex: boolean;
   flip: FlipEdge;
   copies: number;
+  // Ordre « assemblé » : un exemplaire, à imprimer plusieurs fois.
+  collated?: boolean;
+  // Chaque page est un carton à part (données variables).
+  eachPage?: boolean;
   cropMarks: boolean;
 }
 
@@ -114,6 +118,8 @@ export async function imposeDocumentToPdf(input: DocumentImposeInput): Promise<D
     pageCount: pages.length,
     duplex: input.duplex,
     copies: input.copies,
+    collated: input.collated,
+    eachPage: input.eachPage,
   });
   if (plan.perSheet === 0) {
     throw new Error(

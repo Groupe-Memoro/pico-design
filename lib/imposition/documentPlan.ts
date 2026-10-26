@@ -17,6 +17,18 @@
 // on pose la pile de la pose 2 sous celle de la pose 1, et ainsi de suite : le
 // tout est dans l'ordre, exemplaire après exemplaire. Le PDF s'imprime donc en
 // UN seul exemplaire : les copies du document y sont déjà.
+//
+// Ordre « assemblé » (collated) : le PDF ne contient qu'UN jeu de feuilles —
+// un exemplaire, page 1 à la fin, pose après pose et feuille après feuille —
+// à imprimer autant de fois qu'il le faut. Si un exemplaire tient plusieurs
+// fois sur une feuille, le jeu en contient plusieurs (moins de tirages).
+//
+// « Cartons » (eachPage) : les pages ne forment pas un exemplaire, chacune est
+// une pièce à part (cartes de souhait à données variables : un nom par page).
+// Chaque carton est répété `copies` fois, ses exemplaires à la suite ; le PDF
+// contient tout et s'imprime une fois. « Assemblé » place alors les cartons
+// feuille après feuille, « couper et empiler » les garde dans l'ordre une fois
+// les piles de poses posées l'une sous l'autre.
 
 import { computeLayout, type Layout } from "./layout";
 
@@ -35,13 +47,23 @@ export interface DocumentPlanInput {
   pageCount: number;
   duplex: boolean;
   copies: number;
+  // Ordre « assemblé » plutôt que « couper et empiler ».
+  collated?: boolean;
+  // Chaque page (ou paire en recto-verso) est un carton à part.
+  eachPage?: boolean;
 }
 
 export interface DocumentPlan {
   layout: Layout;
-  // Feuillets d'un exemplaire, et au total (tous exemplaires).
+  collated: boolean;
+  eachPage: boolean;
+  // Feuillets d'un exemplaire, et au total dans le PDF.
   leavesPerCopy: number;
   totalLeaves: number;
+  // Exemplaires contenus dans le PDF, et nombre de fois qu'il faut l'imprimer
+  // (1 en « couper et empiler »).
+  copiesPerSet: number;
+  prints: number;
   // Poses par feuille, et feuilles d'impression nécessaires.
   perSheet: number;
   sheets: number;
@@ -70,22 +92,39 @@ export function planDocument(input: DocumentPlanInput): DocumentPlan {
     // Autant de pages que possible, dans le sens qui en met le plus.
     orientation: "auto",
   });
+  return planDocumentOn(layout, input);
+}
+
+// Même plan sur une grille donnée : celle d'un job Duplo ou d'un profil
+// Graphtec, quand le document passe à la découpeuse plutôt qu'au massicot.
+export function planDocumentOn(
+  layout: Layout,
+  input: Pick<DocumentPlanInput, "pageCount" | "duplex" | "copies" | "collated" | "eachPage">
+): DocumentPlan {
   const pageCount = Math.max(0, Math.floor(input.pageCount));
   const copies = Math.max(1, Math.floor(input.copies));
   const leavesPerCopy = input.duplex ? Math.ceil(pageCount / 2) : pageCount;
-  const totalLeaves = leavesPerCopy * copies;
   const perSheet = layout.cells.length;
+  const collated = input.collated === true;
+  const eachPage = input.eachPage === true;
+  const copiesPerSet =
+    collated && !eachPage
+      ? Math.min(copies, Math.max(1, leavesPerCopy > 0 ? Math.floor(perSheet / leavesPerCopy) : 1))
+      : copies;
+  const prints = collated && !eachPage ? Math.ceil(copies / copiesPerSet) : 1;
+  const totalLeaves = leavesPerCopy * copiesPerSet;
   const sheets = perSheet > 0 && totalLeaves > 0 ? Math.ceil(totalLeaves / perSheet) : 0;
-  return { layout, leavesPerCopy, totalLeaves, perSheet, sheets };
+  return { layout, collated, eachPage, leavesPerCopy, totalLeaves, copiesPerSet, prints, perSheet, sheets };
 }
 
 // Le feuillet placé à la pose `slot` de la feuille `sheet` (ordre « couper et
-// empiler »), ou null si la pose reste vide (fin du dernier paquet).
+// empiler » ou « assemblé »), ou null si la pose reste vide.
 export function leafAt(plan: DocumentPlan, sheet: number, slot: number, duplex: boolean, pageCount: number): LeafPages | null {
-  const leaf = slot * plan.sheets + sheet;
+  const leaf = plan.collated ? sheet * plan.perSheet + slot : slot * plan.sheets + sheet;
   if (leaf >= plan.totalLeaves || plan.leavesPerCopy === 0) return null;
-  const copy = Math.floor(leaf / plan.leavesPerCopy);
-  const inCopy = leaf % plan.leavesPerCopy;
+  // Cartons : les exemplaires d'un même carton se suivent.
+  const copy = plan.eachPage ? leaf % plan.copiesPerSet : Math.floor(leaf / plan.leavesPerCopy);
+  const inCopy = plan.eachPage ? Math.floor(leaf / plan.copiesPerSet) : leaf % plan.leavesPerCopy;
   if (!duplex) return { copy, front: inCopy, back: null };
   const front = inCopy * 2;
   const back = front + 1 < pageCount ? front + 1 : null;

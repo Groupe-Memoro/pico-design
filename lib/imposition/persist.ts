@@ -42,6 +42,9 @@ function parseConfigBase(raw: unknown): Omit<ImpositionConfig, "sources"> {
             gutterMm: num(doc.gutterMm),
             bleedMm: num(doc.bleedMm),
             duplex: doc.duplex === true,
+            collated: doc.collated === true,
+            eachPage: doc.eachPage === true,
+            cutting: doc.cutting === "machine" ? "machine" : "guillotine",
             cropMarks: doc.cropMarks !== false,
           }
         : undefined,

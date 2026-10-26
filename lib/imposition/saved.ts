@@ -31,6 +31,13 @@ export interface DocumentSettings {
   gutterMm: number;
   bleedMm: number;
   duplex: boolean;
+  // Ordre « assemblé » (un exemplaire à imprimer N fois) ; absent = « couper et empiler ».
+  collated?: boolean;
+  // Chaque page est un carton à part (données variables) ; absent = document.
+  eachPage?: boolean;
+  // Découpe : au massicot (traits de coupe), ou à la découpeuse de la
+  // configuration (Duplo ou Graphtec, sa grille et ses marques). Absent = massicot.
+  cutting?: "guillotine" | "machine";
   cropMarks: boolean;
 }
 
