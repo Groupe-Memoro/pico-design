@@ -1,6 +1,8 @@
 // Types partagés avec le schéma Supabase (voir supabase/migrations/0001_init.sql).
 // À régénérer plus précisément plus tard avec `supabase gen types typescript`.
 
+import type { UserGuide } from "@/lib/variableData/snap";
+
 export type LogoHAlign = "left" | "center" | "right";
 export type LogoVAlign = "top" | "bottom";
 
@@ -165,6 +167,9 @@ export interface Theme {
   // Zones de texte libres (voir lib/themeText.ts et la migration 0076) : le
   // client y écrit ce qu'il veut, dans la police et la couleur fixées ici.
   text_zones?: ThemeTextZone[];
+  // Repères de l'éditeur (voir la migration 0083), en mm sur la page fond
+  // perdu compris. Absents avant la migration.
+  guides?: UserGuide[];
   created_at: string;
   created_by: string | null;
 }

@@ -5,7 +5,8 @@ import type { Template, ThemeSlot, ThemeSlotShape, ThemeTextZone } from "@/lib/t
 import ThemeTextOverlay from "@/components/ThemeTextOverlay";
 import { MAX_THEME_TEXT_ZONES, THEME_TEXT_ALIGNS, THEME_TEXT_VERTICAL_ALIGNS, newThemeTextZone } from "@/lib/themeText";
 import type { ThemeWithOverlayUrl } from "@/components/ThemesTable";
-import { CopyIcon, SpinnerIcon } from "@/components/icons";
+import { CopyIcon, SpinnerIcon, TrashIcon } from "@/components/icons";
+import { snapAxis, type UserGuide } from "@/lib/variableData/snap";
 import FileDropZone from "@/components/FileDropZone";
 import {
   MAX_POINTS,
@@ -25,6 +26,8 @@ import { templateOptionLabel } from "@/lib/templateLabel";
 import FontPicker from "@/components/FontPicker";
 
 const MIN_RATIO = 0.05;
+// Distance (px à l'écran) sous laquelle un cadre s'aimante à un repère.
+const SNAP_PX = 6;
 
 // Emplacement par défaut d'un nouveau slot — carré (même taille physique en
 // largeur et en hauteur, pas juste widthRatio === heightRatio : ces deux
@@ -103,6 +106,18 @@ export default function ThemeForm({
   const template = templates.find((t) => t.id === templateId) ?? null;
   const pageAspectRatio = template ? (template.width_mm + template.bleed_mm * 2) / (template.height_mm + template.bleed_mm * 2) : 1;
   const [slots, setSlots] = useState<ThemeSlot[]>(() => theme?.slots ?? [defaultSlot(0, pageAspectRatio)]);
+  // Page du modèle en mm, fond perdu compris : les repères s'y mesurent.
+  const pageW = template ? template.width_mm + template.bleed_mm * 2 : 1;
+  const pageH = template ? template.height_mm + template.bleed_mm * 2 : 1;
+  // Repères (voir lib/variableData/snap.ts) : lignes posées par l'utilisateur,
+  // en mm ; avec le magnétisme, les cadres s'y collent, comme à la coupe, à
+  // la marge de sécurité, aux plis, au centre et aux autres cadres.
+  const [userGuides, setUserGuides] = useState<UserGuide[]>(() => theme?.guides ?? []);
+  const [snapOn, setSnapOn] = useState(true);
+  const [showGuides, setShowGuides] = useState(true);
+  // Ligne où un cadre s'aimante pendant le glisser (ratios de la page).
+  const [snapLines, setSnapLines] = useState<{ v: number | null; h: number | null }>({ v: null, h: null });
+  const guideDragRef = useRef<string | null>(null);
   // Zones de texte libres (voir lib/themeText.ts) : le client y écrit ce
   // qu'il veut ; la zone ouverte dans le panneau est encadrée sur l'aperçu.
   const [textZones, setTextZones] = useState<ThemeTextZone[]>(() => theme?.text_zones ?? []);
@@ -197,6 +212,81 @@ export default function ThemeForm({
     return Math.round(angle);
   }
 
+  // Lignes où un cadre peut s'aimanter, en ratios de la page : bords et
+  // centre, coupe, marge de sécurité, plis, repères, et les bords et centres
+  // des autres cadres non tournés.
+  function snapTargets(except: { slot?: number; zone?: number }): { v: number[]; h: number[] } {
+    const v = [0, 0.5, 1, ...userGuides.filter((g) => g.axis === "v").map((g) => g.pos / pageW)];
+    const h = [0, 0.5, 1, ...userGuides.filter((g) => g.axis === "h").map((g) => g.pos / pageH)];
+    if (template) {
+      const b = template.bleed_mm;
+      v.push(b / pageW, 1 - b / pageW, (b + template.safety_margin_x_mm) / pageW, 1 - (b + template.safety_margin_x_mm) / pageW);
+      h.push(b / pageH, 1 - b / pageH, (b + template.safety_margin_y_mm) / pageH, 1 - (b + template.safety_margin_y_mm) / pageH);
+      for (const f of template.fold_marks_vertical_mm ?? []) v.push((b + f) / pageW);
+      for (const f of template.fold_marks_horizontal_mm ?? []) h.push((b + f) / pageH);
+    }
+    const frames = [
+      ...slots.filter((_, i) => i !== except.slot),
+      ...textZones.filter((_, i) => i !== except.zone),
+    ].filter((f) => !f.rotationDeg);
+    for (const f of frames) {
+      v.push(f.positionX - f.widthRatio / 2, f.positionX, f.positionX + f.widthRatio / 2);
+      h.push(f.positionY - f.heightRatio / 2, f.positionY, f.positionY + f.heightRatio / 2);
+    }
+    return { v, h };
+  }
+
+  // Centre d'un cadre qu'on déplace, collé à la ligne la plus proche (bords
+  // et centre pour un cadre droit, le centre seul s'il est tourné).
+  function snapCenter(
+    frame: { positionX: number; positionY: number; widthRatio: number; heightRatio: number; rotationDeg?: number },
+    except: { slot?: number; zone?: number },
+    noSnap: boolean
+  ): { positionX: number; positionY: number } {
+    const { positionX: x, positionY: y } = frame;
+    if (!snapOn || noSnap || boxSize.width === 0) {
+      setSnapLines({ v: null, h: null });
+      return { positionX: x, positionY: y };
+    }
+    const t = snapTargets(except);
+    const halfW = frame.rotationDeg ? 0 : frame.widthRatio / 2;
+    const halfH = frame.rotationDeg ? 0 : frame.heightRatio / 2;
+    const sx = snapAxis([x - halfW, x, x + halfW], t.v, SNAP_PX / boxSize.width);
+    const sy = snapAxis([y - halfH, y, y + halfH], t.h, SNAP_PX / boxSize.height);
+    setSnapLines({ v: sx?.line ?? null, h: sy?.line ?? null });
+    return { positionX: x + (sx?.delta ?? 0), positionY: y + (sy?.delta ?? 0) };
+  }
+
+  const roundMm = (v: number) => Math.round(v * 10) / 10;
+  function addGuide(axis: "v" | "h") {
+    const guide: UserGuide = { id: `guide-${Date.now().toString(36)}`, axis, pos: roundMm(axis === "v" ? pageW / 2 : pageH / 2) };
+    setUserGuides((all) => [...all, guide]);
+  }
+  function updateGuide(id: string, pos: number) {
+    setUserGuides((all) =>
+      all.map((g) => (g.id === id ? { ...g, pos: roundMm(Math.min(g.axis === "v" ? pageW : pageH, Math.max(0, pos))) } : g))
+    );
+  }
+  function removeGuide(id: string) {
+    setUserGuides((all) => all.filter((g) => g.id !== id));
+  }
+  // Glisser un repère sur l'aperçu.
+  function beginGuideDrag(e: React.PointerEvent<HTMLDivElement>, id: string) {
+    e.stopPropagation();
+    guideDragRef.current = id;
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }
+  function handleGuideDragMove(e: React.PointerEvent<HTMLDivElement>) {
+    const id = guideDragRef.current;
+    const rect = previewBoxRef.current?.getBoundingClientRect();
+    const guide = userGuides.find((g) => g.id === id);
+    if (!guide || !rect || rect.width === 0) return;
+    updateGuide(
+      guide.id,
+      guide.axis === "v" ? ((e.clientX - rect.left) / rect.width) * pageW : ((e.clientY - rect.top) / rect.height) * pageH
+    );
+  }
+
   function updateSlot(index: number, patch: Partial<ThemeSlot>) {
     setSlots((prev) => prev.map((s, i) => (i === index ? clampSlot({ ...s, ...patch }) : s)));
   }
@@ -230,7 +320,15 @@ export default function ThemeForm({
       const y = Math.min(1, Math.max(0, start.y + dy / d.startSlot.heightRatio));
       updateSlot(d.index, { points: points.map((p, i) => (i === d.pointIndex ? { x, y } : p)) });
     } else if (d.mode === "move") {
-      updateSlot(d.index, { positionX: d.startSlot.positionX + dx, positionY: d.startSlot.positionY + dy });
+      // Alt : déplacer sans magnétisme.
+      updateSlot(
+        d.index,
+        snapCenter(
+          { ...d.startSlot, positionX: d.startSlot.positionX + dx, positionY: d.startSlot.positionY + dy },
+          { slot: d.index },
+          e.altKey
+        )
+      );
     } else {
       updateSlot(d.index, {
         widthRatio: d.startSlot.widthRatio + dx * 2,
@@ -241,6 +339,7 @@ export default function ThemeForm({
 
   function endDrag() {
     dragRef.current = null;
+    setSnapLines({ v: null, h: null });
   }
 
   // Zones de texte : même glisser que les emplacements (déplacer, poignée de
@@ -283,7 +382,14 @@ export default function ThemeForm({
     const rawX = e.clientX - d.startX;
     const rawY = e.clientY - d.startY;
     if (d.mode === "move") {
-      updateZone(d.index, { positionX: d.start.positionX + rawX / boxSize.width, positionY: d.start.positionY + rawY / boxSize.height });
+      updateZone(
+        d.index,
+        snapCenter(
+          { ...d.start, positionX: d.start.positionX + rawX / boxSize.width, positionY: d.start.positionY + rawY / boxSize.height },
+          { zone: d.index },
+          e.altKey
+        )
+      );
       return;
     }
     // Coin bas-droit : le coin opposé reste en place, dans le repère de la
@@ -302,6 +408,7 @@ export default function ThemeForm({
 
   function endZoneDrag() {
     zoneDragRef.current = null;
+    setSnapLines({ v: null, h: null });
   }
 
   function addZone() {
@@ -491,6 +598,9 @@ export default function ThemeForm({
     formData.append("name", name);
     formData.append("slots", JSON.stringify(slots));
     formData.append("textZones", JSON.stringify(textZones));
+    // Envoyés seulement s'il y en a (ou s'il y en avait) : un thème reste
+    // enregistrable avant la migration 0083.
+    if (userGuides.length > 0 || (theme?.guides?.length ?? 0) > 0) formData.append("guides", JSON.stringify(userGuides));
     if (overlayFile) formData.append("overlay", overlayFile);
     if (backgroundFile) formData.append("background", backgroundFile);
     else if (removeBackground) formData.append("removeBackground", "true");
@@ -866,6 +976,71 @@ export default function ThemeForm({
           e.target.value = "";
         }}
       />
+      {template && (
+        <div className="space-y-2 rounded-lg border border-neutral-200 p-3">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm font-medium">Repères</span>
+            <span className="flex items-center gap-3 text-xs text-neutral-600">
+              <label className="flex items-center gap-1.5">
+                <input type="checkbox" checked={showGuides} onChange={(e) => setShowGuides(e.target.checked)} />
+                Afficher
+              </label>
+              <label className="flex items-center gap-1.5">
+                <input type="checkbox" checked={snapOn} onChange={(e) => setSnapOn(e.target.checked)} />
+                Magnétisme
+              </label>
+            </span>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => addGuide("v")}
+              className="flex-1 rounded-lg border border-neutral-300 px-2 py-1.5 text-xs text-neutral-700 hover:bg-neutral-50"
+            >
+              + Vertical
+            </button>
+            <button
+              type="button"
+              onClick={() => addGuide("h")}
+              className="flex-1 rounded-lg border border-neutral-300 px-2 py-1.5 text-xs text-neutral-700 hover:bg-neutral-50"
+            >
+              + Horizontal
+            </button>
+          </div>
+          {userGuides.length > 0 && (
+            <ul className="space-y-1">
+              {userGuides.map((g) => (
+                <li key={g.id} className="flex items-center gap-2 text-xs text-neutral-600">
+                  <span className="w-20">{g.axis === "v" ? "Vertical, X" : "Horizontal, Y"}</span>
+                  <input
+                    type="number"
+                    step={0.1}
+                    value={g.pos}
+                    onChange={(e) => updateGuide(g.id, Number(e.target.value) || 0)}
+                    className="w-20 rounded border border-neutral-300 px-2 py-1 text-sm"
+                  />
+                  <span>mm</span>
+                  <button
+                    type="button"
+                    onClick={() => removeGuide(g.id)}
+                    aria-label="Retirer le repère"
+                    className="ml-auto rounded-lg p-1 text-neutral-400 hover:bg-red-50 hover:text-red-600"
+                  >
+                    <TrashIcon className="h-3.5 w-3.5" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="text-xs text-neutral-500">
+            Glisse un repère sur l&apos;aperçu pour le placer (mesuré depuis le coin haut-gauche, fond perdu compris).
+            Avec le magnétisme, les cases et les zones de texte s&apos;aimantent aux repères, au centre, à la coupe
+            (rouge), à la marge de sécurité (vert), aux plis (bleu) et entre elles ; Alt pour déplacer sans aimant.
+            Les repères ne sont jamais imprimés.
+          </p>
+        </div>
+      )}
+
       {error && <p className="text-sm text-red-600">{error}</p>}
 
         <div className="flex justify-end gap-3 pt-2">
@@ -1105,6 +1280,64 @@ export default function ThemeForm({
                 />
               </div>
             ))}
+            {/* Repères du modèle (coupe, marge de sécurité, plis) et ligne
+                d'aimantation : visibles ici seulement, jamais imprimés. */}
+            {template && (
+              <svg
+                className="pointer-events-none absolute inset-0 h-full w-full"
+                viewBox={`0 0 ${pageW} ${pageH}`}
+                preserveAspectRatio="none"
+              >
+                {showGuides && (() => {
+                  const b = template.bleed_mm;
+                  const sx = b + template.safety_margin_x_mm;
+                  const sy = b + template.safety_margin_y_mm;
+                  return (
+                    <>
+                      {b > 0 && (
+                        <rect x={b} y={b} width={pageW - 2 * b} height={pageH - 2 * b} fill="none" stroke="#f43f5e" strokeWidth={1} vectorEffect="non-scaling-stroke" />
+                      )}
+                      {(template.safety_margin_x_mm > 0 || template.safety_margin_y_mm > 0) && (
+                        <rect x={sx} y={sy} width={pageW - 2 * sx} height={pageH - 2 * sy} fill="none" stroke="#16a34a" strokeWidth={1} strokeDasharray="4 3" vectorEffect="non-scaling-stroke" />
+                      )}
+                      {(template.fold_marks_vertical_mm ?? []).map((f) => (
+                        <line key={`fv-${f}`} x1={b + f} x2={b + f} y1={0} y2={pageH} stroke="#2563eb" strokeWidth={1} strokeDasharray="4 3" vectorEffect="non-scaling-stroke" />
+                      ))}
+                      {(template.fold_marks_horizontal_mm ?? []).map((f) => (
+                        <line key={`fh-${f}`} x1={0} x2={pageW} y1={b + f} y2={b + f} stroke="#2563eb" strokeWidth={1} strokeDasharray="4 3" vectorEffect="non-scaling-stroke" />
+                      ))}
+                    </>
+                  );
+                })()}
+                {snapLines.v !== null && (
+                  <line x1={snapLines.v * pageW} x2={snapLines.v * pageW} y1={0} y2={pageH} stroke="#d946ef" strokeWidth={1} vectorEffect="non-scaling-stroke" />
+                )}
+                {snapLines.h !== null && (
+                  <line x1={0} x2={pageW} y1={snapLines.h * pageH} y2={snapLines.h * pageH} stroke="#d946ef" strokeWidth={1} vectorEffect="non-scaling-stroke" />
+                )}
+              </svg>
+            )}
+            {/* Repères posés : une ligne fine, et une bande invisible plus
+                large pour les saisir et les glisser. */}
+            {showGuides &&
+              userGuides.map((g) => {
+                const at = `${(g.pos / (g.axis === "v" ? pageW : pageH)) * 100}%`;
+                return (
+                  <div
+                    key={g.id}
+                    onPointerDown={(e) => beginGuideDrag(e, g.id)}
+                    onPointerMove={handleGuideDragMove}
+                    onPointerUp={() => (guideDragRef.current = null)}
+                    title={`${g.axis === "v" ? "X" : "Y"} = ${String(g.pos).replace(".", ",")} mm`}
+                    className={`absolute flex justify-center ${
+                      g.axis === "v" ? "inset-y-0 w-2 -translate-x-1/2 cursor-ew-resize" : "inset-x-0 h-2 -translate-y-1/2 cursor-ns-resize flex-col"
+                    }`}
+                    style={g.axis === "v" ? { left: at } : { top: at }}
+                  >
+                    <div className={g.axis === "v" ? "h-full w-px bg-cyan-500" : "h-px w-full bg-cyan-500"} />
+                  </div>
+                );
+              })}
             {/* Tracé en cours : une couche au-dessus de tout, qui reçoit les
                 clics (les emplacements dessous ne bougent pas pendant ce
                 temps). */}

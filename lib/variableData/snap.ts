@@ -33,6 +33,18 @@ export function parseUserGuides(raw: unknown, pageW: number, pageH: number): Use
   return guides;
 }
 
+// Repères d'un thème, reçus en JSON (champ de formulaire). La page n'est pas
+// connue ici (le modèle peut changer) : seules les valeurs absurdes sont
+// bornées, l'éditeur garde chaque repère dans la page.
+export function parseThemeGuidesField(raw: FormDataEntryValue | null): UserGuide[] | null {
+  if (typeof raw !== "string") return null;
+  try {
+    return parseUserGuides(JSON.parse(raw), 2000, 2000);
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Décalage qui colle l'un des `edges` (bords et centre d'une zone, le long
  * d'un axe) à la cible la plus proche, si elle est à moins de `threshold`.

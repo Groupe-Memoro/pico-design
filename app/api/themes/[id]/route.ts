@@ -4,6 +4,7 @@ import { parseThemeSlotsField } from "@/lib/pdf/theme";
 import { MAX_THEME_SLOTS } from "@/lib/themeShapes";
 import { storageFileName } from "@/lib/storageName";
 import { parseTextZonesField } from "@/lib/themeText";
+import { parseThemeGuidesField } from "@/lib/variableData/snap";
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   const supabase = createServerSupabaseClient();
@@ -33,6 +34,12 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     const textZones = parseTextZonesField(formData.get("textZones"));
     if (!textZones) return NextResponse.json({ error: "Zones de texte invalides." }, { status: 400 });
     update.text_zones = textZones;
+  }
+
+  if (formData.has("guides")) {
+    const guides = parseThemeGuidesField(formData.get("guides"));
+    if (!guides) return NextResponse.json({ error: "Repères invalides." }, { status: 400 });
+    update.guides = guides;
   }
 
   const overlayFile = formData.get("overlay");

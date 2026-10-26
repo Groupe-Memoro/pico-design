@@ -5,6 +5,7 @@ import { parseThemeSlotsField } from "@/lib/pdf/theme";
 import { MAX_THEME_SLOTS } from "@/lib/themeShapes";
 import { storageFileName } from "@/lib/storageName";
 import { parseTextZonesField } from "@/lib/themeText";
+import { parseThemeGuidesField } from "@/lib/variableData/snap";
 
 /**
  * CRUD des Thèmes (voir supabase/migrations/0046_themes.sql et
@@ -43,6 +44,7 @@ export async function POST(request: Request) {
   const backgroundFile = formData.get("background");
   const slots = parseThemeSlotsField(formData.get("slots"));
   const textZones = parseTextZonesField(formData.get("textZones")) ?? [];
+  const guides = parseThemeGuidesField(formData.get("guides")) ?? [];
 
   if (typeof templateId !== "string" || !templateId) {
     return NextResponse.json({ error: "Modèle manquant." }, { status: 400 });
@@ -95,6 +97,8 @@ export async function POST(request: Request) {
       slots,
       // Écrite seulement s'il y en a (voir 0076_theme_text_zones.sql).
       ...(textZones.length > 0 ? { text_zones: textZones } : {}),
+      // Idem pour les repères (voir 0083_theme_guides.sql).
+      ...(guides.length > 0 ? { guides } : {}),
       created_by: user.id,
     })
     .select()
