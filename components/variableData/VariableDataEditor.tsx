@@ -33,6 +33,7 @@ import { parseDataFile } from "@/lib/studentCards/dataFile";
 import { measureInk } from "@/lib/design/inkMeasure";
 import { alignBoxes, boundsOf, edgesX, edgesY, snapAxis, type AlignMode, type Box, type UserGuide } from "@/lib/variableData/snap";
 import CardProduction from "@/components/studentCards/CardProduction";
+import { longestRowIndex } from "@/lib/studentCards/sort";
 
 const MIN_ZONE_MM = 1.5;
 const MAX_ZOOM = 8;
@@ -1129,7 +1130,7 @@ export default function VariableDataEditor({
             par 2 mm). Suppr : retirer.
           </p>
           {data && data.rows.length > 0 && (
-            <div className="flex items-center justify-center gap-2 text-sm text-neutral-600">
+            <div className="flex flex-wrap items-center justify-center gap-2 text-sm text-neutral-600">
               <button
                 type="button"
                 onClick={() => setPreviewIndex((i) => Math.max(0, i - 1))}
@@ -1151,6 +1152,23 @@ export default function VariableDataEditor({
               >
                 ›
               </button>
+              {/* Vérifier le cas le plus long : nom, prénom, programme… */}
+              <select
+                value=""
+                onChange={(e) => {
+                  const index = longestRowIndex(data.rows, e.target.value);
+                  if (index >= 0) setPreviewIndex(index);
+                }}
+                className="rounded-lg border border-neutral-300 px-2 py-1 text-sm"
+                aria-label="Aller à la valeur la plus longue d'une colonne"
+              >
+                <option value="">Le plus long…</option>
+                {data.columns.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
             </div>
           )}
         </div>

@@ -35,3 +35,19 @@ export function sortedRowIndexes(rows: Record<string, string>[], keys: SortKey[]
     return a - b;
   });
 }
+
+// La ligne dont la valeur de la colonne est la plus longue (la première en
+// cas d'égalité), pour vérifier qu'elle tient dans sa zone ; -1 si toutes
+// sont vides.
+export function longestRowIndex(rows: Record<string, string>[], column: string): number {
+  let best = -1;
+  let bestLength = 0;
+  rows.forEach((row, i) => {
+    const length = (row[column] ?? "").trim().length;
+    if (length > bestLength) {
+      best = i;
+      bestLength = length;
+    }
+  });
+  return best;
+}
