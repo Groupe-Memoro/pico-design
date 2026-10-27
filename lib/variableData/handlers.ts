@@ -269,6 +269,66 @@ export async function getVariableDataBackground(id: string, side: string, cfg: V
   }
 }
 
+// Fonds et images fixes des zones (seulement celles du document), pour le rendu.
+async function loadRenderFiles(doc: VariableDataRow, cfg: VariableDataConfig, withBack: boolean) {
+  const storage = createAdminSupabaseClient().storage.from(cfg.bucket);
+  const load = async (path: string | null) => {
+    const file = path ? (await storage.download(path)).data : null;
+    return file ? new Uint8Array(await file.arrayBuffer()) : null;
+  };
+  const [front, back] = await Promise.all([load(doc.front_path), load(withBack ? doc.back_path : null)]);
+  const images = new Map<string, Buffer>();
+  for (const zone of doc.zones) {
+    if (zone.kind !== "image" || !zone.imagePath || !zone.imagePath.startsWith(`${doc.id}/images/`)) continue;
+    const bytes = await load(zone.imagePath);
+    if (bytes) images.set(zone.imagePath, Buffer.from(bytes));
+  }
+  return { front, back, images };
+}
+
+// Photo de remplacement des vignettes : une silhouette grise.
+const PLACEHOLDER_PHOTO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 300 400">
+<rect width="300" height="400" fill="#d4d4d8"/>
+<circle cx="150" cy="150" r="70" fill="#a1a1aa"/>
+<path d="M30 400c0-80 54-140 120-140s120 60 120 140z" fill="#a1a1aa"/>
+</svg>`;
+const THUMBNAIL_WIDTH_PX = 480;
+
+/**
+ * Vignette réaliste du recto pour la liste : la carte rendue comme à la
+ * production, avec la ligne d'exemple (dernier fichier chargé) et une
+ * silhouette à la place de la photo. L'URL porte la date de mise à jour :
+ * le navigateur peut la garder.
+ */
+export async function thumbnailVariableData(id: string, cfg: VariableDataConfig) {
+  const { supabase, user } = await session();
+  if (!user) return json({ error: "Non authentifié." }, 401);
+  const doc = await loadRow(supabase, cfg, id);
+  if (!doc) return json({ error: "Introuvable." }, 404);
+  const page = await cfg.pageSize(doc, supabase);
+  if (!page) return json({ error: "Le modèle de ce gabarit est introuvable." }, 404);
+  try {
+    const { front, images } = await loadRenderFiles(doc, cfg, false);
+    const photo = await sharp(Buffer.from(PLACEHOLDER_PHOTO_SVG)).jpeg().toBuffer();
+    const { pdf } = await renderStudentCards(
+      { width_mm: page.width, height_mm: page.height, two_sided: false, zones: doc.zones },
+      { front, back: null },
+      [{ row: doc.sample?.row ?? {}, photo, label: "Exemple" }],
+      images
+    );
+    // Échelle du rendu : environ deux fois la largeur affichée, puis réduit.
+    const scale = Math.max(1, (THUMBNAIL_WIDTH_PX * 2) / ((page.width / 25.4) * 72));
+    const [png] = await pdfToPng(pdf, { pagesToProcess: [1], viewportScale: scale });
+    if (!png?.content) throw new Error();
+    const out = await sharp(png.content).resize({ width: THUMBNAIL_WIDTH_PX, withoutEnlargement: true }).png().toBuffer();
+    return new NextResponse(new Uint8Array(out), {
+      headers: { "Content-Type": "image/png", "Cache-Control": "private, max-age=604800" },
+    });
+  } catch {
+    return json({ error: "Vignette impossible." }, 422);
+  }
+}
+
 /**
  * Un lot de pages en PDF. Le navigateur envoie les lignes par lots (champ
  * `cards` : [{ row, photo, label }], `photo` nommant le fichier joint) et
@@ -303,20 +363,8 @@ export async function renderVariableData(request: Request, id: string, cfg: Vari
     });
   }
 
-  const storage = createAdminSupabaseClient().storage.from(cfg.bucket);
-  const load = async (path: string | null) => {
-    const file = path ? (await storage.download(path)).data : null;
-    return file ? new Uint8Array(await file.arrayBuffer()) : null;
-  };
   try {
-    const [front, back] = await Promise.all([load(doc.front_path), load(doc.two_sided ? doc.back_path : null)]);
-    // Images fixes des zones (seulement celles du document).
-    const images = new Map<string, Buffer>();
-    for (const zone of doc.zones) {
-      if (zone.kind !== "image" || !zone.imagePath || !zone.imagePath.startsWith(`${doc.id}/images/`)) continue;
-      const bytes = await load(zone.imagePath);
-      if (bytes) images.set(zone.imagePath, Buffer.from(bytes));
-    }
+    const { front, back, images } = await loadRenderFiles(doc, cfg, doc.two_sided);
     const { pdf, warnings } = await renderStudentCards(
       { width_mm: page.width, height_mm: page.height, two_sided: doc.two_sided, zones: doc.zones },
       { front, back },

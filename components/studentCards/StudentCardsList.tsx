@@ -11,6 +11,34 @@ import { CARD_FORMATS, type StudentCardTemplate } from "@/lib/studentCards/types
 const formatLabel = (w: number, h: number) =>
   `${String(Number(w)).replace(".", ",")} × ${String(Number(h)).replace(".", ",")} mm`;
 
+// Vignette du recto, rendue comme à la production avec l'élève d'exemple
+// (voir thumbnailVariableData). L'URL change à chaque enregistrement.
+function CardThumbnail({ template: t }: { template: StudentCardTemplate }) {
+  const [failed, setFailed] = useState(false);
+  const W = Number(t.width_mm);
+  const H = Number(t.height_mm);
+  const empty = !t.front_path && t.zones.length === 0;
+  return (
+    <div
+      className="flex h-16 shrink-0 items-center justify-center overflow-hidden rounded-md bg-neutral-100 shadow-sm ring-1 ring-neutral-200"
+      style={{ aspectRatio: `${W} / ${H}` }}
+    >
+      {empty || failed ? (
+        <span className="px-1 text-center text-[10px] leading-tight text-neutral-400">Aucun aperçu</span>
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={`/api/student-cards/${t.id}/thumbnail?v=${encodeURIComponent(t.updated_at)}`}
+          alt=""
+          loading="lazy"
+          onError={() => setFailed(true)}
+          className="h-full w-full object-cover"
+        />
+      )}
+    </div>
+  );
+}
+
 // Nouveau modèle : nom, école, format et recto-verso. Le reste se règle dans l'éditeur.
 function NewCardForm({ schools, onCancel }: { schools: string[]; onCancel: () => void }) {
   const router = useRouter();
@@ -201,6 +229,9 @@ export default function StudentCardsList({ templates }: { templates: StudentCard
                       key={t.id}
                       className={`flex items-center justify-between gap-3 px-4 py-3 ${deletingId === t.id ? "opacity-40" : ""}`}
                     >
+                      <Link href={`/cartes-etudiantes/${t.id}`} className="shrink-0" tabIndex={-1}>
+                        <CardThumbnail template={t} />
+                      </Link>
                       <Link href={`/cartes-etudiantes/${t.id}`} className="min-w-0 flex-1">
                         <p className="truncate font-medium text-pico-black hover:underline">{t.name}</p>
                         <p className="text-xs text-neutral-500">
