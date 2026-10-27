@@ -83,7 +83,7 @@ export default function TemplateRow({
       <td className="p-4">
         <input type="checkbox" checked={selected} onChange={onToggleSelect} />
       </td>
-      <td className="p-4 font-semibold text-pico-black">{template.name}</td>
+      <td className="p-4 font-semibold text-text">{template.name}</td>
       <td className="p-4 text-neutral-500">
         {template.two_sided ? "Recto-verso" : "Recto"}
       </td>
@@ -99,7 +99,7 @@ export default function TemplateRow({
             title={`Profil d'imposition : ${impositionProfileName}`}
             aria-label={`Profil d'imposition : ${impositionProfileName}`}
           >
-            <LinkIcon className="h-4 w-4 text-green-600" />
+            <LinkIcon className="h-4 w-4 text-success-strong" />
           </span>
         ) : (
           <span className="text-neutral-300" aria-label="Aucun profil d'imposition">—</span>
@@ -111,7 +111,7 @@ export default function TemplateRow({
             onClick={() => onPreview(template)}
             title="Visualiser"
             aria-label="Visualiser"
-            className="inline-flex rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-pico-black"
+            className="icon-btn"
           >
             <EyeIcon className="h-4 w-4" />
           </button>
@@ -119,7 +119,7 @@ export default function TemplateRow({
             onClick={() => onManageMockups(template)}
             title="Mockups"
             aria-label="Mockups"
-            className="inline-flex rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-pico-black"
+            className="icon-btn"
           >
             {/* Même icône que le mockup d'un produit (ProductTableRow) : un
                 mockup se reconnaît partout au même symbole. */}
@@ -130,16 +130,16 @@ export default function TemplateRow({
             onClick={handleCopyId}
             title={copiedId ? "Id copié" : `Copier l'id pour Shopify (${template.id})`}
             aria-label="Copier l'id pour Shopify"
-            className="inline-flex rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-pico-black"
+            className="icon-btn"
           >
-            {copiedId ? <CheckIcon className="h-4 w-4 text-green-600" /> : <ShopifyIcon className="h-4 w-4" />}
+            {copiedId ? <CheckIcon className="h-4 w-4 text-success-strong" /> : <ShopifyIcon className="h-4 w-4" />}
           </button>
           <button
             onClick={handleDuplicate}
             disabled={duplicating}
             title="Dupliquer"
             aria-label="Dupliquer"
-            className="inline-flex rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-pico-black disabled:opacity-50"
+            className="icon-btn disabled:opacity-50"
           >
             {duplicating ? <SpinnerIcon className="h-4 w-4" /> : <CopyIcon className="h-4 w-4" />}
           </button>
@@ -147,7 +147,7 @@ export default function TemplateRow({
             onClick={() => onEdit(template)}
             title="Modifier"
             aria-label="Modifier"
-            className="inline-flex rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-pico-black"
+            className="icon-btn"
           >
             <FilePenIcon className="h-4 w-4" />
           </button>
@@ -156,7 +156,7 @@ export default function TemplateRow({
             disabled={deleting}
             title="Supprimer"
             aria-label="Supprimer"
-            className="inline-flex rounded-lg p-1.5 text-neutral-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+            className="inline-flex rounded-lg p-1.5 text-neutral-500 hover:bg-danger-subtle hover:text-danger disabled:opacity-50"
           >
             {deleting ? <SpinnerIcon className="h-4 w-4" /> : <TrashIcon className="h-4 w-4" />}
           </button>

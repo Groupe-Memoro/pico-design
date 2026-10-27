@@ -99,7 +99,7 @@ export default function TemplatesTable({
     <div>
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="flex items-center gap-2 text-page-title font-semibold text-pico-black">
+          <h1 className="flex items-center gap-2 text-page-title font-semibold text-text">
             Modèles
             <UpdatingBadge show={isPending} />
           </h1>
@@ -109,7 +109,7 @@ export default function TemplatesTable({
         </div>
         <button
           onClick={() => setModal({ mode: "create" })}
-          className="flex items-center gap-2 rounded-lg bg-pico-maroon px-4 py-2 text-sm font-medium text-white hover:bg-pico-maroon-dark"
+          className="flex items-center gap-2 btn-primary"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-4 w-4">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v14m-7-7h14" />
@@ -137,16 +137,16 @@ export default function TemplatesTable({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Rechercher (nom)..."
-            className="w-full rounded-lg border border-neutral-300 bg-white py-2 pl-9 pr-3 text-sm"
+            className="w-full rounded-lg border border-neutral-300 bg-surface py-2 pl-9 pr-3 text-sm"
           />
         </div>
         <div className="flex items-end gap-3">
           <div>
-            <label className="block text-xs font-medium text-neutral-500">Catégorie</label>
+            <label className="label">Catégorie</label>
             <select
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
-              className="mt-1 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm"
+              className="mt-1 input"
             >
               <option value="">— Toutes —</option>
               {categories.map((c) => (
@@ -175,11 +175,11 @@ export default function TemplatesTable({
       />
 
       {filtered.length === 0 ? (
-        <p className="rounded-xl border border-neutral-200 bg-white p-4 text-sm text-neutral-500">
+        <p className="card p-4 text-sm text-neutral-500">
           Aucun modèle ne correspond.
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm">
+        <div className="overflow-x-auto card shadow-sm">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-sm font-semibold text-neutral-700">
@@ -194,7 +194,7 @@ export default function TemplatesTable({
                   <button
                     type="button"
                     onClick={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}
-                    className="flex items-center gap-1 hover:text-pico-black"
+                    className="flex items-center gap-1 hover:text-text"
                   >
                     Nom <SortIcon />
                   </button>

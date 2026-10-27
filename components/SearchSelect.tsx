@@ -143,7 +143,7 @@ export default function SearchSelect({
         createPortal(
           <div
             ref={panelRef}
-            className="fixed z-[100] flex flex-col overflow-hidden rounded-xl border border-neutral-200 bg-white text-sm text-neutral-900 shadow-xl"
+            className="fixed z-[100] flex flex-col overflow-hidden card text-sm text-neutral-900 shadow-xl"
             style={{ left: position.left, top: position.top, width: position.width, maxHeight: position.maxHeight }}
             onKeyDown={onKeyDown}
           >

@@ -397,7 +397,7 @@ export default function OrdersTable({
       )}
 
       {result && (
-        <div className="mt-3 rounded-xl border border-green-300 bg-green-50 p-3 text-sm text-green-900">
+        <div className="mt-3 rounded-xl border border-success bg-success-subtle p-3 text-sm text-success-strong">
           <div className="flex items-start justify-between gap-3">
             <p className="font-medium">Mise en production : {result.batch.files.length} PDF imposé{result.batch.files.length > 1 ? "s" : ""}</p>
             <button type="button" onClick={() => setResult(null)} className="text-xs underline">
@@ -411,14 +411,14 @@ export default function OrdersTable({
                   <DownloadIcon className="h-3.5 w-3.5" />
                   {f.name}
                 </a>{" "}
-                <span className="text-green-800">
+                <span className="text-success-strong">
                   — {f.pieces} pièce{f.pieces > 1 ? "s" : ""}, {f.sheets} feuille{f.sheets > 1 ? "s" : ""}
                 </span>
               </li>
             ))}
           </ul>
           {result.skipped.length > 0 && (
-            <div className="mt-2 text-amber-800">
+            <div className="mt-2 text-warning-strong">
               <p className="font-medium">Laissés de côté :</p>
               <ul className="list-disc pl-5">
                 {result.skipped.map((s, i) => (

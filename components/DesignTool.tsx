@@ -318,7 +318,7 @@ export default function DesignTool({
       {phase === "pick" && (
         <div>
           <div className="mb-6">
-            <h1 className="text-page-title font-semibold text-pico-black">Outil Shopify</h1>
+            <h1 className="text-page-title font-semibold text-text">Outil Shopify</h1>
             <p className="text-sm text-neutral-500">
               Prépare ton design personnalisé — choisis un modèle pour commencer.
             </p>

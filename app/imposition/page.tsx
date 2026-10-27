@@ -17,14 +17,14 @@ export default async function ImpositionsPage() {
     <div>
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-page-title font-semibold text-pico-black">Imposition</h1>
+          <h1 className="text-page-title font-semibold text-text">Imposition</h1>
           <p className="text-sm text-neutral-500">
             {rows.length} imposition{rows.length > 1 ? "s" : ""} enregistrée{rows.length > 1 ? "s" : ""}.
           </p>
         </div>
         <Link
           href="/imposition/new"
-          className="flex items-center gap-2 rounded-lg bg-pico-maroon px-4 py-2 text-sm font-medium text-white hover:bg-pico-maroon-dark"
+          className="flex items-center gap-2 btn-primary"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-4 w-4">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v14m-7-7h14" />

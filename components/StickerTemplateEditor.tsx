@@ -61,7 +61,7 @@ function useTextMeasure(fontsVersion: number) {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="block text-xs font-medium text-neutral-500">{label}</span>
+      <span className="label">{label}</span>
       {children}
     </label>
   );
@@ -326,7 +326,7 @@ export default function StickerTemplateEditor({
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <Link href="/autocollants" className="text-xs text-neutral-500 underline hover:text-pico-black">
+          <Link href="/autocollants" className="text-xs text-neutral-500 underline hover:text-text">
             ← Tous les modèles
           </Link>
           <input
@@ -337,7 +337,7 @@ export default function StickerTemplateEditor({
               setDirty(true);
             }}
             aria-label="Nom du modèle"
-            className="mt-1 block w-full max-w-xl rounded-lg border border-transparent bg-transparent px-1 text-page-title font-semibold text-pico-black hover:border-neutral-300 focus:border-neutral-300"
+            className="mt-1 block w-full max-w-xl rounded-lg border border-transparent bg-transparent px-1 text-page-title font-semibold text-text hover:border-neutral-300 focus:border-neutral-300"
           />
           <p className="px-1 text-sm text-neutral-500">
             Planche {sheetLabel(W, H)}
@@ -369,7 +369,7 @@ export default function StickerTemplateEditor({
                   })
                 );
               }}
-              className="rounded-lg border border-neutral-300 bg-white px-2 py-1 text-sm"
+              className="rounded-lg border border-neutral-300 bg-surface px-2 py-1 text-sm"
             >
               <option value="">Aucun — la planche occupe toute la feuille</option>
               {cutters.map((c) => (
@@ -389,12 +389,12 @@ export default function StickerTemplateEditor({
           )}
         </div>
         <div className="flex items-center gap-3">
-          {dirty && <span className="text-xs text-amber-700">Modifications non enregistrées</span>}
+          {dirty && <span className="text-xs text-warning-strong">Modifications non enregistrées</span>}
           <button
             type="button"
             onClick={save}
             disabled={saving || !dirty}
-            className="flex items-center gap-2 rounded-lg bg-pico-maroon px-4 py-2 text-sm font-medium text-white hover:bg-pico-maroon-dark disabled:opacity-50"
+            className="flex items-center gap-2 btn-primary disabled:opacity-50"
           >
             {saving && <SpinnerIcon className="h-4 w-4" />}
             Enregistrer
@@ -403,7 +403,7 @@ export default function StickerTemplateEditor({
       </div>
 
       {message && (
-        <p className={`text-sm ${message.tone === "error" ? "text-red-600" : "text-neutral-600"}`}>{message.text}</p>
+        <p className={`text-sm ${message.tone === "error" ? "text-danger" : "text-neutral-600"}`}>{message.text}</p>
       )}
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
@@ -554,15 +554,15 @@ export default function StickerTemplateEditor({
 
         <div className="space-y-4">
           {/* Fichiers du modèle */}
-          <section className="space-y-3 rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
-            <h2 className="text-sm font-semibold text-pico-black">Fichiers du modèle</h2>
+          <section className="space-y-3 card p-4 shadow-sm">
+            <h2 className="text-sm font-semibold text-text">Fichiers du modèle</h2>
             {STICKER_ASSETS.map((asset) =>
               asset === "marks" && cutter ? (
                 // Avec un profil, ses codes servent : rien à envoyer ici.
                 <div key={asset} className="space-y-1 border-t border-neutral-100 pt-3">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-medium text-pico-black">{STICKER_ASSET_LABELS.marks}</span>
-                    <span className={`text-xs ${cutter.marks_path ? "text-green-700" : "text-amber-700"}`}>
+                    <span className="text-sm font-medium text-text">{STICKER_ASSET_LABELS.marks}</span>
+                    <span className={`text-xs ${cutter.marks_path ? "text-success-strong" : "text-warning-strong"}`}>
                       {cutter.marks_path ? "✓ du profil" : "absents du profil"}
                     </span>
                   </div>
@@ -574,8 +574,8 @@ export default function StickerTemplateEditor({
               ) : (
               <div key={asset} className="space-y-1 border-t border-neutral-100 pt-3 first:border-0 first:pt-0">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-medium text-pico-black">{STICKER_ASSET_LABELS[asset]}</span>
-                  <span className={`text-xs ${hasAsset(asset) ? "text-green-700" : "text-amber-700"}`}>
+                  <span className="text-sm font-medium text-text">{STICKER_ASSET_LABELS[asset]}</span>
+                  <span className={`text-xs ${hasAsset(asset) ? "text-success-strong" : "text-warning-strong"}`}>
                     {uploading === asset ? "Envoi…" : hasAsset(asset) ? "✓ en place" : "manquant"}
                   </span>
                 </div>
@@ -596,7 +596,7 @@ export default function StickerTemplateEditor({
                       href={`/api/stickers/${template.id}/asset/guide?download=1`}
                       title="Télécharger le gabarit"
                       aria-label="Télécharger le gabarit"
-                      className="rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-pico-black"
+                      className="icon-btn"
                     >
                       <DownloadIcon className="h-4 w-4" />
                     </a>
@@ -607,7 +607,7 @@ export default function StickerTemplateEditor({
                       onClick={() => confirm(`Retirer « ${STICKER_ASSET_LABELS[asset]} » ?`) && uploadAsset(asset, null, true)}
                       title="Retirer"
                       aria-label="Retirer"
-                      className="rounded-lg p-1.5 text-neutral-500 hover:bg-red-50 hover:text-red-600"
+                      className="rounded-lg p-1.5 text-neutral-500 hover:bg-danger-subtle hover:text-danger"
                     >
                       <TrashIcon className="h-4 w-4" />
                     </button>
@@ -619,9 +619,9 @@ export default function StickerTemplateEditor({
           </section>
 
           {/* Zone sélectionnée */}
-          <section className="space-y-3 rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
+          <section className="space-y-3 card p-4 shadow-sm">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-pico-black">
+              <h2 className="text-sm font-semibold text-text">
                 {selected ? `Zone ${zones.indexOf(selected) + 1}` : "Zones de nom"}
               </h2>
               {selected && (
@@ -631,7 +631,7 @@ export default function StickerTemplateEditor({
                     onClick={() => duplicate(selected)}
                     title="Dupliquer"
                     aria-label="Dupliquer la zone"
-                    className="rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-pico-black"
+                    className="icon-btn"
                   >
                     <CopyIcon className="h-4 w-4" />
                   </button>
@@ -640,7 +640,7 @@ export default function StickerTemplateEditor({
                     onClick={() => removeZone(selected.id)}
                     title="Supprimer"
                     aria-label="Supprimer la zone"
-                    className="rounded-lg p-1.5 text-neutral-500 hover:bg-red-50 hover:text-red-600"
+                    className="rounded-lg p-1.5 text-neutral-500 hover:bg-danger-subtle hover:text-danger"
                   >
                     <TrashIcon className="h-4 w-4" />
                   </button>
@@ -745,14 +745,14 @@ export default function StickerTemplateEditor({
           </section>
 
           {/* Préparer des planches */}
-          <section className="space-y-3 rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
-            <h2 className="text-sm font-semibold text-pico-black">Préparer des planches</h2>
+          <section className="space-y-3 card p-4 shadow-sm">
+            <h2 className="text-sm font-semibold text-text">Préparer des planches</h2>
             <textarea
               value={names}
               onChange={(e) => setNames(e.target.value)}
               rows={5}
               placeholder={"Un nom par ligne, une planche par nom\nEx. Léa Tremblay"}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+              className="w-full input"
             />
             <button
               type="button"
@@ -769,7 +769,7 @@ export default function StickerTemplateEditor({
             </button>
             {zones.length === 0 && <p className="text-xs text-neutral-500">Tracez d&apos;abord au moins une zone de nom.</p>}
             {!(cutter ? cutter.marks_path : hasAsset("marks")) && zones.length > 0 && (
-              <p className="text-xs text-amber-700">Sans fichier de codes Graphtec, la planche ne pourra pas être découpée.</p>
+              <p className="text-xs text-warning-strong">Sans fichier de codes Graphtec, la planche ne pourra pas être découpée.</p>
             )}
           </section>
         </div>
@@ -789,7 +789,7 @@ export default function StickerTemplateEditor({
             <a
               href={result.url}
               download={result.filename}
-              className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-pico-maroon px-4 py-2 text-sm font-medium text-white hover:bg-pico-maroon-dark"
+              className="flex flex-1 items-center justify-center gap-2 btn-primary"
             >
               <DownloadIcon className="h-4 w-4" />
               Télécharger le PDF
@@ -797,7 +797,7 @@ export default function StickerTemplateEditor({
             {hasAsset("guide") && (
               <a
                 href={`/api/stickers/${template.id}/asset/guide?download=1`}
-                className="flex items-center justify-center gap-2 rounded-lg border border-neutral-300 px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50"
+                className="flex items-center justify-center gap-2 btn-secondary"
               >
                 <DownloadIcon className="h-4 w-4" />
                 Gabarit de découpe

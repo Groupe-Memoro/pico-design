@@ -53,10 +53,10 @@ export default function SkuPicker({
           setQuery("");
         }}
         placeholder="— Aucun — (rechercher un SKU ou un nom...)"
-        className="mt-1 w-full rounded border border-neutral-300 px-3 py-2 text-sm"
+        className="mt-1 w-full input"
       />
       {open && (
-        <div className="absolute z-10 mt-1 max-h-60 w-full overflow-y-auto rounded-lg border border-neutral-200 bg-white shadow-lg">
+        <div className="absolute z-10 mt-1 max-h-60 w-full overflow-y-auto rounded-lg border border-neutral-200 bg-surface shadow-lg">
           <button
             type="button"
             onClick={() => select("")}
@@ -73,11 +73,11 @@ export default function SkuPicker({
               type="button"
               onClick={() => select(s.id)}
               className={`block w-full px-3 py-2 text-left text-sm hover:bg-neutral-50 ${
-                s.id === value ? "bg-pico-cream" : ""
+                s.id === value ? "bg-primary-subtle" : ""
               }`}
             >
               <span className="font-mono text-xs text-neutral-500">{s.sku}</span>
-              <span className="ml-2 text-pico-black">{s.name}</span>
+              <span className="ml-2 text-text">{s.name}</span>
             </button>
           ))}
         </div>

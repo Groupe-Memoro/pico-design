@@ -72,7 +72,7 @@ export default function UsersTable({
     <div>
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="flex items-center gap-2 text-page-title font-semibold text-pico-black">
+          <h1 className="flex items-center gap-2 text-page-title font-semibold text-text">
             Utilisateurs
             <UpdatingBadge show={isPending} />
           </h1>
@@ -82,7 +82,7 @@ export default function UsersTable({
         </div>
         <button
           onClick={() => setModal({ mode: "create" })}
-          className="flex items-center gap-2 rounded-lg bg-pico-maroon px-4 py-2 text-sm font-medium text-white hover:bg-pico-maroon-dark"
+          className="flex items-center gap-2 btn-primary"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-4 w-4">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v14m-7-7h14" />
@@ -96,16 +96,16 @@ export default function UsersTable({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Rechercher (nom, courriel)..."
-          className="w-full max-w-xs rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm"
+          className="w-full max-w-xs input"
         />
       </div>
 
       {filtered.length === 0 ? (
-        <p className="rounded-xl border border-neutral-200 bg-white p-4 text-sm text-neutral-500">
+        <p className="card p-4 text-sm text-neutral-500">
           Aucun utilisateur ne correspond.
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm">
+        <div className="overflow-x-auto card shadow-sm">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-sm font-semibold text-neutral-700">
@@ -120,7 +120,7 @@ export default function UsersTable({
                 const isSelf = u.id === currentUserId;
                 return (
                   <tr key={u.id} className="border-t border-neutral-100 hover:bg-neutral-50">
-                    <td className="p-4 font-semibold text-pico-black">
+                    <td className="p-4 font-semibold text-text">
                       {u.full_name || "—"}
                       {isSelf && <span className="ml-2 text-xs font-normal text-neutral-400">(vous)</span>}
                     </td>
@@ -132,7 +132,7 @@ export default function UsersTable({
                           onClick={() => setModal({ mode: "edit", user: u })}
                           title="Modifier"
                           aria-label="Modifier"
-                          className="inline-flex rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-pico-black"
+                          className="icon-btn"
                         >
                           <FilePenIcon className="h-4 w-4" />
                         </button>
@@ -141,7 +141,7 @@ export default function UsersTable({
                           disabled={isSelf || deletingId === u.id}
                           title={isSelf ? "Impossible de supprimer votre propre compte" : "Supprimer"}
                           aria-label="Supprimer"
-                          className="inline-flex rounded-lg p-1.5 text-neutral-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-30"
+                          className="inline-flex rounded-lg p-1.5 text-neutral-500 hover:bg-danger-subtle hover:text-danger disabled:opacity-30"
                         >
                           {deletingId === u.id ? (
                             <SpinnerIcon className="h-4 w-4" />

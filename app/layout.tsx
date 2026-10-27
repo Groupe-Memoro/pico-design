@@ -3,6 +3,7 @@ import { apercu, gelica } from "@/lib/fonts";
 import "./globals.css";
 import AppShell from "@/components/AppShell";
 import AppSettingsStyle from "@/components/AppSettingsStyle";
+import { THEME_SCRIPT } from "@/lib/colorTheme";
 
 // Le favicon passe par les réglages (module Paramètres) : la route renvoie
 // le fichier téléversé, ou le logo d'origine à défaut. D'où `icons` ici
@@ -19,7 +20,11 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="fr" className={`${apercu.variable} ${gelica.variable}`}>
+    // data-theme est posé par THEME_SCRIPT avant React : d'où suppressHydrationWarning.
+    <html lang="fr" className={`${apercu.variable} ${gelica.variable}`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       <body>
         {/* Habillage de l'administration ; l'Outil Shopify pose le sien
             par-dessus dans app/design/layout.tsx. */}

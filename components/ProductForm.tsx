@@ -511,7 +511,7 @@ export default function ProductForm({
 
   if (templates.length === 0) {
     return (
-      <p className="rounded border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800">
+      <p className="rounded border border-warning bg-warning-subtle p-4 text-sm text-warning-strong">
         Aucun modèle configuré. Crée d&apos;abord un modèle dans{" "}
         <a href="/templates" className="underline">
           Modèles
@@ -533,7 +533,7 @@ export default function ProductForm({
             setNameTouched(true);
           }}
           placeholder={isMultiTemplate ? "Ex. Collection floral (optionnel)" : "Ex. Étui iPhone 15 — motif floral"}
-          className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
+          className="mt-1 w-full input"
         />
         {!nameTouched && (
           <p className="mt-1 text-xs text-neutral-500">
@@ -553,7 +553,7 @@ export default function ProductForm({
           <select
             value={templateId}
             onChange={(e) => setTemplateId(e.target.value)}
-            className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
+            className="mt-1 w-full input"
           >
             {categories.map((category) => {
               const items = templates.filter((t) => t.category_id === category.id);
@@ -599,7 +599,7 @@ export default function ProductForm({
             <button
               type="button"
               onClick={toggleAllTemplates}
-              className="text-xs text-neutral-500 underline hover:text-pico-black"
+              className="text-xs text-neutral-500 underline hover:text-text"
             >
               {selectedTemplateIds.length === visibleTemplates.length ? "Tout désélectionner" : "Tout sélectionner"}
             </button>
@@ -621,7 +621,7 @@ export default function ProductForm({
                   </label>
                   <div className="space-y-1">
                     {items.map((t) => (
-                      <label key={t.id} className="flex items-center gap-2 text-sm text-pico-black">
+                      <label key={t.id} className="flex items-center gap-2 text-sm text-text">
                         <input
                           type="checkbox"
                           checked={selectedTemplateIds.includes(t.id)}
@@ -649,7 +649,7 @@ export default function ProductForm({
         <select
           value={collectionId}
           onChange={(e) => setCollectionId(e.target.value)}
-          className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
+          className="mt-1 w-full input"
         >
           <option value="">— Aucune —</option>
           {collections.map((c) => (
@@ -731,7 +731,7 @@ export default function ProductForm({
           }
         />
         {pdfPlan?.warning && (
-          <p className="mt-2 rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+          <p className="mt-2 rounded border border-warning bg-warning-subtle p-3 text-sm text-warning-strong">
             ⚠ {pdfPlan.warning}
           </p>
         )}
@@ -741,7 +741,7 @@ export default function ProductForm({
         <div>
           <div className="mb-1 flex items-center justify-between">
             <label className="text-sm font-medium">{logoLabel}</label>
-            <label className="flex items-center gap-2 text-sm text-pico-black">
+            <label className="flex items-center gap-2 text-sm text-text">
               <input
                 type="checkbox"
                 checked={showLogo}
@@ -821,7 +821,7 @@ export default function ProductForm({
             </>
           )}
 
-          <label className="mt-3 flex items-center gap-2 text-sm text-pico-black">
+          <label className="mt-3 flex items-center gap-2 text-sm text-text">
             <input
               type="checkbox"
               checked={logoShadow}
@@ -857,7 +857,7 @@ export default function ProductForm({
                 <button
                   type="button"
                   onClick={() => setShadowSettings(DEFAULT_LOGO_SHADOW)}
-                  className="shrink-0 text-xs text-neutral-500 underline hover:text-pico-black"
+                  className="shrink-0 text-xs text-neutral-500 underline hover:text-text"
                 >
                   Réinitialiser
                 </button>
@@ -876,7 +876,7 @@ export default function ProductForm({
               Verso <span className="font-normal text-neutral-400">(modèle recto-verso)</span>
             </p>
             {!usePanels && (
-            <label className="flex items-center gap-2 text-sm text-pico-black">
+            <label className="flex items-center gap-2 text-sm text-text">
               <input
                 type="checkbox"
                 checked={sameAsFront}
@@ -910,7 +910,7 @@ export default function ProductForm({
         </div>
       )}
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
       {createProgress && (
         <p className="flex items-center gap-2 text-sm text-neutral-500">
           <SpinnerIcon className="h-4 w-4" />

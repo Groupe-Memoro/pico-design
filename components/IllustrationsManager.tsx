@@ -57,7 +57,7 @@ function IllustrationCard({ illustration, onChanged }: { illustration: Illustrat
   }
 
   return (
-    <div className={`overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm ${busy ? "opacity-50" : ""}`}>
+    <div className={`overflow-hidden card shadow-sm ${busy ? "opacity-50" : ""}`}>
       <div className="flex aspect-square items-center justify-center p-3" style={CHECKERBOARD}>
         {illustration.fileUrl && (
           // eslint-disable-next-line @next/next/no-img-element
@@ -90,14 +90,14 @@ function IllustrationCard({ illustration, onChanged }: { illustration: Illustrat
             <button
               type="submit"
               aria-label="Enregistrer le nom"
-              className="rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-pico-black"
+              className="icon-btn"
             >
               <CheckIcon className="h-4 w-4" />
             </button>
           </form>
         ) : (
           <>
-            <p className="min-w-0 flex-1 truncate px-1 text-sm font-medium text-pico-black" title={illustration.name}>
+            <p className="min-w-0 flex-1 truncate px-1 text-sm font-medium text-text" title={illustration.name}>
               {illustration.name}
             </p>
             <button
@@ -105,7 +105,7 @@ function IllustrationCard({ illustration, onChanged }: { illustration: Illustrat
               onClick={() => setEditing(true)}
               title="Renommer"
               aria-label="Renommer"
-              className="rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-pico-black"
+              className="icon-btn"
             >
               <FilePenIcon className="h-4 w-4" />
             </button>
@@ -115,7 +115,7 @@ function IllustrationCard({ illustration, onChanged }: { illustration: Illustrat
               disabled={busy}
               title="Supprimer"
               aria-label="Supprimer"
-              className="rounded-lg p-1.5 text-neutral-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+              className="rounded-lg p-1.5 text-neutral-500 hover:bg-danger-subtle hover:text-danger disabled:opacity-50"
             >
               <TrashIcon className="h-4 w-4" />
             </button>
@@ -170,7 +170,7 @@ export default function IllustrationsManager({ illustrations }: { illustrations:
     <div>
       <div className="mb-6 flex items-center justify-between gap-3">
         <div>
-          <h1 className="flex items-center gap-2 text-page-title font-semibold text-pico-black">
+          <h1 className="flex items-center gap-2 text-page-title font-semibold text-text">
             Banque d&apos;illustrations
             <UpdatingBadge show={isPending} />
           </h1>
@@ -183,7 +183,7 @@ export default function IllustrationsManager({ illustrations }: { illustrations:
           type="button"
           onClick={() => fileInput.current?.click()}
           disabled={uploading}
-          className="flex shrink-0 items-center gap-2 rounded-lg bg-pico-maroon px-4 py-2 text-sm font-medium text-white hover:bg-pico-maroon-dark disabled:opacity-50"
+          className="flex shrink-0 items-center gap-2 btn-primary disabled:opacity-50"
         >
           {uploading && <SpinnerIcon className="h-4 w-4" />}
           {uploading ? "Envoi en cours..." : "Ajouter des illustrations"}
@@ -205,17 +205,17 @@ export default function IllustrationsManager({ illustrations }: { illustrations:
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Rechercher (nom)..."
           aria-label="Rechercher une illustration"
-          className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm sm:max-w-xs"
+          className="w-full input sm:max-w-xs"
         />
         <p className="text-xs text-neutral-500">PNG, JPEG, WebP ou SVG, 15 Mo au maximum. Imprimées telles quelles.</p>
       </div>
 
       {message && (
-        <p className={`mb-4 text-sm ${message.tone === "error" ? "text-red-600" : "text-neutral-600"}`}>{message.text}</p>
+        <p className={`mb-4 text-sm ${message.tone === "error" ? "text-danger" : "text-neutral-600"}`}>{message.text}</p>
       )}
 
       {illustrations.length === 0 ? (
-        <p className="rounded-xl border border-neutral-200 bg-white p-6 text-center text-sm text-neutral-500">
+        <p className="card p-6 text-center text-sm text-neutral-500">
           Aucune illustration pour l&apos;instant. Ajoutez-en : elles apparaîtront dans l&apos;Outil Shopify, sous
           « Illustration ».
         </p>

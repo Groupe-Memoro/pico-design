@@ -83,7 +83,7 @@ export default function ShopifyExportModal({
           produits arrivent en brouillon.
         </p>
         <div>
-          <label className="block text-xs font-medium text-neutral-500">Prix de chaque variante ($)</label>
+          <label className="label">Prix de chaque variante ($)</label>
           <input
             required
             inputMode="decimal"
@@ -92,12 +92,12 @@ export default function ShopifyExportModal({
             onChange={(e) => setPrice(e.target.value)}
             placeholder="24,99"
             autoFocus
-            className="mt-1 w-40 rounded-lg border border-neutral-300 bg-white px-3 py-2"
+            className="mt-1 w-40 input"
           />
         </div>
-        {error && <p className="rounded-lg bg-red-50 p-3 text-red-700">{error}</p>}
+        {error && <p className="rounded-lg bg-danger-subtle p-3 text-danger">{error}</p>}
         {skipped.length > 0 && (
-          <div className="rounded-lg bg-amber-50 p-3 text-amber-800">
+          <div className="rounded-lg bg-warning-subtle p-3 text-warning-strong">
             <p className="font-medium">Fichier téléchargé, mais certains produits sont sans image :</p>
             <ul className="mt-1 list-disc pl-5">
               {skipped.map((s, i) => (

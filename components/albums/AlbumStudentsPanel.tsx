@@ -130,7 +130,7 @@ function ImportForm({ albumId, existing, onDone }: { albumId: string; existing: 
             </p>
           )}
           {match.unmatched.length > 0 && photos.length > 0 && (
-            <p className="mt-1 text-amber-700">
+            <p className="mt-1 text-warning-strong">
               {match.unmatched.length} photo{match.unmatched.length > 1 ? "s" : ""} sans élève :{" "}
               {match.unmatched.slice(0, 8).map((i) => photos[i].name).join(", ")}
               {match.unmatched.length > 8 ? "…" : ""}
@@ -156,13 +156,13 @@ function ImportForm({ albumId, existing, onDone }: { albumId: string; existing: 
         </div>
       )}
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
       <div className="flex justify-end">
         <button
           type="button"
           onClick={run}
           disabled={Boolean(busy) || (!rows && withPhoto === 0)}
-          className="flex items-center gap-2 rounded-lg bg-pico-maroon px-4 py-2 text-sm font-medium text-white hover:bg-pico-maroon-dark disabled:opacity-50"
+          className="flex items-center gap-2 btn-primary disabled:opacity-50"
         >
           {busy && <SpinnerIcon className="h-4 w-4" />}
           {busy ?? "Importer"}
@@ -244,12 +244,12 @@ function StudentForm({
         <label className="block text-sm font-medium">{student?.photo_path ? "Remplacer la photo" : "Photo"}</label>
         <input type="file" accept={ACCEPTED_PHOTO_TYPES} onChange={(e) => setPhoto(e.target.files?.[0] ?? null)} className="mt-1 block w-full text-sm" />
       </div>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
       <div className="flex justify-end">
         <button
           type="submit"
           disabled={busy || (!first.trim() && !last.trim())}
-          className="flex items-center gap-2 rounded-lg bg-pico-maroon px-4 py-2 text-sm font-medium text-white hover:bg-pico-maroon-dark disabled:opacity-50"
+          className="flex items-center gap-2 btn-primary disabled:opacity-50"
         >
           {busy && <SpinnerIcon className="h-4 w-4" />}
           Enregistrer
@@ -303,7 +303,7 @@ export default function AlbumStudentsPanel({
           <p className="text-sm text-neutral-600">
             {students.length} finissant{students.length > 1 ? "s" : ""}
             {groups.length > 0 && ` · ${groups.length} groupe${groups.length > 1 ? "s" : ""}`}
-            {missing > 0 && <span className="text-amber-700"> · {missing} sans photo</span>}
+            {missing > 0 && <span className="text-warning-strong"> · {missing} sans photo</span>}
           </p>
         </div>
         <div className="flex gap-2">
@@ -312,7 +312,7 @@ export default function AlbumStudentsPanel({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Rechercher…"
-            className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm sm:w-48"
+            className="w-full input sm:w-48"
           />
           <button
             type="button"
@@ -332,11 +332,11 @@ export default function AlbumStudentsPanel({
       </div>
 
       {students.length === 0 ? (
-        <p className="rounded-xl border border-neutral-200 bg-white p-6 text-center text-sm text-neutral-500">
+        <p className="card p-6 text-center text-sm text-neutral-500">
           Aucun finissant. Importez la liste de l&apos;école (Excel ou CSV) et le dossier de photos.
         </p>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white">
+        <div className="overflow-hidden card">
           <table className="w-full text-sm">
             <thead className="bg-neutral-50 text-left text-xs text-neutral-500">
               <tr>
@@ -367,7 +367,7 @@ export default function AlbumStudentsPanel({
                       onClick={() => setModal({ mode: "edit", student: s })}
                       title="Modifier"
                       aria-label="Modifier"
-                      className="rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-pico-black"
+                      className="icon-btn"
                     >
                       <FilePenIcon className="h-4 w-4" />
                     </button>
@@ -376,7 +376,7 @@ export default function AlbumStudentsPanel({
                       onClick={() => remove(s)}
                       title="Retirer"
                       aria-label="Retirer"
-                      className="rounded-lg p-1.5 text-neutral-500 hover:bg-red-50 hover:text-red-600"
+                      className="rounded-lg p-1.5 text-neutral-500 hover:bg-danger-subtle hover:text-danger"
                     >
                       <TrashIcon className="h-4 w-4" />
                     </button>

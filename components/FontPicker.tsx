@@ -160,7 +160,7 @@ export default function FontPicker({
         createPortal(
           <div
             ref={panelRef}
-            className="fixed z-[100] flex flex-col overflow-hidden rounded-xl border border-neutral-200 bg-white text-sm text-neutral-900 shadow-xl"
+            className="fixed z-[100] flex flex-col overflow-hidden card text-sm text-neutral-900 shadow-xl"
             style={{ left: position.left, top: position.top, width: position.width, maxHeight: position.maxHeight }}
             onKeyDown={onKeyDown}
           >
@@ -182,7 +182,7 @@ export default function FontPicker({
               {sections.map((section) =>
                 section.options.length === 0 ? null : (
                   <div key={section.label}>
-                    <p className="sticky top-0 bg-white px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+                    <p className="sticky top-0 bg-surface px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
                       {section.label}
                     </p>
                     {section.options.map((font) => {

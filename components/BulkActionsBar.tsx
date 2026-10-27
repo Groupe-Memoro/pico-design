@@ -21,8 +21,8 @@ export default function BulkActionsBar({
   if (count === 0) return null;
 
   return (
-    <div className="mb-4 flex items-center justify-between rounded-lg border border-pico-maroon/30 bg-pico-cream px-4 py-2 text-sm">
-      <span className="text-pico-black">
+    <div className="mb-4 flex items-center justify-between rounded-lg border border-pico-maroon/30 bg-primary-subtle px-4 py-2 text-sm">
+      <span className="text-text">
         {count} {label}
         {count > 1 ? "s" : ""} sélectionné{count > 1 ? "s" : ""}
       </span>
@@ -30,7 +30,7 @@ export default function BulkActionsBar({
         <button
           type="button"
           onClick={onClear}
-          className="rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-neutral-600 hover:bg-neutral-50"
+          className="rounded-lg border border-neutral-300 bg-surface px-3 py-1.5 text-neutral-600 hover:bg-neutral-50"
         >
           Annuler
         </button>
@@ -39,7 +39,7 @@ export default function BulkActionsBar({
           type="button"
           onClick={onDelete}
           disabled={deleting}
-          className="flex items-center gap-2 rounded-lg bg-red-600 px-3 py-1.5 text-white hover:bg-red-700 disabled:opacity-50"
+          className="flex items-center gap-2 rounded-lg bg-danger px-3 py-1.5 text-white hover:bg-danger-hover disabled:opacity-50"
         >
           {deleting && <SpinnerIcon className="h-4 w-4" />}
           Supprimer

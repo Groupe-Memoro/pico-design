@@ -39,7 +39,7 @@ export default function ToolTopBar({
               dans l'outil (voir useHideChrome). La route renvoie le fichier
               d'origine tant que rien n'est téléversé. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={`/api/settings/${brandScope}/asset/logo`} alt="Pico" className="h-6 w-auto" />
+          <img src={`/api/settings/${brandScope}/asset/logo`} alt="Pico" className="brand-logo h-6 w-auto" />
         </Link>
         <span className="h-7 w-px shrink-0 bg-border" aria-hidden="true" />
         <div className="min-w-0">

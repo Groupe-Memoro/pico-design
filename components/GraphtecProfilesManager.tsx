@@ -244,12 +244,12 @@ function ProfileForm({
         />
       </div>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
       <div className="flex gap-2">
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-lg border border-neutral-300 px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-50"
+          className="btn-secondary"
         >
           Annuler
         </button>
@@ -309,7 +309,7 @@ export default function GraphtecProfilesManager({
             <li key={p.id} className="flex items-center justify-between gap-3 px-3 py-2.5">
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium">{p.name}</p>
-                <p className={`text-xs ${sheet ? "text-neutral-500" : "text-red-600"}`}>
+                <p className={`text-xs ${sheet ? "text-neutral-500" : "text-danger"}`}>
                   {sheet ? sheetLabel(sheet.width_mm, sheet.height_mm) : "Format du papier à choisir"} · {p.grid_cols} ×{" "}
                   {p.grid_rows} pièces
                   {p.marks_path ? " · marques" : ""}
@@ -324,7 +324,7 @@ export default function GraphtecProfilesManager({
       <button
         type="button"
         onClick={() => setEditing("new")}
-        className="w-full rounded-lg border border-dashed border-neutral-300 px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-50"
+        className="w-full btn-secondary border-dashed"
       >
         + Nouveau profil
       </button>

@@ -87,7 +87,7 @@ export default function VisualsGrid({
     <div>
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="flex items-center gap-2 text-page-title font-semibold text-pico-black">
+          <h1 className="flex items-center gap-2 text-page-title font-semibold text-text">
             Banque de visuels
             <UpdatingBadge show={isPending} />
           </h1>
@@ -98,7 +98,7 @@ export default function VisualsGrid({
         </div>
         <button
           onClick={() => setModal({ mode: "create" })}
-          className="flex items-center gap-2 rounded-lg bg-pico-maroon px-4 py-2 text-sm font-medium text-white hover:bg-pico-maroon-dark"
+          className="flex items-center gap-2 btn-primary"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-4 w-4">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v14m-7-7h14" />
@@ -126,16 +126,16 @@ export default function VisualsGrid({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Rechercher (nom)..."
-            className="w-full rounded-lg border border-neutral-300 bg-white py-2 pl-9 pr-3 text-sm"
+            className="w-full rounded-lg border border-neutral-300 bg-surface py-2 pl-9 pr-3 text-sm"
           />
         </div>
         <div className="flex items-end gap-3">
           <div>
-            <label className="block text-xs font-medium text-neutral-500">Collection</label>
+            <label className="label">Collection</label>
             <select
               value={collectionId}
               onChange={(e) => setCollectionId(e.target.value)}
-              className="mt-1 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm"
+              className="mt-1 input"
             >
               <option value="">— Toutes —</option>
               {collections.map((c) => (
@@ -173,7 +173,7 @@ export default function VisualsGrid({
       />
 
       {filtered.length === 0 ? (
-        <p className="rounded-xl border border-neutral-200 bg-white p-4 text-sm text-neutral-500">
+        <p className="card p-4 text-sm text-neutral-500">
           Aucun visuel ne correspond.
         </p>
       ) : (
@@ -181,7 +181,7 @@ export default function VisualsGrid({
           {filtered.map((v) => (
             <div
               key={v.id}
-              className={`overflow-hidden rounded-xl border bg-white shadow-sm transition-opacity duration-300 ${
+              className={`overflow-hidden rounded-xl border bg-surface shadow-sm transition-opacity duration-300 ${
                 selection.selected.has(v.id) ? "border-pico-maroon" : "border-neutral-200"
               } ${deletingId === v.id ? "opacity-40" : ""}`}
             >
@@ -201,13 +201,13 @@ export default function VisualsGrid({
               </div>
               <div className="p-3">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="truncate text-sm font-medium text-pico-black">{v.name}</span>
+                  <span className="truncate text-sm font-medium text-text">{v.name}</span>
                   <div className="flex shrink-0 gap-1">
                     <button
                       onClick={() => setModal({ mode: "edit", visual: v })}
                       title="Modifier"
                       aria-label="Modifier"
-                      className="inline-flex rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-pico-black"
+                      className="icon-btn"
                     >
                       <FilePenIcon className="h-4 w-4" />
                     </button>
@@ -216,7 +216,7 @@ export default function VisualsGrid({
                       disabled={deletingId === v.id}
                       title="Supprimer"
                       aria-label="Supprimer"
-                      className="inline-flex rounded-lg p-1.5 text-neutral-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                      className="inline-flex rounded-lg p-1.5 text-neutral-500 hover:bg-danger-subtle hover:text-danger disabled:opacity-50"
                     >
                       {deletingId === v.id ? (
                         <SpinnerIcon className="h-4 w-4" />

@@ -629,7 +629,7 @@ export default function ThemeForm({
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Ex. Cadre Noël"
-            className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
+            className="mt-1 w-full input"
           />
         </div>
 
@@ -639,7 +639,7 @@ export default function ThemeForm({
             required
             value={templateId}
             onChange={(e) => setTemplateId(e.target.value)}
-            className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
+            className="mt-1 w-full input"
           >
             {templates.map((t) => (
               <option key={t.id} value={t.id}>
@@ -687,7 +687,7 @@ export default function ThemeForm({
               <button
                 type="button"
                 onClick={() => setRemoveBackground(true)}
-                className="shrink-0 text-xs text-red-600 hover:underline"
+                className="shrink-0 text-xs text-danger hover:underline"
               >
                 Retirer le fond
               </button>
@@ -743,7 +743,7 @@ export default function ThemeForm({
                         className={`px-2.5 py-1 ${
                           slotShape(slot) === option.value
                             ? "bg-blue-600 text-white"
-                            : "bg-white text-neutral-700 hover:bg-neutral-50"
+                            : "bg-surface text-neutral-700 hover:bg-neutral-50"
                         }`}
                       >
                         {option.label}
@@ -863,7 +863,7 @@ export default function ThemeForm({
                           <FontPicker
                             value={zone.fontId}
                             onChange={(fontId) => updateZone(i, { fontId })}
-                            className="mt-1 w-full rounded border border-neutral-300 bg-white px-2 py-1"
+                            className="mt-1 w-full rounded border border-neutral-300 bg-surface px-2 py-1"
                           />
                         </label>
                         <label className="block">
@@ -903,7 +903,7 @@ export default function ThemeForm({
                               key={a.value}
                               type="button"
                               onClick={() => updateZone(i, { verticalAlign: a.value })}
-                              className={`px-2 py-1 ${(zone.verticalAlign ?? "middle") === a.value ? "bg-emerald-600 text-white" : "bg-white text-neutral-700 hover:bg-neutral-50"}`}
+                              className={`px-2 py-1 ${(zone.verticalAlign ?? "middle") === a.value ? "bg-emerald-600 text-white" : "bg-surface text-neutral-700 hover:bg-neutral-50"}`}
                             >
                               {a.label}
                             </button>
@@ -915,7 +915,7 @@ export default function ThemeForm({
                               key={a.value}
                               type="button"
                               onClick={() => updateZone(i, { align: a.value })}
-                              className={`px-2 py-1 ${zone.align === a.value ? "bg-emerald-600 text-white" : "bg-white text-neutral-700 hover:bg-neutral-50"}`}
+                              className={`px-2 py-1 ${zone.align === a.value ? "bg-emerald-600 text-white" : "bg-surface text-neutral-700 hover:bg-neutral-50"}`}
                             >
                               {a.label}
                             </button>
@@ -949,7 +949,7 @@ export default function ThemeForm({
                           />
                           <span className="text-neutral-400">(0 = sans limite)</span>
                         </label>
-                        <button type="button" onClick={() => removeZone(i)} className="text-red-600 hover:underline">
+                        <button type="button" onClick={() => removeZone(i)} className="text-danger hover:underline">
                           Retirer
                         </button>
                       </div>
@@ -1024,7 +1024,7 @@ export default function ThemeForm({
                     type="button"
                     onClick={() => removeGuide(g.id)}
                     aria-label="Retirer le repère"
-                    className="ml-auto rounded-lg p-1 text-neutral-400 hover:bg-red-50 hover:text-red-600"
+                    className="ml-auto rounded-lg p-1 text-neutral-400 hover:bg-danger-subtle hover:text-danger"
                   >
                     <TrashIcon className="h-3.5 w-3.5" />
                   </button>
@@ -1041,13 +1041,13 @@ export default function ThemeForm({
         </div>
       )}
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
 
         <div className="flex justify-end gap-3 pt-2">
           <button
             type="submit"
             disabled={loading}
-            className="flex items-center gap-2 rounded-lg bg-pico-maroon px-4 py-2 text-sm font-medium text-white hover:bg-pico-maroon-dark disabled:opacity-60"
+            className="flex items-center gap-2 btn-primary disabled:opacity-60"
           >
             {loading && <SpinnerIcon className="h-4 w-4" />}
             {isEditing ? "Enregistrer" : "Créer le thème"}
@@ -1076,7 +1076,7 @@ export default function ThemeForm({
               <button
                 type="button"
                 onClick={() => setDrawing(null)}
-                className="rounded-md border border-blue-200 bg-white px-2.5 py-1"
+                className="rounded-md border border-blue-200 bg-surface px-2.5 py-1"
               >
                 Annuler
               </button>
@@ -1194,7 +1194,7 @@ export default function ThemeForm({
                         duplicateSlot(i);
                       }}
                       title="Dupliquer cet emplacement"
-                      className="flex h-5 w-5 items-center justify-center rounded-full bg-white/90 text-neutral-600 hover:bg-white"
+                      className="flex h-5 w-5 items-center justify-center rounded-full bg-neutral-50/90 text-neutral-600 hover:bg-surface"
                     >
                       <CopyIcon className="h-3 w-3" />
                     </button>
@@ -1208,7 +1208,7 @@ export default function ThemeForm({
                         removeSlot(i);
                       }}
                       title="Retirer cet emplacement"
-                      className="flex h-5 w-5 items-center justify-center rounded-full bg-white/90 text-[10px] text-neutral-600 hover:bg-white"
+                      className="flex h-5 w-5 items-center justify-center rounded-full bg-neutral-50/90 text-[10px] text-neutral-600 hover:bg-surface"
                     >
                       ✕
                     </button>
@@ -1375,7 +1375,7 @@ export default function ThemeForm({
                   <span
                     key={pi}
                     className={`pointer-events-none absolute rounded-full border-2 border-white shadow ${
-                      pi === 0 && drawing.points.length >= MIN_POLYGON_SIDES ? "h-4 w-4 bg-green-600" : "h-3 w-3 bg-blue-600"
+                      pi === 0 && drawing.points.length >= MIN_POLYGON_SIDES ? "h-4 w-4 bg-success" : "h-3 w-3 bg-blue-600"
                     }`}
                     style={{ left: `${p.x * 100}%`, top: `${p.y * 100}%`, transform: "translate(-50%, -50%)" }}
                   />

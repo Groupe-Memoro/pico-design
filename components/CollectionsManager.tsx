@@ -62,7 +62,7 @@ function SortableRow({
   const isBusy = busyId === item.id;
 
   return (
-    <li ref={setNodeRef} style={style} className="flex items-center gap-2 bg-white p-3">
+    <li ref={setNodeRef} style={style} className="flex items-center gap-2 bg-surface p-3">
       <button
         type="button"
         {...attributes}
@@ -84,7 +84,7 @@ function SortableRow({
           className="flex-1 rounded border border-neutral-300 px-2 py-1 text-sm"
         />
       ) : (
-        <span className="flex-1 text-sm text-pico-black">{item.name}</span>
+        <span className="flex-1 text-sm text-text">{item.name}</span>
       )}
       <div className="flex shrink-0 gap-1">
         {isEditing ? (
@@ -93,7 +93,7 @@ function SortableRow({
             disabled={isBusy}
             title="Enregistrer"
             aria-label="Enregistrer"
-            className="inline-flex rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-pico-black disabled:opacity-50"
+            className="icon-btn disabled:opacity-50"
           >
             {isBusy ? (
               <SpinnerIcon className="h-4 w-4" />
@@ -108,7 +108,7 @@ function SortableRow({
             onClick={() => onStartEdit(item)}
             title="Modifier"
             aria-label="Modifier"
-            className="inline-flex rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-pico-black"
+            className="icon-btn"
           >
             <FilePenIcon className="h-4 w-4" />
           </button>
@@ -118,7 +118,7 @@ function SortableRow({
           disabled={isBusy}
           title="Supprimer"
           aria-label="Supprimer"
-          className="inline-flex rounded-lg p-1.5 text-neutral-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+          className="inline-flex rounded-lg p-1.5 text-neutral-500 hover:bg-danger-subtle hover:text-danger disabled:opacity-50"
         >
           {isBusy ? <SpinnerIcon className="h-4 w-4" /> : <TrashIcon className="h-4 w-4" />}
         </button>
@@ -267,19 +267,19 @@ export default function CollectionsManager({
         </SortableContext>
       </DndContext>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
 
       <form onSubmit={handleCreate} className="flex gap-2">
         <input
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
           placeholder={`Nouvelle ${itemLabel}...`}
-          className="flex-1 rounded border border-neutral-300 px-3 py-2 text-sm"
+          className="flex-1 input"
         />
         <button
           type="submit"
           disabled={creating || !newName.trim()}
-          className="inline-flex items-center gap-2 rounded-lg bg-pico-maroon px-4 py-2 text-sm font-medium text-white hover:bg-pico-maroon-dark disabled:opacity-50"
+          className="inline-flex items-center gap-2 btn-primary disabled:opacity-50"
         >
           {creating && <SpinnerIcon className="h-4 w-4" />}
           Ajouter

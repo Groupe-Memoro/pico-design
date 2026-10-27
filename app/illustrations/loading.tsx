@@ -20,7 +20,7 @@ export default function Loading() {
         {Array.from({ length: 8 }).map((_, i) => (
           <div
             key={i}
-            className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm"
+            className="overflow-hidden card shadow-sm"
           >
             <Skeleton className="h-32" />
             <div className="space-y-2 p-3">

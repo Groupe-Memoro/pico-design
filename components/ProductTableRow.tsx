@@ -83,7 +83,7 @@ export default function ProductTableRow({
           <div className="h-12 w-12 rounded-lg bg-neutral-100" />
         )}
       </td>
-      <td className="p-4 font-semibold text-pico-black">{product.name}</td>
+      <td className="p-4 font-semibold text-text">{product.name}</td>
       <td className="p-4 text-neutral-700">{templateName}</td>
       <td className="p-4 text-neutral-700">
         {dimensions ? templateSizeLabel(dimensions, false, "×") : "—"}
@@ -97,7 +97,7 @@ export default function ProductTableRow({
               href={`/api/products/${product.id}/pdf`}
               title="Télécharger le PDF"
               aria-label="Télécharger le PDF"
-              className="inline-flex rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-pico-black"
+              className="icon-btn"
             >
               <DownloadIcon className="h-4 w-4" />
             </a>
@@ -115,7 +115,7 @@ export default function ProductTableRow({
               onClick={() => onViewMockup(product)}
               title="Voir le mockup"
               aria-label="Voir le mockup"
-              className="inline-flex rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-pico-black"
+              className="icon-btn"
             >
               <LayersIcon className="h-4 w-4" />
             </button>
@@ -124,15 +124,15 @@ export default function ProductTableRow({
             onClick={handleCopyId}
             title={copiedId ? "Id copié" : `Copier l'id pour Shopify (${product.id})`}
             aria-label="Copier l'id pour Shopify"
-            className="inline-flex rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-pico-black"
+            className="icon-btn"
           >
-            {copiedId ? <CheckIcon className="h-4 w-4 text-green-600" /> : <ShopifyIcon className="h-4 w-4" />}
+            {copiedId ? <CheckIcon className="h-4 w-4 text-success-strong" /> : <ShopifyIcon className="h-4 w-4" />}
           </button>
           <button
             onClick={() => onEdit(product)}
             title="Modifier"
             aria-label="Modifier"
-            className="inline-flex rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-pico-black"
+            className="icon-btn"
           >
             <FilePenIcon className="h-4 w-4" />
           </button>
@@ -141,7 +141,7 @@ export default function ProductTableRow({
             disabled={deleting}
             title="Supprimer"
             aria-label="Supprimer"
-            className="inline-flex rounded-lg p-1.5 text-neutral-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+            className="inline-flex rounded-lg p-1.5 text-neutral-500 hover:bg-danger-subtle hover:text-danger disabled:opacity-50"
           >
             {deleting ? <SpinnerIcon className="h-4 w-4" /> : <TrashIcon className="h-4 w-4" />}
           </button>

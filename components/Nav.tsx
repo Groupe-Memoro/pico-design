@@ -5,7 +5,8 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { shopScopeOf } from "@/lib/appSettings";
 import { createClient } from "@/lib/supabase/client";
-import { LayoutGridIcon, LifeBuoyIcon, LogOutIcon, MenuIcon, PanelLeftIcon, XIcon } from "@/components/icons";
+import { LayoutGridIcon, LifeBuoyIcon, LogOutIcon, MenuIcon, MoonIcon, PanelLeftIcon, SunIcon, XIcon } from "@/components/icons";
+import { applyColorTheme } from "@/lib/colorTheme";
 import { groupMenuOrder, hasSidebar, MENU_ITEMS, menuKeysForRole, resolveMenuOrder, type MenuKey } from "@/lib/menuItems";
 import Modal from "@/components/Modal";
 import ChangePasswordForm from "@/components/ChangePasswordForm";
@@ -140,6 +141,14 @@ export default function Nav() {
     router.refresh();
   }
 
+  // Mode sombre : lu sur <html>, où THEME_SCRIPT l'a posé avant le rendu.
+  const [dark, setDark] = useState(false);
+  useEffect(() => setDark(document.documentElement.dataset.theme === "dark"), []);
+  function toggleTheme() {
+    applyColorTheme(dark ? "light" : "dark");
+    setDark(!dark);
+  }
+
   // Menu de gauche réduit aux icônes (bouton « Réduire »). Préférence de ce
   // navigateur seulement.
   const [collapsed, setCollapsed] = useState(false);
@@ -246,12 +255,12 @@ export default function Nav() {
           {shopHome ? (
             <a href={shopHome} className="flex shrink-0 items-center gap-2.5" aria-label="Retour à la boutique">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={`/api/settings/${logoScope}/asset/logo`} alt="" className="h-7 w-auto" />
+              <img src={`/api/settings/${logoScope}/asset/logo`} alt="" className="brand-logo h-7 w-auto" />
             </a>
           ) : (
             <Link href="/" className="flex shrink-0 items-center gap-2.5" aria-label="Pico Design — tableau de bord">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={`/api/settings/${logoScope}/asset/logo`} alt="" className="h-7 w-auto" />
+              <img src={`/api/settings/${logoScope}/asset/logo`} alt="" className="brand-logo h-7 w-auto" />
             </Link>
           )}
           {/* Retour au tableau de bord, comme la grille à côté de « Pico OS ». */}
@@ -289,6 +298,19 @@ export default function Nav() {
             >
               <LifeBuoyIcon className="h-5 w-5 motion-safe:group-hover:animate-jello" />
             </Link>
+            <button
+              type="button"
+              onClick={toggleTheme}
+              title={dark ? "Mode clair" : "Mode sombre"}
+              aria-label={dark ? "Mode clair" : "Mode sombre"}
+              className="group flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-text-muted hover:bg-surface-muted hover:text-text"
+            >
+              {dark ? (
+                <SunIcon className="h-5 w-5 motion-safe:group-hover:animate-jello" />
+              ) : (
+                <MoonIcon className="h-5 w-5 motion-safe:group-hover:animate-jello" />
+              )}
+            </button>
             {/* La pastille du nom ouvre « Changer mon mot de passe » (tous les rôles). */}
             <button
               onClick={() => setAccountOpen(true)}
@@ -357,7 +379,7 @@ export default function Nav() {
           }}
         >
           {passwordChanged ? (
-            <p className="text-sm text-green-700">Mot de passe changé.</p>
+            <p className="text-sm text-success-strong">Mot de passe changé.</p>
           ) : (
             <ChangePasswordForm onSuccess={() => setPasswordChanged(true)} />
           )}

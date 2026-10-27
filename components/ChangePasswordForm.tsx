@@ -4,7 +4,7 @@ import { useState } from "react";
 import { PASSWORD_MIN_LENGTH, passwordStrength, validatePassword } from "@/lib/passwordPolicy";
 import { SpinnerIcon } from "@/components/icons";
 
-const STRENGTH_COLORS = ["bg-red-500", "bg-red-500", "bg-amber-500", "bg-emerald-500", "bg-emerald-600"];
+const STRENGTH_COLORS = ["bg-danger", "bg-danger", "bg-warning", "bg-emerald-500", "bg-emerald-600"];
 
 export default function ChangePasswordForm({
   onSuccess,
@@ -58,7 +58,7 @@ export default function ChangePasswordForm({
           required
           value={currentPassword}
           onChange={(e) => setCurrentPassword(e.target.value)}
-          className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+          className="mt-1 w-full input"
         />
       </div>
       <div>
@@ -69,7 +69,7 @@ export default function ChangePasswordForm({
           required
           value={newPassword}
           onChange={(e) => setNewPassword(e.target.value)}
-          className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+          className="mt-1 w-full input"
         />
         {newPassword && (
           <div className="mt-1.5">
@@ -84,7 +84,7 @@ export default function ChangePasswordForm({
               ))}
             </div>
             <p
-              className={`mt-1 text-xs ${policyError ? "text-red-600" : "text-neutral-500"}`}
+              className={`mt-1 text-xs ${policyError ? "text-danger" : "text-neutral-500"}`}
             >
               {policyError ?? `Robustesse : ${strength.label.toLowerCase()}`}
             </p>
@@ -104,19 +104,19 @@ export default function ChangePasswordForm({
           required
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
-          className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+          className="mt-1 w-full input"
         />
-        {mismatch && <p className="mt-1 text-xs text-red-600">Les mots de passe ne correspondent pas.</p>}
+        {mismatch && <p className="mt-1 text-xs text-danger">Les mots de passe ne correspondent pas.</p>}
       </div>
       <label className="flex items-center gap-2 text-xs text-neutral-600">
         <input type="checkbox" checked={showPasswords} onChange={(e) => setShowPasswords(e.target.checked)} />
         Afficher les mots de passe
       </label>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
       <button
         type="submit"
         disabled={saving || !currentPassword || !newPassword || Boolean(policyError) || mismatch}
-        className="inline-flex items-center gap-2 rounded-lg bg-pico-maroon px-4 py-2 text-sm font-medium text-white hover:bg-pico-maroon-dark disabled:opacity-50"
+        className="inline-flex items-center gap-2 btn-primary disabled:opacity-50"
       >
         {saving && <SpinnerIcon className="h-4 w-4" />}
         Changer le mot de passe

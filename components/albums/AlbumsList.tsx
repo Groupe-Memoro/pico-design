@@ -72,12 +72,12 @@ function CreateAlbumForm({ onCreated }: { onCreated: (id: string) => void }) {
         </select>
         <p className="mt-1 text-xs text-neutral-500">Fond perdu de 1/8 po. Modifiable ensuite dans Réglages.</p>
       </div>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
       <div className="flex justify-end">
         <button
           type="submit"
           disabled={busy}
-          className="flex items-center gap-2 rounded-lg bg-pico-maroon px-4 py-2 text-sm font-medium text-white hover:bg-pico-maroon-dark disabled:opacity-60"
+          className="flex items-center gap-2 btn-primary disabled:opacity-60"
         >
           {busy && <SpinnerIcon className="h-4 w-4" />}
           Créer l&apos;album
@@ -96,7 +96,7 @@ export default function AlbumsList({ albums }: { albums: AlbumSummary[] }) {
     <div>
       <div className="mb-6 flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-page-title font-semibold text-pico-black">Albums des finissants</h1>
+          <h1 className="text-page-title font-semibold text-text">Albums des finissants</h1>
           <p className="text-sm text-neutral-500">
             Liste des élèves et photos, pages de portraits automatiques, PDF d&apos;impression.
           </p>
@@ -104,14 +104,14 @@ export default function AlbumsList({ albums }: { albums: AlbumSummary[] }) {
         <button
           type="button"
           onClick={() => setCreating(true)}
-          className="shrink-0 rounded-lg bg-pico-maroon px-4 py-2 text-sm font-medium text-white hover:bg-pico-maroon-dark"
+          className="shrink-0 btn-primary"
         >
           Nouvel album
         </button>
       </div>
 
       {albums.length === 0 ? (
-        <p className="rounded-xl border border-neutral-200 bg-white p-6 text-center text-sm text-neutral-500">
+        <p className="card p-6 text-center text-sm text-neutral-500">
           Aucun album pour l&apos;instant. Créez-en un pour importer la liste des finissants et leurs photos.
         </p>
       ) : (
@@ -120,9 +120,9 @@ export default function AlbumsList({ albums }: { albums: AlbumSummary[] }) {
             <Link
               key={a.id}
               href={`/albums/${a.id}`}
-              className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm transition hover:border-neutral-300 hover:shadow"
+              className="card p-4 shadow-sm transition hover:border-neutral-300 hover:shadow"
             >
-              <p className="font-medium text-pico-black">{a.name}</p>
+              <p className="font-medium text-text">{a.name}</p>
               <p className="text-sm text-neutral-500">{[a.school, a.year].filter(Boolean).join(" · ") || "—"}</p>
               <p className="mt-3 text-xs text-neutral-500">
                 {a.students} finissant{a.students > 1 ? "s" : ""} ·{" "}

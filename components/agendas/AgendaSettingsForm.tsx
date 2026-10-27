@@ -79,7 +79,7 @@ export default function AgendaSettingsForm({ agenda, onSaved }: { agenda: Agenda
   return (
     <form onSubmit={submit} className="max-w-3xl space-y-6">
       <section className="space-y-3">
-        <h3 className="text-sm font-semibold text-pico-black">Agenda</h3>
+        <h3 className="text-sm font-semibold text-text">Agenda</h3>
         <div className="grid gap-3 sm:grid-cols-3">
           <div>
             <label className={labelClass}>Nom</label>
@@ -107,7 +107,7 @@ export default function AgendaSettingsForm({ agenda, onSaved }: { agenda: Agenda
       </section>
 
       <section className="space-y-3">
-        <h3 className="text-sm font-semibold text-pico-black">Jours de cycle</h3>
+        <h3 className="text-sm font-semibold text-text">Jours de cycle</h3>
         <div className="grid gap-3 sm:grid-cols-3">
           <div>
             <label className={labelClass}>Longueur du cycle</label>
@@ -129,7 +129,7 @@ export default function AgendaSettingsForm({ agenda, onSaved }: { agenda: Agenda
       </section>
 
       <section className="space-y-3">
-        <h3 className="text-sm font-semibold text-pico-black">Format et marges (pouces)</h3>
+        <h3 className="text-sm font-semibold text-text">Format et marges (pouces)</h3>
         <div className="grid gap-3 sm:grid-cols-4">
           <div>
             <label className={labelClass}>Format</label>
@@ -173,7 +173,7 @@ export default function AgendaSettingsForm({ agenda, onSaved }: { agenda: Agenda
       </section>
 
       <section className="space-y-3">
-        <h3 className="text-sm font-semibold text-pico-black">Style</h3>
+        <h3 className="text-sm font-semibold text-text">Style</h3>
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <label className={labelClass}>Police des titres</label>
@@ -199,11 +199,11 @@ export default function AgendaSettingsForm({ agenda, onSaved }: { agenda: Agenda
         </label>
       </section>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
       <button
         type="submit"
         disabled={busy}
-        className="flex items-center gap-2 rounded-lg bg-pico-maroon px-4 py-2 text-sm font-medium text-white hover:bg-pico-maroon-dark disabled:opacity-60"
+        className="flex items-center gap-2 btn-primary disabled:opacity-60"
       >
         {busy && <SpinnerIcon className="h-4 w-4" />}
         Enregistrer les réglages

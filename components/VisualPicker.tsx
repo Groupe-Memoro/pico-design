@@ -37,7 +37,7 @@ export default function VisualPicker({
             <img src={selected.fileUrl} alt="" className="h-full w-full object-contain" />
           ) : null}
         </div>
-        <span className="flex-1 truncate text-sm text-pico-black">
+        <span className="flex-1 truncate text-sm text-text">
           {selected?.name ?? "Choisir un visuel..."}
         </span>
         <svg
@@ -58,7 +58,7 @@ export default function VisualPicker({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Rechercher (nom)..."
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+              className="w-full input"
             />
             {filtered.length === 0 ? (
               <p className="text-sm text-neutral-500">Aucun visuel ne correspond.</p>
@@ -86,7 +86,7 @@ export default function VisualPicker({
                         <div className="h-full w-full rounded bg-neutral-100" />
                       )}
                     </div>
-                    <div className="truncate px-2 py-1.5 text-xs text-pico-black">{v.name}</div>
+                    <div className="truncate px-2 py-1.5 text-xs text-text">{v.name}</div>
                   </button>
                 ))}
               </div>

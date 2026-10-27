@@ -24,7 +24,7 @@ export interface ImpositionRow {
 
 // Boutons d'action : icône seule (le libellé est dans l'info-bulle et pour les lecteurs d'écran).
 const actionClass =
-  "rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-pico-black disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-neutral-400";
+  "rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-text disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-neutral-400";
 
 export default function ImpositionsTable({ rows }: { rows: ImpositionRow[] }) {
   const router = useRouter();
@@ -46,7 +46,7 @@ export default function ImpositionsTable({ rows }: { rows: ImpositionRow[] }) {
 
   if (rows.length === 0) {
     return (
-      <p className="rounded-xl border border-neutral-200 bg-white p-4 text-sm text-neutral-500">
+      <p className="card p-4 text-sm text-neutral-500">
         Aucune imposition enregistrée pour l&apos;instant. Cliquez sur « Nouvelle imposition » pour commencer.
       </p>
     );
@@ -54,7 +54,7 @@ export default function ImpositionsTable({ rows }: { rows: ImpositionRow[] }) {
 
   return (
     <>
-      <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm">
+      <div className="overflow-x-auto card shadow-sm">
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-sm font-semibold text-neutral-700">
@@ -66,7 +66,7 @@ export default function ImpositionsTable({ rows }: { rows: ImpositionRow[] }) {
           <tbody>
             {rows.map((row) => (
               <tr key={row.id} className="border-t border-neutral-100 hover:bg-neutral-50">
-                <td className="p-4 font-semibold text-pico-black">{row.name}</td>
+                <td className="p-4 font-semibold text-text">{row.name}</td>
                 <td className="whitespace-nowrap p-4 text-neutral-500">
                   {formatDateTime(row.updated_at)}
                 </td>
@@ -105,7 +105,7 @@ export default function ImpositionsTable({ rows }: { rows: ImpositionRow[] }) {
                       disabled={deletingId === row.id}
                       title="Supprimer"
                       aria-label="Supprimer"
-                      className={`${actionClass} hover:bg-red-50 hover:text-red-600`}
+                      className={`${actionClass} hover:bg-danger-subtle hover:text-danger`}
                     >
                       {deletingId === row.id ? <SpinnerIcon className="h-4 w-4" /> : <TrashIcon className="h-4 w-4" />}
                     </button>
@@ -126,7 +126,7 @@ export default function ImpositionsTable({ rows }: { rows: ImpositionRow[] }) {
           />
           <a
             href={`/api/impositions/${viewing.id}/pdf?download=1`}
-            className="mt-4 flex items-center justify-center gap-2 rounded-lg bg-pico-maroon px-4 py-2 text-sm font-medium text-white hover:bg-pico-maroon-dark"
+            className="mt-4 flex items-center justify-center gap-2 btn-primary"
           >
             <DownloadIcon className="h-4 w-4" />
             Télécharger le PDF

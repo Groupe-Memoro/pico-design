@@ -95,7 +95,7 @@ function AlignBar({ count, onAlign }: { count: number; onAlign: (mode: AlignMode
   const modes: AlignMode[] = ["left", "hcenter", "right", "top", "vcenter", "bottom", "distributeH", "distributeV"];
   return (
     <div className="space-y-1">
-      <span className="block text-xs font-medium text-neutral-500">
+      <span className="label">
         {count > 1 ? "Aligner les zones entre elles" : "Aligner sur la page"}
       </span>
       <div className="flex flex-wrap gap-1">
@@ -125,7 +125,7 @@ function AlignBar({ count, onAlign }: { count: number; onAlign: (mode: AlignMode
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="block text-xs font-medium text-neutral-500">{label}</span>
+      <span className="label">{label}</span>
       {children}
     </label>
   );
@@ -739,7 +739,7 @@ export default function VariableDataEditor({
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <Link href={backHref} className="text-xs text-neutral-500 underline hover:text-pico-black">
+          <Link href={backHref} className="text-xs text-neutral-500 underline hover:text-text">
             ← Retour à la liste
           </Link>
           <input
@@ -750,7 +750,7 @@ export default function VariableDataEditor({
               setDirty(true);
             }}
             aria-label="Nom du modèle"
-            className="mt-1 block w-full max-w-xl rounded-lg border border-transparent bg-transparent px-1 text-page-title font-semibold text-pico-black hover:border-neutral-300 focus:border-neutral-300"
+            className="mt-1 block w-full max-w-xl rounded-lg border border-transparent bg-transparent px-1 text-page-title font-semibold text-text hover:border-neutral-300 focus:border-neutral-300"
           />
           <div className="mt-1 flex flex-wrap items-center gap-3 px-1 text-sm text-neutral-600">
             {extraField && (
@@ -764,7 +764,7 @@ export default function VariableDataEditor({
                     setExtraValue(e.target.value);
                     setDirty(true);
                   }}
-                  className="w-64 rounded-lg border border-neutral-300 bg-white px-2 py-1 text-sm"
+                  className="w-64 rounded-lg border border-neutral-300 bg-surface px-2 py-1 text-sm"
                 />
                 <datalist id="variable-data-extra">
                   {extraField.suggestions.map((s) => (
@@ -789,12 +789,12 @@ export default function VariableDataEditor({
           </div>
         </div>
         <div className="flex items-center gap-3">
-          {dirty && <span className="text-xs text-amber-700">Modifications non enregistrées</span>}
+          {dirty && <span className="text-xs text-warning-strong">Modifications non enregistrées</span>}
           <button
             type="button"
             onClick={save}
             disabled={saving || !dirty}
-            className="flex items-center gap-2 rounded-lg bg-pico-maroon px-4 py-2 text-sm font-medium text-white hover:bg-pico-maroon-dark disabled:opacity-50"
+            className="flex items-center gap-2 btn-primary disabled:opacity-50"
           >
             {saving && <SpinnerIcon className="h-4 w-4" />}
             Enregistrer
@@ -803,7 +803,7 @@ export default function VariableDataEditor({
       </div>
 
       {message && (
-        <p className={`text-sm ${message.tone === "error" ? "text-red-600" : "text-neutral-600"}`}>{message.text}</p>
+        <p className={`text-sm ${message.tone === "error" ? "text-danger" : "text-neutral-600"}`}>{message.text}</p>
       )}
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_24rem]">
@@ -818,7 +818,7 @@ export default function VariableDataEditor({
                     setSide(s);
                     setSelectedId(null);
                   }}
-                  className={`px-3 py-1.5 ${side === s ? "bg-pico-maroon text-white" : "bg-white hover:bg-neutral-50"}`}
+                  className={`px-3 py-1.5 ${side === s ? "bg-pico-maroon text-white" : "bg-surface hover:bg-neutral-50"}`}
                 >
                   {CARD_SIDE_LABELS[s]}
                 </button>
@@ -832,7 +832,7 @@ export default function VariableDataEditor({
                     key={k}
                     type="button"
                     onClick={() => setTool(k)}
-                    className={`px-3 py-1.5 ${tool === k ? "bg-pico-black text-white" : "bg-white hover:bg-neutral-50"}`}
+                    className={`px-3 py-1.5 ${tool === k ? "bg-pico-black text-white" : "bg-surface hover:bg-neutral-50"}`}
                   >
                     {CARD_ZONE_LABELS[k]}
                   </button>
@@ -847,7 +847,7 @@ export default function VariableDataEditor({
               onClick={() => zoomTo([...ZOOM_STEPS].reverse().find((z) => z < zoom - 0.01) ?? 1)}
               disabled={zoom <= 1}
               aria-label="Dézoomer"
-              className="h-7 w-7 rounded-lg border border-neutral-300 bg-white text-base leading-none hover:bg-neutral-50 disabled:opacity-40"
+              className="h-7 w-7 rounded-lg border border-neutral-300 bg-surface text-base leading-none hover:bg-neutral-50 disabled:opacity-40"
             >
               −
             </button>
@@ -857,7 +857,7 @@ export default function VariableDataEditor({
               onClick={() => zoomTo(ZOOM_STEPS.find((z) => z > zoom + 0.01) ?? MAX_ZOOM)}
               disabled={zoom >= MAX_ZOOM}
               aria-label="Zoomer"
-              className="h-7 w-7 rounded-lg border border-neutral-300 bg-white text-base leading-none hover:bg-neutral-50 disabled:opacity-40"
+              className="h-7 w-7 rounded-lg border border-neutral-300 bg-surface text-base leading-none hover:bg-neutral-50 disabled:opacity-40"
             >
               +
             </button>
@@ -865,7 +865,7 @@ export default function VariableDataEditor({
               type="button"
               onClick={() => zoomTo(1)}
               disabled={zoom === 1}
-              className="ml-1 rounded-lg border border-neutral-300 bg-white px-2 py-1 hover:bg-neutral-50 disabled:opacity-40"
+              className="ml-1 rounded-lg border border-neutral-300 bg-surface px-2 py-1 hover:bg-neutral-50 disabled:opacity-40"
             >
               Ajuster
             </button>
@@ -1113,7 +1113,7 @@ export default function VariableDataEditor({
               )}
               {(guides.safetyX > 0 || guides.safetyY > 0) && (
                 <span className="flex items-center gap-1.5">
-                  <span className="inline-block w-5 border-t-2 border-dashed border-green-600" /> Marge de sécurité
+                  <span className="inline-block w-5 border-t-2 border-dashed border-success" /> Marge de sécurité
                 </span>
               )}
               {(guides.folds.front.v.length > 0 || guides.folds.front.h.length > 0) && (
@@ -1175,10 +1175,10 @@ export default function VariableDataEditor({
 
         <div className="space-y-4">
           {/* Fond de la face affichée */}
-          <section className="space-y-2 rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
+          <section className="space-y-2 card p-4 shadow-sm">
             <div className="flex items-center justify-between gap-2">
-              <h2 className="text-sm font-semibold text-pico-black">Fond du {CARD_SIDE_LABELS[side].toLowerCase()}</h2>
-              <span className={`text-xs ${hasBackground(side) ? "text-green-700" : "text-amber-700"}`}>
+              <h2 className="text-sm font-semibold text-text">Fond du {CARD_SIDE_LABELS[side].toLowerCase()}</h2>
+              <span className={`text-xs ${hasBackground(side) ? "text-success-strong" : "text-warning-strong"}`}>
                 {uploading === side ? "Envoi…" : hasBackground(side) ? "✓ en place" : "manquant"}
               </span>
             </div>
@@ -1203,7 +1203,7 @@ export default function VariableDataEditor({
                   onClick={() => confirm("Retirer ce fond ?") && uploadBackground(side, null, true)}
                   title="Retirer"
                   aria-label="Retirer le fond"
-                  className="rounded-lg p-1.5 text-neutral-500 hover:bg-red-50 hover:text-red-600"
+                  className="rounded-lg p-1.5 text-neutral-500 hover:bg-danger-subtle hover:text-danger"
                 >
                   <TrashIcon className="h-4 w-4" />
                 </button>
@@ -1212,9 +1212,9 @@ export default function VariableDataEditor({
           </section>
 
           {/* Zone sélectionnée */}
-          <section className="space-y-3 rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
+          <section className="space-y-3 card p-4 shadow-sm">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-pico-black">
+              <h2 className="text-sm font-semibold text-text">
                 {selected ? `Zone ${CARD_ZONE_LABELS[selected.kind].toLowerCase()}` : selectedIds.length > 1 ? "Sélection" : "Zones"}
               </h2>
               {selected && (
@@ -1224,7 +1224,7 @@ export default function VariableDataEditor({
                     onClick={() => duplicate(selected)}
                     title="Dupliquer"
                     aria-label="Dupliquer la zone"
-                    className="rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-pico-black"
+                    className="icon-btn"
                   >
                     <CopyIcon className="h-4 w-4" />
                   </button>
@@ -1233,7 +1233,7 @@ export default function VariableDataEditor({
                     onClick={() => removeZone(selected.id)}
                     title="Supprimer"
                     aria-label="Supprimer la zone"
-                    className="rounded-lg p-1.5 text-neutral-500 hover:bg-red-50 hover:text-red-600"
+                    className="rounded-lg p-1.5 text-neutral-500 hover:bg-danger-subtle hover:text-danger"
                   >
                     <TrashIcon className="h-4 w-4" />
                   </button>
@@ -1247,7 +1247,7 @@ export default function VariableDataEditor({
                   <button
                     type="button"
                     onClick={() => removeZones(selectedIds)}
-                    className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-neutral-500 hover:bg-red-50 hover:text-red-600"
+                    className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-neutral-500 hover:bg-danger-subtle hover:text-danger"
                   >
                     <TrashIcon className="h-3.5 w-3.5" /> Supprimer
                   </button>
@@ -1365,7 +1365,7 @@ export default function VariableDataEditor({
                       )}
                       {hasRowData && shown && (
                         <p className="truncate text-xs text-neutral-500">
-                          {vocab.Row} {previewIndex + 1} : <span className="text-pico-black">{shown}</span>
+                          {vocab.Row} {previewIndex + 1} : <span className="text-text">{shown}</span>
                         </p>
                       )}
                     </div>
@@ -1520,9 +1520,9 @@ export default function VariableDataEditor({
           </section>
 
           {/* Repères et magnétisme */}
-          <section className="space-y-2 rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
+          <section className="space-y-2 card p-4 shadow-sm">
             <div className="flex items-center justify-between gap-2">
-              <h2 className="text-sm font-semibold text-pico-black">Repères</h2>
+              <h2 className="text-sm font-semibold text-text">Repères</h2>
               <label className="flex items-center gap-1.5 text-xs text-neutral-600">
                 <input type="checkbox" checked={snapOn} onChange={(e) => setSnapOn(e.target.checked)} />
                 Magnétisme
@@ -1561,7 +1561,7 @@ export default function VariableDataEditor({
                       type="button"
                       onClick={() => removeGuide(g.id)}
                       aria-label="Retirer le repère"
-                      className="ml-auto rounded-lg p-1 text-neutral-400 hover:bg-red-50 hover:text-red-600"
+                      className="ml-auto rounded-lg p-1 text-neutral-400 hover:bg-danger-subtle hover:text-danger"
                     >
                       <TrashIcon className="h-3.5 w-3.5" />
                     </button>

@@ -74,7 +74,7 @@ export default function ThemesTable({
     <div>
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="flex items-center gap-2 text-page-title font-semibold text-pico-black">
+          <h1 className="flex items-center gap-2 text-page-title font-semibold text-text">
             Thèmes
             <UpdatingBadge show={isPending} />
           </h1>
@@ -86,7 +86,7 @@ export default function ThemesTable({
         <button
           onClick={() => setModal({ mode: "create" })}
           disabled={templates.length === 0}
-          className="flex items-center gap-2 rounded-lg bg-pico-maroon px-4 py-2 text-sm font-medium text-white hover:bg-pico-maroon-dark disabled:opacity-40"
+          className="flex items-center gap-2 btn-primary disabled:opacity-40"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-4 w-4">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v14m-7-7h14" />
@@ -96,7 +96,7 @@ export default function ThemesTable({
       </div>
 
       {templates.length === 0 && (
-        <p className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800">
+        <p className="mb-4 rounded-xl border border-warning bg-warning-subtle p-4 text-sm text-warning-strong">
           Aucun modèle disponible — crée-en un d&apos;abord dans{" "}
           <a href="/templates" className="underline">
             Modèles
@@ -124,15 +124,15 @@ export default function ThemesTable({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Rechercher (nom)..."
-            className="w-full rounded-lg border border-neutral-300 bg-white py-2 pl-9 pr-3 text-sm"
+            className="w-full rounded-lg border border-neutral-300 bg-surface py-2 pl-9 pr-3 text-sm"
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-neutral-500">Modèle</label>
+          <label className="label">Modèle</label>
           <select
             value={templateId}
             onChange={(e) => setTemplateId(e.target.value)}
-            className="mt-1 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm"
+            className="mt-1 input"
           >
             <option value="">— Tous —</option>
             {templates.map((t) => (
@@ -145,7 +145,7 @@ export default function ThemesTable({
       </div>
 
       {filtered.length === 0 ? (
-        <p className="rounded-xl border border-neutral-200 bg-white p-4 text-sm text-neutral-500">
+        <p className="card p-4 text-sm text-neutral-500">
           Aucun thème ne correspond.
         </p>
       ) : (
@@ -153,7 +153,7 @@ export default function ThemesTable({
           {filtered.map((t) => (
             <div
               key={t.id}
-              className={`overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm transition-opacity duration-300 ${
+              className={`overflow-hidden card shadow-sm transition-opacity duration-300 ${
                 deletingId === t.id ? "opacity-40" : ""
               }`}
             >
@@ -167,13 +167,13 @@ export default function ThemesTable({
               </div>
               <div className="p-3">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="truncate text-sm font-medium text-pico-black">{t.name}</span>
+                  <span className="truncate text-sm font-medium text-text">{t.name}</span>
                   <div className="flex shrink-0 gap-1">
                     <button
                       onClick={() => setModal({ mode: "edit", theme: t })}
                       title="Modifier"
                       aria-label="Modifier"
-                      className="inline-flex rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-pico-black"
+                      className="icon-btn"
                     >
                       <FilePenIcon className="h-4 w-4" />
                     </button>
@@ -182,7 +182,7 @@ export default function ThemesTable({
                       disabled={deletingId === t.id}
                       title="Supprimer"
                       aria-label="Supprimer"
-                      className="inline-flex rounded-lg p-1.5 text-neutral-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                      className="inline-flex rounded-lg p-1.5 text-neutral-500 hover:bg-danger-subtle hover:text-danger disabled:opacity-50"
                     >
                       {deletingId === t.id ? <SpinnerIcon className="h-4 w-4" /> : <TrashIcon className="h-4 w-4" />}
                     </button>

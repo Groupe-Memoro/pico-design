@@ -1439,7 +1439,7 @@ export default function ImageSourcePicker({
           </div>
         )
       ) : visuals.length === 0 ? (
-        <p className="rounded border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800">
+        <p className="rounded border border-warning bg-warning-subtle p-4 text-sm text-warning-strong">
           Aucun visuel dans la banque. Ajoutes-en d&apos;abord dans{" "}
           <a href="/visuals" className="underline">
             Banque de visuels
@@ -1516,14 +1516,14 @@ export default function ImageSourcePicker({
             <button
               type="button"
               onClick={recenter}
-              className="text-xs text-neutral-500 underline hover:text-pico-black"
+              className="text-xs text-neutral-500 underline hover:text-text"
             >
               Recentrer
             </button>
           )}
         </div>
         )}
-        {previewError && <p className="mt-1 text-sm text-red-600">{previewError}</p>}
+        {previewError && <p className="mt-1 text-sm text-danger">{previewError}</p>}
         {hasTemplate ? (
           // Cadre gris autour de la page : seulement dans l'admin. Dans l'Outil
           // Shopify, sa marge prendrait sur la place de la page (voir fitBox).
@@ -2020,7 +2020,7 @@ export default function ImageSourcePicker({
               {/* Sans en-tête (Outil Shopify), le rendu en cours se signale
                   dans le coin de la page. */}
               {previewSize === "lg" && previewLoading && (
-                <span className="pointer-events-none absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-white/90 px-2 py-0.5 text-xs text-neutral-500 shadow-sm">
+                <span className="pointer-events-none absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-neutral-50/90 px-2 py-0.5 text-xs text-neutral-500 shadow-sm">
                   <SpinnerIcon className="h-3.5 w-3.5" /> génération...
                 </span>
               )}

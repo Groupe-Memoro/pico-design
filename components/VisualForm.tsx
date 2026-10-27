@@ -112,7 +112,7 @@ export default function VisualForm({
               setNameTouched(true);
             }}
             placeholder="Ex. Motif pois orange"
-            className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
+            className="mt-1 w-full input"
           />
         </div>
       )}
@@ -151,7 +151,7 @@ export default function VisualForm({
         <select
           value={collectionId}
           onChange={(e) => setCollectionId(e.target.value)}
-          className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
+          className="mt-1 w-full input"
         >
           <option value="">— Aucune —</option>
           {collections.map((c) => (
@@ -169,7 +169,7 @@ export default function VisualForm({
         </p>
       )}
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
 
       <button
         type="submit"

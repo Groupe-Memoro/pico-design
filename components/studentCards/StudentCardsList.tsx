@@ -71,7 +71,7 @@ function NewCardForm({ schools, onCancel }: { schools: string[]; onCancel: () =>
   return (
     <form onSubmit={submit} className="space-y-4">
       <div>
-        <label className="block text-xs font-medium text-neutral-500">École</label>
+        <label className="label">École</label>
         <input
           autoFocus
           list="student-card-schools"
@@ -79,7 +79,7 @@ function NewCardForm({ schools, onCancel }: { schools: string[]; onCancel: () =>
           maxLength={120}
           onChange={(e) => setSchool(e.target.value)}
           placeholder="Ex. École secondaire Notre-Dame"
-          className="mt-1 w-full rounded border border-neutral-300 px-3 py-2 text-sm"
+          className="mt-1 w-full input"
           required
         />
         <datalist id="student-card-schools">
@@ -89,18 +89,18 @@ function NewCardForm({ schools, onCancel }: { schools: string[]; onCancel: () =>
         </datalist>
       </div>
       <div>
-        <label className="block text-xs font-medium text-neutral-500">Nom du modèle</label>
+        <label className="label">Nom du modèle</label>
         <input
           value={name}
           maxLength={120}
           onChange={(e) => setName(e.target.value)}
           placeholder="Ex. Carte étudiante 2026-2027"
-          className="mt-1 w-full rounded border border-neutral-300 px-3 py-2 text-sm"
+          className="mt-1 w-full input"
           required
         />
       </div>
       <div>
-        <span className="block text-xs font-medium text-neutral-500">Format</span>
+        <span className="label">Format</span>
         <div className="mt-1 flex flex-wrap gap-1.5">
           {CARD_FORMATS.map((f, i) => (
             <button
@@ -120,19 +120,19 @@ function NewCardForm({ schools, onCancel }: { schools: string[]; onCancel: () =>
         <input type="checkbox" checked={twoSided} onChange={(e) => setTwoSided(e.target.checked)} />
         Recto-verso
       </label>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
       <div className="flex gap-2">
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-lg border border-neutral-300 px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-50"
+          className="btn-secondary"
         >
           Annuler
         </button>
         <button
           type="submit"
           disabled={busy}
-          className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-pico-maroon px-4 py-2 text-sm font-medium text-white hover:bg-pico-maroon-dark disabled:opacity-50"
+          className="flex flex-1 items-center justify-center gap-2 btn-primary disabled:opacity-50"
         >
           {busy && <SpinnerIcon className="h-4 w-4" />}
           Créer et ouvrir le modèle
@@ -182,7 +182,7 @@ export default function StudentCardsList({ templates }: { templates: StudentCard
     <div>
       <div className="mb-6 flex items-center justify-between gap-3">
         <div>
-          <h1 className="flex items-center gap-2 text-page-title font-semibold text-pico-black">
+          <h1 className="flex items-center gap-2 text-page-title font-semibold text-text">
             Cartes étudiantes
             <UpdatingBadge show={isPending} />
           </h1>
@@ -194,7 +194,7 @@ export default function StudentCardsList({ templates }: { templates: StudentCard
         <button
           type="button"
           onClick={() => setCreating(true)}
-          className="shrink-0 rounded-lg bg-pico-maroon px-4 py-2 text-sm font-medium text-white hover:bg-pico-maroon-dark"
+          className="shrink-0 btn-primary"
         >
           Nouveau modèle
         </button>
@@ -205,12 +205,12 @@ export default function StudentCardsList({ templates }: { templates: StudentCard
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Rechercher (école, modèle)..."
-          className="mb-4 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm sm:max-w-xs"
+          className="mb-4 w-full input sm:max-w-xs"
         />
       )}
 
       {templates.length === 0 ? (
-        <p className="rounded-xl border border-neutral-200 bg-white p-6 text-center text-sm text-neutral-500">
+        <p className="card p-6 text-center text-sm text-neutral-500">
           Aucun modèle pour l&apos;instant. Créez-en un pour une école, ajoutez le fond de la carte, puis dessinez les
           zones : textes, photo et code-barres.
         </p>
@@ -219,7 +219,7 @@ export default function StudentCardsList({ templates }: { templates: StudentCard
           {groups.map(([school, items]) => (
             <section key={school}>
               <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">{school}</h2>
-              <ul className="divide-y divide-neutral-100 rounded-xl border border-neutral-200 bg-white">
+              <ul className="divide-y divide-neutral-100 card">
                 {items.map((t) => {
                   const missing = [!t.front_path && "fond du recto", t.two_sided && !t.back_path && "fond du verso", t.zones.length === 0 && "zones"]
                     .filter(Boolean)
@@ -233,11 +233,11 @@ export default function StudentCardsList({ templates }: { templates: StudentCard
                         <CardThumbnail template={t} />
                       </Link>
                       <Link href={`/cartes-etudiantes/${t.id}`} className="min-w-0 flex-1">
-                        <p className="truncate font-medium text-pico-black hover:underline">{t.name}</p>
+                        <p className="truncate font-medium text-text hover:underline">{t.name}</p>
                         <p className="text-xs text-neutral-500">
                           {formatLabel(t.width_mm, t.height_mm)} · {t.two_sided ? "recto-verso" : "recto"} · {t.zones.length}{" "}
                           zone{t.zones.length > 1 ? "s" : ""}
-                          {missing && <span className="text-amber-700"> · à compléter : {missing}</span>}
+                          {missing && <span className="text-warning-strong"> · à compléter : {missing}</span>}
                         </p>
                       </Link>
                       <div className="flex shrink-0 items-center gap-1">
@@ -245,7 +245,7 @@ export default function StudentCardsList({ templates }: { templates: StudentCard
                           href={`/cartes-etudiantes/${t.id}`}
                           title="Ouvrir"
                           aria-label="Ouvrir"
-                          className="rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-pico-black"
+                          className="icon-btn"
                         >
                           <FilePenIcon className="h-4 w-4" />
                         </Link>
@@ -255,7 +255,7 @@ export default function StudentCardsList({ templates }: { templates: StudentCard
                           disabled={deletingId === t.id}
                           title="Supprimer"
                           aria-label="Supprimer"
-                          className="rounded-lg p-1.5 text-neutral-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                          className="rounded-lg p-1.5 text-neutral-500 hover:bg-danger-subtle hover:text-danger disabled:opacity-50"
                         >
                           {deletingId === t.id ? <SpinnerIcon className="h-4 w-4" /> : <TrashIcon className="h-4 w-4" />}
                         </button>

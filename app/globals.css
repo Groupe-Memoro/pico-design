@@ -28,6 +28,20 @@
   --neutral-700: #423b32;
   --neutral-800: #2a251f;
   --neutral-900: #1a1613;
+  --neutral-950: #0f0c0a;
+  /* Mêmes gris en triplets RVB : la palette « neutral » de Tailwind en est
+     faite (voir tailwind.config.ts), opacités comprises (bg-neutral-200/70). */
+  --neutral-50-rgb: 250 247 242;
+  --neutral-100-rgb: 242 236 227;
+  --neutral-200-rgb: 230 221 209;
+  --neutral-300-rgb: 212 200 184;
+  --neutral-400-rgb: 169 158 142;
+  --neutral-500-rgb: 125 115 100;
+  --neutral-600-rgb: 92 83 71;
+  --neutral-700-rgb: 66 59 50;
+  --neutral-800-rgb: 42 37 31;
+  --neutral-900-rgb: 26 22 19;
+  --neutral-950-rgb: 15 12 10;
 
   --background: var(--neutral-50);
   --surface: var(--neutral-0);
@@ -42,6 +56,7 @@
   --primary: var(--pico-bourgogne);
   --primary-hover: #4d0c1f;
   --primary-subtle: #f6e6ea;
+  --primary-rgb: 99 16 40;
   --accent: var(--pico-orange);
   --accent-hover: #e8531f;
   --accent-subtle: #ffe9e0;
@@ -53,6 +68,11 @@
   --warning-subtle: #fdefd9;
   --danger: #c0392b;
   --danger-subtle: #fae7e4;
+  --danger-hover: #a12f23;
+  /* Textes d'état : --warning et --success sont trop clairs pour un texte
+     de 12 px sur fond clair ; ces deux-là passent 4,5:1. */
+  --warning-strong: #8a5410;
+  --success-strong: #2c6e44;
   /* Pastilles d'état (voir SideDot, DesignEditor) : --success/--danger sont
      volontairement doux pour les encadrés et les textes, trop discrets sur
      une pastille de 8 px. Ces deux-ci tiennent aussi bien sur le fond clair
@@ -85,6 +105,26 @@
 }
 
 :root[data-theme="dark"] {
+  color-scheme: dark;
+  /* Gamme de gris inversée : les classes neutral-* de l'interface (fonds
+     doux, bordures, textes secondaires) suivent sans être retouchées. */
+  --neutral-50-rgb: 38 32 25;
+  --neutral-100-rgb: 46 38 31;
+  --neutral-200-rgb: 58 48 40;
+  --neutral-300-rgb: 74 62 51;
+  --neutral-400-rgb: 107 94 80;
+  --neutral-500-rgb: 140 129 114;
+  --neutral-600-rgb: 182 171 156;
+  --neutral-700-rgb: 207 197 183;
+  --neutral-800-rgb: 227 219 207;
+  --neutral-900-rgb: 244 239 232;
+  --neutral-950-rgb: 250 247 242;
+  --primary-rgb: 184 69 95;
+  --danger: #e0675a;
+  --danger-hover: #ec7f73;
+  --warning-strong: #f0b25e;
+  --success: #5fb27c;
+  --success-strong: #7cc796;
   --background: #151210;
   --surface: #1f1a16;
   --surface-muted: #282019;
@@ -547,4 +587,44 @@ select:not([multiple]):not([size]) {
   background-position: right 0.75rem center;
   background-size: 1em;
   padding-right: 2.25rem;
+}
+
+/* Composants de base de l'interface : un seul endroit pour l'arrondi, les
+   marges et les couleurs des encadrés, champs et boutons. Dans @layer
+   components : un utilitaire posé à côté (mt-1, w-full, px-2…) l'emporte. */
+@layer components {
+  /* Encadré de section, liste, tableau. */
+  .card {
+    @apply rounded-xl border border-neutral-200 bg-surface;
+  }
+  /* Champ texte, nombre, menu déroulant, zone de texte. */
+  .input {
+    @apply rounded border border-neutral-300 bg-surface px-3 py-2 text-sm text-text placeholder:text-neutral-400 focus:border-pico-maroon focus:outline-none focus:ring-2 focus:ring-pico-maroon/20 disabled:opacity-60;
+  }
+  /* Étiquette au-dessus d'un champ. */
+  .label {
+    @apply block text-xs font-medium text-neutral-500;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-60;
+  }
+  /* Action principale (bourgogne). */
+  .btn-primary {
+    @apply btn bg-pico-maroon font-medium text-white hover:bg-pico-maroon-dark;
+  }
+  /* Action secondaire (contour). */
+  .btn-secondary {
+    @apply btn border border-neutral-300 bg-surface text-neutral-700 hover:bg-neutral-50;
+  }
+  /* Bouton d'icône seule (ouvrir, supprimer…). */
+  .icon-btn {
+    @apply inline-flex items-center justify-center rounded-lg p-1.5 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-text;
+  }
+}
+
+/* Mode sombre : le logo (une image, réglable dans Paramètres) passe en blanc.
+   brightness(0) le rend noir, invert(1) le retourne en blanc ; la
+   transparence est gardée. */
+:root[data-theme="dark"] .brand-logo {
+  filter: brightness(0) invert(1);
 }

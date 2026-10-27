@@ -123,7 +123,7 @@ export default function AlbumBlockForm({
               {c.photo ? "Remplacer la photo" : "Choisir une photo"}
             </button>
             {c.photo && (
-              <button type="button" onClick={() => patch<CoverContent>({ photo: null })} className="text-sm text-red-600 hover:underline">
+              <button type="button" onClick={() => patch<CoverContent>({ photo: null })} className="text-sm text-danger hover:underline">
                 Retirer
               </button>
             )}
@@ -213,12 +213,12 @@ export default function AlbumBlockForm({
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={allThumbs[p]} alt="" className="h-full w-full object-cover" />
                 )}
-                <span className="absolute left-1 top-1 rounded bg-white/90 px-1 text-[10px] font-medium">{i + 1}</span>
+                <span className="absolute left-1 top-1 rounded bg-neutral-50/90 px-1 text-[10px] font-medium">{i + 1}</span>
                 <button
                   type="button"
                   onClick={() => patch<FreeContent>({ photos: c.photos.filter((x) => x !== p) })}
                   aria-label="Retirer la photo"
-                  className="absolute right-1 top-1 rounded-full bg-white/90 p-1 text-neutral-600 hover:text-red-600"
+                  className="absolute right-1 top-1 rounded-full bg-neutral-50/90 p-1 text-neutral-600 hover:text-danger"
                 >
                   <TrashIcon className="h-3.5 w-3.5" />
                 </button>
@@ -296,13 +296,13 @@ export default function AlbumBlockForm({
             <SpinnerIcon className="h-4 w-4" /> Envoi des photos… {uploading}
           </p>
         )}
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-danger">{error}</p>}
         <div className="flex justify-end pt-2">
           <button
             type="button"
             onClick={save}
             disabled={saving || Boolean(uploading)}
-            className="flex items-center gap-2 rounded-lg bg-pico-maroon px-4 py-2 text-sm font-medium text-white hover:bg-pico-maroon-dark disabled:opacity-60"
+            className="flex items-center gap-2 btn-primary disabled:opacity-60"
           >
             {saving && <SpinnerIcon className="h-4 w-4" />}
             Enregistrer

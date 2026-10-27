@@ -19,7 +19,7 @@ export function RowActions({ onEdit, onDelete, busy }: { onEdit: () => void; onD
         type="button"
         onClick={onEdit}
         aria-label="Modifier"
-        className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-pico-black"
+        className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-text"
       >
         <FilePenIcon className="h-4 w-4" />
       </button>
@@ -28,7 +28,7 @@ export function RowActions({ onEdit, onDelete, busy }: { onEdit: () => void; onD
         onClick={onDelete}
         disabled={busy}
         aria-label="Supprimer"
-        className="rounded-lg p-1.5 text-neutral-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
+        className="rounded-lg p-1.5 text-neutral-400 hover:bg-danger-subtle hover:text-danger disabled:opacity-40"
       >
         {busy ? <SpinnerIcon className="h-4 w-4" /> : <TrashIcon className="h-4 w-4" />}
       </button>
@@ -41,7 +41,7 @@ export function SubmitButton({ loading, children }: { loading: boolean; children
     <button
       type="submit"
       disabled={loading}
-      className="flex w-full items-center justify-center gap-2 rounded-lg bg-pico-maroon px-4 py-2 text-sm font-medium text-white hover:bg-pico-maroon-dark disabled:opacity-50"
+      className="flex w-full items-center justify-center gap-2 btn-primary disabled:opacity-50"
     >
       {loading && <SpinnerIcon className="h-4 w-4" />}
       {children}
@@ -94,12 +94,12 @@ function SheetForm({
         <MeasureField key={`w-${unit}`} label="Largeur" valueMm={width} unit={unit} onChange={setWidth} />
         <MeasureField key={`h-${unit}`} label="Hauteur" valueMm={height} unit={unit} onChange={setHeight} />
       </div>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
       <div className="flex gap-2">
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-lg border border-neutral-300 px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-50"
+          className="btn-secondary"
         >
           Annuler
         </button>
@@ -164,7 +164,7 @@ export function SheetsManager({
       <button
         type="button"
         onClick={() => setEditing("new")}
-        className="w-full rounded-lg border border-dashed border-neutral-300 px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-50"
+        className="w-full btn-secondary border-dashed"
       >
         + Nouvelle feuille
       </button>

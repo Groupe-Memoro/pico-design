@@ -39,7 +39,7 @@ function SortableTile({ menuKey }: { menuKey: MenuKey }) {
     <div
       ref={setNodeRef}
       style={style}
-      className="group relative flex items-center gap-4 rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm transition-all duration-200 ease-out hover:-translate-y-1 hover:border-transparent hover:shadow-xl"
+      className="group relative flex items-center gap-4 rounded-2xl border border-neutral-200 bg-surface p-5 shadow-sm transition-all duration-200 ease-out hover:-translate-y-1 hover:border-transparent hover:shadow-xl"
     >
       <Link href={item.href} className="flex flex-1 items-center gap-4 overflow-hidden">
         <span
@@ -49,7 +49,7 @@ function SortableTile({ menuKey }: { menuKey: MenuKey }) {
               carte (`group`) ; `motion-safe` la coupe pour qui a demandé moins d'animations. */}
           <item.icon className="h-6 w-6 motion-safe:group-hover:animate-jello" />
         </span>
-        <span className="truncate font-heading text-2xl font-semibold text-pico-black transition-transform duration-200 ease-out group-hover:translate-x-0.5">
+        <span className="truncate font-heading text-2xl font-semibold text-text transition-transform duration-200 ease-out group-hover:translate-x-0.5">
           {item.title}
         </span>
       </Link>

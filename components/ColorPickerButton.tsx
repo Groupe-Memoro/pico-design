@@ -127,7 +127,7 @@ export default function ColorPickerButton({
         createPortal(
           <div
             ref={panelRef}
-            className="fixed z-50 space-y-2 rounded-xl border border-neutral-200 bg-white p-3 shadow-xl"
+            className="fixed z-50 space-y-2 card p-3 shadow-xl"
             style={{ top: position.top, left: position.left, width: PANEL_WIDTH }}
           >
             <HexColorPicker

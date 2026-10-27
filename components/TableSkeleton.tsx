@@ -16,7 +16,7 @@ export default function TableSkeleton({ rows = 6 }: { rows?: number }) {
         <Skeleton className="h-9 w-32 rounded-lg" />
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
+      <div className="overflow-hidden card shadow-sm">
         {Array.from({ length: rows }).map((_, i) => (
           <div
             key={i}

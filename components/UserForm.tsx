@@ -74,7 +74,7 @@ export default function UserForm({
         <input
           value={fullName}
           onChange={(e) => setFullName(e.target.value)}
-          className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+          className="mt-1 w-full input"
         />
       </div>
       <div>
@@ -84,7 +84,7 @@ export default function UserForm({
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+          className="mt-1 w-full input"
         />
       </div>
       <div>
@@ -93,7 +93,7 @@ export default function UserForm({
           value={role}
           onChange={(e) => setRole(e.target.value as "admin" | "designer" | "gestionnaire")}
           disabled={isSelf}
-          className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm disabled:bg-neutral-100"
+          className="mt-1 w-full input disabled:bg-neutral-100"
         >
           <option value="designer">Designer</option>
           <option value="gestionnaire">Gestionnaire</option>
@@ -114,7 +114,7 @@ export default function UserForm({
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder={isEditing ? "Laisser vide pour ne pas changer" : undefined}
-            className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+            className="w-full input"
           />
           <button
             type="button"
@@ -142,9 +142,9 @@ export default function UserForm({
             </button>
           )}
         </div>
-        {copied && <p className="mt-1 text-xs text-green-600">Copié.</p>}
+        {copied && <p className="mt-1 text-xs text-success-strong">Copié.</p>}
         {password && passwordError ? (
-          <p className="mt-1 text-xs text-red-600">{passwordError}</p>
+          <p className="mt-1 text-xs text-danger">{passwordError}</p>
         ) : (
           <p className="mt-1 text-xs text-neutral-500">
             {!isEditing
@@ -153,11 +153,11 @@ export default function UserForm({
           </p>
         )}
       </div>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
       <button
         type="submit"
         disabled={saving || Boolean(password && passwordError)}
-        className="inline-flex items-center gap-2 rounded-lg bg-pico-maroon px-4 py-2 text-sm font-medium text-white hover:bg-pico-maroon-dark disabled:opacity-50"
+        className="inline-flex items-center gap-2 btn-primary disabled:opacity-50"
       >
         {saving && <SpinnerIcon className="h-4 w-4" />}
         {isEditing ? "Enregistrer" : "Créer le compte"}

@@ -104,7 +104,7 @@ function QualityBadge({ dpi }: { dpi: number }) {
   const low = dpi < 100;
   return (
     <span
-      className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${low ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-800"}`}
+      className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${low ? "bg-danger-subtle text-danger" : "bg-warning-subtle text-warning-strong"}`}
       title={`Environ ${Math.round(dpi)} ppp à ce format (300 idéal).`}
     >
       {low ? "Risque de flou" : "Qualité moyenne"}
@@ -449,10 +449,10 @@ export default function PhotoPrintTool({
           <p className="text-sm text-text-muted">Glisse-les ici ou clique — JPEG, PNG, WebP, ou un fichier .zip.</p>
           <input ref={input} type="file" multiple accept={ACCEPT} className="hidden" onChange={(e) => e.target.files && addFiles(e.target.files)} />
         </div>
-        {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+        {error && <p className="mt-3 text-sm text-danger">{error}</p>}
 
         {done !== null && (
-          <p className="mt-4 rounded-lg bg-green-50 p-3 text-sm text-green-800">
+          <p className="mt-4 rounded-lg bg-success-subtle p-3 text-sm text-success-strong">
             {done} photo{done > 1 ? "s" : ""} enregistrée{done > 1 ? "s" : ""} (lot {batchId.current}). Depuis la boutique, elles
             arrivent directement au panier.
           </p>
@@ -488,7 +488,7 @@ export default function PhotoPrintTool({
                   <button type="button" onClick={() => setEditing(i)} className="relative flex h-44 items-center justify-center bg-surface-muted" title="Vérifier le cadrage">
                     <CropPreview photo={photo} template={template} url={photo.thumbUrl} width={pageOf(template, photo.rotated).w > pageOf(template, photo.rotated).h ? 160 : 112} />
                     {photo.reviewed && (
-                      <span className="absolute right-1 top-1 rounded-full bg-green-600 p-0.5 text-white">
+                      <span className="absolute right-1 top-1 rounded-full bg-success p-0.5 text-white">
                         <CheckIcon className="h-3.5 w-3.5" />
                       </span>
                     )}
@@ -517,7 +517,7 @@ export default function PhotoPrintTool({
                         +
                       </button>
                     </div>
-                    <button type="button" onClick={() => remove(i)} className="rounded-lg p-1.5 text-text-muted hover:bg-red-50 hover:text-red-600" aria-label="Retirer">
+                    <button type="button" onClick={() => remove(i)} className="rounded-lg p-1.5 text-text-muted hover:bg-danger-subtle hover:text-danger" aria-label="Retirer">
                       <TrashIcon className="h-4 w-4" />
                     </button>
                   </div>

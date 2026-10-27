@@ -131,7 +131,7 @@ export default function DuploJobsManager({
   return (
     <div className="space-y-5">
       <div className="space-y-2">
-        <label className="block text-xs font-medium text-neutral-500">Fichier AllJobs de la Duplo</label>
+        <label className="label">Fichier AllJobs de la Duplo</label>
         <input
           type="file"
           accept=".csv,text/csv"
@@ -147,17 +147,17 @@ export default function DuploJobsManager({
             type="button"
             onClick={handleImport}
             disabled={busy}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-pico-maroon px-4 py-2 text-sm font-medium text-white hover:bg-pico-maroon-dark disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-2 btn-primary disabled:opacity-50"
           >
             {busy && <SpinnerIcon className="h-4 w-4" />}
             Importer {parsed.jobs.length} jobs de « {parsed.fileName} »
           </button>
         )}
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-danger">{error}</p>}
       </div>
 
       <div className="space-y-2">
-        <label className="block text-xs font-medium text-neutral-500">
+        <label className="label">
           Codes-barres des jobs (PDF) · {barcodeJobNos.length} importés
         </label>
         <input
@@ -187,7 +187,7 @@ export default function DuploJobsManager({
                 type="button"
                 onClick={handleBarcodeImport}
                 disabled={busy}
-                className="flex w-full items-center justify-center gap-2 rounded-lg bg-pico-maroon px-4 py-2 text-sm font-medium text-white hover:bg-pico-maroon-dark disabled:opacity-50"
+                className="flex w-full items-center justify-center gap-2 btn-primary disabled:opacity-50"
               >
                 {busy && <SpinnerIcon className="h-4 w-4" />}
                 {progress ? `Import… ${progress.done} / ${progress.total}` : `Importer ${barcodes.files.length} codes-barres`}
@@ -195,18 +195,18 @@ export default function DuploJobsManager({
             )}
           </>
         )}
-        {barcodeError && <p className="text-sm text-red-600">{barcodeError}</p>}
+        {barcodeError && <p className="text-sm text-danger">{barcodeError}</p>}
       </div>
 
       <div>
         <div className="mb-2 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-pico-black">Jobs enregistrés ({jobs.length})</h3>
+          <h3 className="text-sm font-semibold text-text">Jobs enregistrés ({jobs.length})</h3>
           {jobs.length > 0 && (
             <button
               type="button"
               onClick={handleClear}
               disabled={busy}
-              className="text-xs text-neutral-500 underline hover:text-red-600 disabled:opacity-40"
+              className="text-xs text-neutral-500 underline hover:text-danger disabled:opacity-40"
             >
               Vider le catalogue
             </button>

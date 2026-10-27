@@ -51,7 +51,7 @@ export default function SkuForm({
           value={form.sku}
           onChange={(e) => setForm((f) => ({ ...f, sku: e.target.value }))}
           placeholder="Ex. imp-4x6-1side"
-          className="mt-1 w-full rounded border border-neutral-300 px-3 py-2 font-mono text-sm"
+          className="mt-1 w-full input font-mono"
         />
       </div>
       <div>
@@ -61,7 +61,7 @@ export default function SkuForm({
           value={form.name}
           onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
           placeholder="Ex. Papeterie - 4 x 6 pouces / 1 côté"
-          className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
+          className="mt-1 w-full input"
         />
       </div>
       <div>
@@ -70,7 +70,7 @@ export default function SkuForm({
           required
           value={form.sku_group_id}
           onChange={(e) => setForm((f) => ({ ...f, sku_group_id: e.target.value }))}
-          className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
+          className="mt-1 w-full input"
         >
           {skuGroups.map((g) => (
             <option key={g.id} value={g.id}>
@@ -79,18 +79,18 @@ export default function SkuForm({
           ))}
         </select>
         {skuGroups.length === 0 && (
-          <p className="mt-1 text-xs text-amber-700">
+          <p className="mt-1 text-xs text-warning-strong">
             Aucun groupe disponible — crée-en un d&apos;abord.
           </p>
         )}
       </div>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
 
       <button
         type="submit"
         disabled={loading}
-        className="flex w-full items-center justify-center gap-2 rounded-lg bg-pico-maroon px-4 py-2 text-sm font-medium text-white hover:bg-pico-maroon-dark disabled:opacity-50"
+        className="flex w-full items-center justify-center gap-2 btn-primary disabled:opacity-50"
       >
         {loading && <SpinnerIcon className="h-4 w-4" />}
         {isEditing ? "Enregistrer" : "Créer le SKU"}

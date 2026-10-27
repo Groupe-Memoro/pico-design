@@ -90,7 +90,7 @@ export default function IllustrationPicker({
                   />
                 )}
                 {loadingId === illustration.id && (
-                  <span className="absolute inset-0 flex items-center justify-center bg-white/60">
+                  <span className="absolute inset-0 flex items-center justify-center bg-neutral-50/60">
                     <SpinnerIcon className="h-5 w-5" />
                   </span>
                 )}

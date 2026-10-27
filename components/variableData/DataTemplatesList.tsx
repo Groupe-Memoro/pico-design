@@ -67,7 +67,7 @@ function NewDataTemplateForm({
   return (
     <form onSubmit={submit} className="space-y-4">
       <div>
-        <label className="block text-xs font-medium text-neutral-500">Modèle</label>
+        <label className="label">Modèle</label>
         <SearchSelect
           options={options}
           value={templateId}
@@ -83,29 +83,29 @@ function NewDataTemplateForm({
         <p className="mt-1 text-xs text-neutral-500">Le gabarit reprend son format et son fond perdu.</p>
       </div>
       <div>
-        <label className="block text-xs font-medium text-neutral-500">Nom du gabarit</label>
+        <label className="label">Nom du gabarit</label>
         <input
           value={name}
           maxLength={120}
           onChange={(e) => setName(e.target.value)}
           placeholder="Ex. Cartes de remerciement — mariage Tremblay"
-          className="mt-1 w-full rounded border border-neutral-300 px-3 py-2 text-sm"
+          className="mt-1 w-full input"
           required
         />
       </div>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
       <div className="flex gap-2">
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-lg border border-neutral-300 px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-50"
+          className="btn-secondary"
         >
           Annuler
         </button>
         <button
           type="submit"
           disabled={busy}
-          className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-pico-maroon px-4 py-2 text-sm font-medium text-white hover:bg-pico-maroon-dark disabled:opacity-50"
+          className="flex flex-1 items-center justify-center gap-2 btn-primary disabled:opacity-50"
         >
           {busy && <SpinnerIcon className="h-4 w-4" />}
           Créer et ouvrir le gabarit
@@ -153,7 +153,7 @@ export default function DataTemplatesList({
     <div>
       <div className="mb-6 flex items-center justify-between gap-3">
         <div>
-          <h1 className="flex items-center gap-2 text-page-title font-semibold text-pico-black">
+          <h1 className="flex items-center gap-2 text-page-title font-semibold text-text">
             Données variables
             <UpdatingBadge show={isPending} />
           </h1>
@@ -165,7 +165,7 @@ export default function DataTemplatesList({
         <button
           type="button"
           onClick={() => setCreating(true)}
-          className="shrink-0 rounded-lg bg-pico-maroon px-4 py-2 text-sm font-medium text-white hover:bg-pico-maroon-dark"
+          className="shrink-0 btn-primary"
         >
           Nouveau gabarit
         </button>
@@ -176,17 +176,17 @@ export default function DataTemplatesList({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Rechercher (gabarit, modèle)..."
-          className="mb-4 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm sm:max-w-xs"
+          className="mb-4 w-full input sm:max-w-xs"
         />
       )}
 
       {items.length === 0 ? (
-        <p className="rounded-xl border border-neutral-200 bg-white p-6 text-center text-sm text-neutral-500">
+        <p className="card p-6 text-center text-sm text-neutral-500">
           Aucun gabarit pour l&apos;instant. Créez-en un à partir d&apos;un modèle, ajoutez le fond du graphiste, puis
           dessinez les zones : textes, photo et code-barres.
         </p>
       ) : (
-        <ul className="divide-y divide-neutral-100 rounded-xl border border-neutral-200 bg-white">
+        <ul className="divide-y divide-neutral-100 card">
           {shown.map((d) => {
             const t = templateById.get(d.template_id);
             const missing = [!d.front_path && "fond du recto", d.two_sided && !d.back_path && "fond du verso", d.zones.length === 0 && "zones"]
@@ -195,10 +195,10 @@ export default function DataTemplatesList({
             return (
               <li key={d.id} className={`flex items-center justify-between gap-3 px-4 py-3 ${deletingId === d.id ? "opacity-40" : ""}`}>
                 <Link href={`/donnees-variables/${d.id}`} className="min-w-0 flex-1">
-                  <p className="truncate font-medium text-pico-black hover:underline">{d.name}</p>
+                  <p className="truncate font-medium text-text hover:underline">{d.name}</p>
                   <p className="text-xs text-neutral-500">
                     {t ? labelOf(t) : "Modèle supprimé"} · {d.zones.length} zone{d.zones.length > 1 ? "s" : ""}
-                    {missing && <span className="text-amber-700"> · à compléter : {missing}</span>}
+                    {missing && <span className="text-warning-strong"> · à compléter : {missing}</span>}
                   </p>
                 </Link>
                 <div className="flex shrink-0 items-center gap-1">
@@ -206,7 +206,7 @@ export default function DataTemplatesList({
                     href={`/donnees-variables/${d.id}`}
                     title="Ouvrir"
                     aria-label="Ouvrir"
-                    className="rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-pico-black"
+                    className="icon-btn"
                   >
                     <FilePenIcon className="h-4 w-4" />
                   </Link>
@@ -216,7 +216,7 @@ export default function DataTemplatesList({
                     disabled={deletingId === d.id}
                     title="Supprimer"
                     aria-label="Supprimer"
-                    className="rounded-lg p-1.5 text-neutral-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                    className="rounded-lg p-1.5 text-neutral-500 hover:bg-danger-subtle hover:text-danger disabled:opacity-50"
                   >
                     {deletingId === d.id ? <SpinnerIcon className="h-4 w-4" /> : <TrashIcon className="h-4 w-4" />}
                   </button>

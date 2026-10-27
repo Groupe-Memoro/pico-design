@@ -103,7 +103,7 @@ export default function AgendaPagesPanel({
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-neutral-600">
           {total} page{total > 1 ? "s" : ""}
-          {toFour > 0 && <span className="text-amber-700"> · multiple de 4 pour la reliure : ajoutez {toFour} page{toFour > 1 ? "s" : ""} (Notes)</span>}
+          {toFour > 0 && <span className="text-warning-strong"> · multiple de 4 pour la reliure : ajoutez {toFour} page{toFour > 1 ? "s" : ""} (Notes)</span>}
         </p>
         <div className="flex flex-wrap gap-2">
           {(["calendar", "info", "pdf", "sponsors", "notes", "cover"] as AgendaPageKind[]).map((kind) => (
@@ -118,10 +118,10 @@ export default function AgendaPagesPanel({
         {blocks.map((block, index) => {
           const own = pages.map((page, i) => ({ page, i })).filter((p) => p.page.blockId === block.id);
           return (
-            <div key={block.id} className="rounded-xl border border-neutral-200 bg-white p-3 shadow-sm">
+            <div key={block.id} className="card p-3 shadow-sm">
               <div className="mb-2 flex items-center gap-2">
                 <span className="rounded bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-700">{AGENDA_PAGE_LABELS[block.kind]}</span>
-                <span className="min-w-0 flex-1 truncate text-sm text-pico-black">{summary(block, agenda)}</span>
+                <span className="min-w-0 flex-1 truncate text-sm text-text">{summary(block, agenda)}</span>
                 <span className="text-xs text-neutral-500">
                   {own.length ? `p. ${own[0].i + 1}${own.length > 1 ? `–${own[own.length - 1].i + 1}` : ""}` : "aucune page"}
                 </span>
@@ -131,10 +131,10 @@ export default function AgendaPagesPanel({
                 <button type="button" onClick={() => move(index, 1)} disabled={index === blocks.length - 1} aria-label="Descendre" className="rounded p-1 text-neutral-500 hover:bg-neutral-100 disabled:opacity-30">
                   <ChevronDownIcon className="h-4 w-4" />
                 </button>
-                <button type="button" onClick={() => setEditing(block)} aria-label="Modifier" title="Modifier" className="rounded p-1 text-neutral-500 hover:bg-neutral-100 hover:text-pico-black">
+                <button type="button" onClick={() => setEditing(block)} aria-label="Modifier" title="Modifier" className="rounded p-1 text-neutral-500 hover:bg-neutral-100 hover:text-text">
                   <FilePenIcon className="h-4 w-4" />
                 </button>
-                <button type="button" onClick={() => remove(block)} aria-label="Supprimer" title="Supprimer" className="rounded p-1 text-neutral-500 hover:bg-red-50 hover:text-red-600">
+                <button type="button" onClick={() => remove(block)} aria-label="Supprimer" title="Supprimer" className="rounded p-1 text-neutral-500 hover:bg-danger-subtle hover:text-danger">
                   <TrashIcon className="h-4 w-4" />
                 </button>
               </div>

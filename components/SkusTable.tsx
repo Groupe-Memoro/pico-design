@@ -81,7 +81,7 @@ export default function SkusTable({ skus, skuGroups }: { skus: Sku[]; skuGroups:
     <div>
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="flex items-center gap-2 text-page-title font-semibold text-pico-black">
+          <h1 className="flex items-center gap-2 text-page-title font-semibold text-text">
             SKU
             <UpdatingBadge show={isPending} />
           </h1>
@@ -91,7 +91,7 @@ export default function SkusTable({ skus, skuGroups }: { skus: Sku[]; skuGroups:
         </div>
         <button
           onClick={() => setModal({ mode: "create" })}
-          className="flex items-center gap-2 rounded-lg bg-pico-maroon px-4 py-2 text-sm font-medium text-white hover:bg-pico-maroon-dark"
+          className="flex items-center gap-2 btn-primary"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-4 w-4">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v14m-7-7h14" />
@@ -119,16 +119,16 @@ export default function SkusTable({ skus, skuGroups }: { skus: Sku[]; skuGroups:
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Rechercher (SKU ou nom)..."
-            className="w-full rounded-lg border border-neutral-300 bg-white py-2 pl-9 pr-3 text-sm"
+            className="w-full rounded-lg border border-neutral-300 bg-surface py-2 pl-9 pr-3 text-sm"
           />
         </div>
         <div className="flex items-end gap-3">
           <div>
-            <label className="block text-xs font-medium text-neutral-500">Groupe</label>
+            <label className="label">Groupe</label>
             <select
               value={groupId}
               onChange={(e) => setGroupId(e.target.value)}
-              className="mt-1 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm"
+              className="mt-1 input"
             >
               <option value="">— Tous —</option>
               {skuGroups.map((g) => (
@@ -148,7 +148,7 @@ export default function SkusTable({ skus, skuGroups }: { skus: Sku[]; skuGroups:
         </div>
       </div>
 
-      {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
+      {error && <p className="mb-4 text-sm text-danger">{error}</p>}
 
       <BulkActionsBar
         count={selection.selected.size}
@@ -159,11 +159,11 @@ export default function SkusTable({ skus, skuGroups }: { skus: Sku[]; skuGroups:
       />
 
       {filtered.length === 0 ? (
-        <p className="rounded-xl border border-neutral-200 bg-white p-4 text-sm text-neutral-500">
+        <p className="card p-4 text-sm text-neutral-500">
           Aucun SKU ne correspond.
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm">
+        <div className="overflow-x-auto card shadow-sm">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-sm font-semibold text-neutral-700">
@@ -204,7 +204,7 @@ export default function SkusTable({ skus, skuGroups }: { skus: Sku[]; skuGroups:
                         onClick={() => setModal({ mode: "edit", sku: s })}
                         title="Modifier"
                         aria-label="Modifier"
-                        className="inline-flex rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-pico-black"
+                        className="icon-btn"
                       >
                         <FilePenIcon className="h-4 w-4" />
                       </button>
@@ -213,7 +213,7 @@ export default function SkusTable({ skus, skuGroups }: { skus: Sku[]; skuGroups:
                         disabled={busyId === s.id}
                         title="Supprimer"
                         aria-label="Supprimer"
-                        className="inline-flex rounded-lg p-1.5 text-neutral-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                        className="inline-flex rounded-lg p-1.5 text-neutral-500 hover:bg-danger-subtle hover:text-danger disabled:opacity-50"
                       >
                         {busyId === s.id ? <SpinnerIcon className="h-4 w-4" /> : <TrashIcon className="h-4 w-4" />}
                       </button>

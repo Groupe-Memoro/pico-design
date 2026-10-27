@@ -110,7 +110,7 @@ export default function AgendaDaysEditor({ agenda, days, onChanged }: { agenda: 
             const offset = weekdayIndex(first);
             const count = dayOfMonth(lastDayOfMonth(first));
             return (
-              <div key={first} className="rounded-xl border border-neutral-200 bg-white p-2">
+              <div key={first} className="card p-2">
                 <p className="mb-1 text-sm font-medium capitalize">
                   {MONTHS[monthIndex(first)]} {year(first)}
                 </p>
@@ -136,7 +136,7 @@ export default function AgendaDaysEditor({ agenda, days, onChanged }: { agenda: 
                         title={s ? `${dayKindInfo(s.kind).label}${s.label ? ` — ${s.label}` : ""}` : info?.cycle ? `${agenda.settings.cycleLabel} ${info.cycle}` : undefined}
                         className={`relative flex h-9 flex-col items-center justify-center rounded text-xs ${
                           selectedSet.has(iso) ? "ring-2 ring-pico-maroon" : ""
-                        } ${!info ? "text-neutral-300" : weekdayIndex(iso) >= 5 ? "text-neutral-400" : "text-pico-black"}`}
+                        } ${!info ? "text-neutral-300" : weekdayIndex(iso) >= 5 ? "text-neutral-400" : "text-text"}`}
                         style={color ? { background: `${color}26`, boxShadow: `inset 0 -3px 0 ${color}` } : undefined}
                       >
                         <span className="font-medium">{i + 1}</span>
@@ -152,7 +152,7 @@ export default function AgendaDaysEditor({ agenda, days, onChanged }: { agenda: 
       </div>
 
       <div className="space-y-4 lg:sticky lg:top-4 lg:self-start">
-        <div className="rounded-xl border border-neutral-200 bg-white p-4">
+        <div className="card p-4">
           {selected.length === 0 ? (
             <p className="text-sm text-neutral-500">Cliquez sur une date ; Maj+clic pour choisir une plage (ex. la relâche).</p>
           ) : (
@@ -162,7 +162,7 @@ export default function AgendaDaysEditor({ agenda, days, onChanged }: { agenda: 
               </p>
               <div>
                 <label className="block text-sm font-medium">Type</label>
-                <select value={kind} onChange={(e) => setKind(e.target.value as DayKind)} className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm">
+                <select value={kind} onChange={(e) => setKind(e.target.value as DayKind)} className="mt-1 w-full input">
                   {DAY_KINDS.map((k) => (
                     <option key={k.kind} value={k.kind}>
                       {k.label}
@@ -178,7 +178,7 @@ export default function AgendaDaysEditor({ agenda, days, onChanged }: { agenda: 
                   onChange={(e) => setLabel(e.target.value)}
                   placeholder={dayKindInfo(kind).label}
                   maxLength={80}
-                  className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+                  className="mt-1 w-full input"
                 />
               </div>
               <div className="flex flex-wrap gap-2">
@@ -203,7 +203,7 @@ export default function AgendaDaysEditor({ agenda, days, onChanged }: { agenda: 
               {selected.length > 1 && <p className="text-xs text-neutral-500">Les samedis et dimanches de la plage restent normaux.</p>}
             </div>
           )}
-          {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+          {error && <p className="mt-2 text-sm text-danger">{error}</p>}
         </div>
 
         <button
@@ -215,7 +215,7 @@ export default function AgendaDaysEditor({ agenda, days, onChanged }: { agenda: 
           Ajouter les fériés du Québec
         </button>
 
-        <div className="rounded-xl border border-neutral-200 bg-white p-3">
+        <div className="card p-3">
           <p className="mb-2 text-sm font-medium">Journées spéciales ({days.length})</p>
           <ul className="max-h-80 space-y-1 overflow-y-auto text-xs">
             {days.map((d) => (

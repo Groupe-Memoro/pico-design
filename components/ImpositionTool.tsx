@@ -1075,16 +1075,16 @@ export default function ImpositionTool({
     return vertical ? "haut-haut" : "haut-bas";
   }
 
-  const selectClass = "mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm";
+  const selectClass = "mt-1 w-full rounded-lg border border-neutral-300 bg-surface px-3 py-2 text-sm";
   const labelClass = "block text-xs font-medium text-neutral-500";
 
   return (
     <div>
       <div className="mb-6">
-        <Link href="/imposition" className="text-xs text-neutral-500 underline hover:text-pico-black">
+        <Link href="/imposition" className="text-xs text-neutral-500 underline hover:text-text">
           ← Toutes les impositions
         </Link>
-        <h1 className="mt-1 flex items-center gap-2 text-page-title font-semibold text-pico-black">
+        <h1 className="mt-1 flex items-center gap-2 text-page-title font-semibold text-text">
           {saved ? "Modifier l'imposition" : "Nouvelle imposition"}
           <UpdatingBadge show={isRefreshing} />
         </h1>
@@ -1095,7 +1095,7 @@ export default function ImpositionTool({
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,26rem)_1fr]">
         <div className="space-y-5">
-          <section className="space-y-4 rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
+          <section className="space-y-4 card p-4 shadow-sm">
             <div>
               <label className={labelClass}>Nom de l&apos;imposition</label>
               <input
@@ -1195,7 +1195,7 @@ export default function ImpositionTool({
                   <button
                     type="button"
                     onClick={() => setModal({ mode: "sheets" })}
-                    className="text-xs text-neutral-500 underline hover:text-pico-black"
+                    className="text-xs text-neutral-500 underline hover:text-text"
                   >
                     Gérer
                   </button>
@@ -1239,7 +1239,7 @@ export default function ImpositionTool({
                       <button type="button" onClick={updateProfile} disabled={profileBusy} className="rounded-lg border border-neutral-300 px-2.5 py-1 hover:bg-neutral-50 disabled:opacity-50">
                         Mettre à jour le profil
                       </button>
-                      <button type="button" onClick={deleteProfile} disabled={profileBusy} className="rounded-lg border border-neutral-300 px-2.5 py-1 text-red-600 hover:bg-red-50 disabled:opacity-50">
+                      <button type="button" onClick={deleteProfile} disabled={profileBusy} className="rounded-lg border border-neutral-300 px-2.5 py-1 text-danger hover:bg-danger-subtle disabled:opacity-50">
                         Supprimer
                       </button>
                     </>
@@ -1282,7 +1282,7 @@ export default function ImpositionTool({
                   <button
                     type="button"
                     onClick={() => setModal({ mode: "graphtec-profiles" })}
-                    className="text-xs text-neutral-500 underline hover:text-pico-black"
+                    className="text-xs text-neutral-500 underline hover:text-text"
                   >
                     Gérer
                   </button>
@@ -1316,7 +1316,7 @@ export default function ImpositionTool({
                   <button
                     type="button"
                     onClick={() => setModal({ mode: "duplo-jobs" })}
-                    className="text-xs text-neutral-500 underline hover:text-pico-black"
+                    className="text-xs text-neutral-500 underline hover:text-text"
                   >
                     Gérer
                   </button>
@@ -1382,7 +1382,7 @@ export default function ImpositionTool({
                     )}
                 </select>
                 {mismatchedDuplo && (
-                  <p className="mt-1 text-xs text-amber-700">
+                  <p className="mt-1 text-xs text-warning-strong">
                     Les traits du job n° {mismatchedDuplo.job_no} ne tombent pas sur ce format : il ne peut pas couper
                     ces pièces en une passe. S&apos;il coupe la feuille en morceaux à repasser, cochez « Deux passes ».
                   </p>
@@ -1414,7 +1414,7 @@ export default function ImpositionTool({
                         ))}
                     </select>
                     {selectedJob1 && selectedJob2 && !twoPassResult && (
-                      <p className="mt-1 text-xs text-amber-700">
+                      <p className="mt-1 text-xs text-warning-strong">
                         Ces deux jobs ne vont pas ensemble : la passe 1 doit couper la feuille en morceaux de{" "}
                         {Math.round(selectedJob2.width_mm * 10) / 10} × {Math.round(selectedJob2.length_mm * 10) / 10} mm (la
                         feuille du job n° {selectedJob2.job_no}), et ce job doit couper ce format dans chaque morceau.
@@ -1599,8 +1599,8 @@ export default function ImpositionTool({
           </section>
 
           {isDocument && (
-          <section className="space-y-3 rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
-            <h2 className="text-sm font-semibold text-pico-black">Fichiers à imposer</h2>
+          <section className="space-y-3 card p-4 shadow-sm">
+            <h2 className="text-sm font-semibold text-text">Fichiers à imposer</h2>
 
             {!docFile && !docStoredPath && !docProductId ? (
               <p className="text-sm text-neutral-500">Aucun fichier pour l&apos;instant.</p>
@@ -1609,7 +1609,7 @@ export default function ImpositionTool({
                 <div className="flex items-start gap-2">
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{docName}</p>
-                    <p className={`text-xs ${docInfo?.mixed ? "text-red-600" : "text-neutral-500"}`}>
+                    <p className={`text-xs ${docInfo?.mixed ? "text-danger" : "text-neutral-500"}`}>
                       {docProductId ? "Produit" : "PDF téléversé"}
                       {docReading
                         ? " · lecture…"
@@ -1633,7 +1633,7 @@ export default function ImpositionTool({
                       setDocBleedSource(null);
                     }}
                     aria-label="Retirer"
-                    className="rounded-lg p-1 text-neutral-400 hover:bg-red-50 hover:text-red-600"
+                    className="rounded-lg p-1 text-neutral-400 hover:bg-danger-subtle hover:text-danger"
                   >
                     <TrashIcon className="h-4 w-4" />
                   </button>
@@ -1662,7 +1662,7 @@ export default function ImpositionTool({
                 <select
                   value={docProductToAdd}
                   onChange={(e) => setDocProductToAdd(e.target.value)}
-                  className="min-w-0 flex-1 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm"
+                  className="min-w-0 flex-1 input"
                 >
                   <option value="">{products.length === 0 ? "Aucun produit avec PDF" : "Choisir un produit…"}</option>
                   {docProductGroups.map((group) => (
@@ -1700,8 +1700,8 @@ export default function ImpositionTool({
           )}
 
           {!isDocument && (
-          <section className="space-y-3 rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
-            <h2 className="text-sm font-semibold text-pico-black">Fichiers à imposer</h2>
+          <section className="space-y-3 card p-4 shadow-sm">
+            <h2 className="text-sm font-semibold text-text">Fichiers à imposer</h2>
 
             {items.length === 0 && <p className="text-sm text-neutral-500">Aucun fichier pour l&apos;instant.</p>}
             {multiPage && (
@@ -1733,7 +1733,7 @@ export default function ImpositionTool({
                       )}
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium">{item.name}</p>
-                        <p className={`text-xs ${ok ? "text-neutral-500" : "text-red-600"}`}>
+                        <p className={`text-xs ${ok ? "text-neutral-500" : "text-danger"}`}>
                           {item.kind === "product" ? "Produit" : item.image ? "Image téléversée" : "PDF téléversé"}
                           {item.widthMm !== null && item.heightMm !== null
                             ? ` · ${sizeLabel(item.widthMm, item.heightMm)}`
@@ -1747,7 +1747,7 @@ export default function ImpositionTool({
                         type="button"
                         onClick={() => setItems((c) => c.filter((i) => i.key !== item.key))}
                         aria-label="Retirer"
-                        className="rounded-lg p-1 text-neutral-400 hover:bg-red-50 hover:text-red-600"
+                        className="rounded-lg p-1 text-neutral-400 hover:bg-danger-subtle hover:text-danger"
                       >
                         <TrashIcon className="h-4 w-4" />
                       </button>
@@ -1763,13 +1763,13 @@ export default function ImpositionTool({
                           <button
                             type="button"
                             onClick={() => updateItem(item.key, { back: null })}
-                            className="text-neutral-500 underline hover:text-red-600"
+                            className="text-neutral-500 underline hover:text-danger"
                           >
                             Retirer
                           </button>
                         </>
                       ) : (
-                        <label className="cursor-pointer text-neutral-600 underline hover:text-pico-black">
+                        <label className="cursor-pointer text-neutral-600 underline hover:text-text">
                           Ajouter un fichier de verso
                           <input
                             type="file"
@@ -1800,7 +1800,7 @@ export default function ImpositionTool({
                       <button
                         type="button"
                         onClick={() => fillItem(item.key)}
-                        className="text-xs text-neutral-500 underline hover:text-pico-black"
+                        className="text-xs text-neutral-500 underline hover:text-text"
                       >
                         Remplir
                       </button>
@@ -1815,7 +1815,7 @@ export default function ImpositionTool({
                 <select
                   value={productToAdd}
                   onChange={(e) => setProductToAdd(e.target.value)}
-                  className="min-w-0 flex-1 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm"
+                  className="min-w-0 flex-1 input"
                 >
                   <option value="">
                     {availableProducts.length === 0 ? "Aucun produit avec PDF pour ce format" : "Ajouter un produit…"}
@@ -1849,9 +1849,9 @@ export default function ImpositionTool({
         </div>
 
         <section className="space-y-4">
-          <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
+          <div className="card p-4 shadow-sm">
             <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-              <h2 className="text-sm font-semibold text-pico-black">Aperçu de la feuille</h2>
+              <h2 className="text-sm font-semibold text-text">Aperçu de la feuille</h2>
               <label className="flex items-center gap-1.5 text-xs text-neutral-600">
                 <input type="checkbox" checked={showCuts} onChange={(e) => setShowCuts(e.target.checked)} />
                 <span className="inline-block h-0.5 w-4" style={{ backgroundColor: CUT_COLOR }} />
@@ -1990,7 +1990,7 @@ export default function ImpositionTool({
 
           <div className="flex flex-col items-stretch gap-2">
             {(error || saveProblem) && (
-              <p className={`text-sm ${error ? "text-red-600" : "text-neutral-500"}`}>{error ?? saveProblem}</p>
+              <p className={`text-sm ${error ? "text-danger" : "text-neutral-500"}`}>{error ?? saveProblem}</p>
             )}
             <button
               type="button"
@@ -2005,7 +2005,7 @@ export default function ImpositionTool({
               type="button"
               onClick={handlePreview}
               disabled={saving || generating || Boolean(problem)}
-              className="flex items-center justify-center gap-2 rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
+              className="flex items-center justify-center gap-2 btn-secondary font-medium disabled:opacity-50"
             >
               {generating && <SpinnerIcon className="h-4 w-4" />}
               {generating ? (staging ? "Envoi du PDF…" : "Génération en cours...") : "Aperçu du PDF (sans enregistrer)"}
@@ -2035,7 +2035,7 @@ export default function ImpositionTool({
           <a
             href={modal.url}
             download={`imposition-${sheet ? `${formatInches(sheet.width_mm)}x${formatInches(sheet.height_mm)}` : "feuille"}.pdf`}
-            className="mt-4 flex items-center justify-center gap-2 rounded-lg bg-pico-maroon px-4 py-2 text-sm font-medium text-white hover:bg-pico-maroon-dark"
+            className="mt-4 flex items-center justify-center gap-2 btn-primary"
           >
             <DownloadIcon className="h-4 w-4" />
             Télécharger le PDF

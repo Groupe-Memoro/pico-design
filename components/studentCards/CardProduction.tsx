@@ -202,11 +202,11 @@ export default function CardProduction({
 
   const busy = progress !== null;
   return (
-    <section className="space-y-3 rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
-      <h2 className="text-sm font-semibold text-pico-black">Produire les {vocab.pages}</h2>
+    <section className="space-y-3 card p-4 shadow-sm">
+      <h2 className="text-sm font-semibold text-text">Produire les {vocab.pages}</h2>
 
       <div className="space-y-1">
-        <span className="block text-xs font-medium text-neutral-500">1. Fichier des {vocab.rows} (Excel ou CSV)</span>
+        <span className="label">1. Fichier des {vocab.rows} (Excel ou CSV)</span>
         <input
           type="file"
           accept=".csv,.txt,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -222,7 +222,7 @@ export default function CardProduction({
           <div className="flex items-center justify-between gap-2 rounded-lg bg-neutral-50 px-2 py-1.5 text-xs">
             <span className="min-w-0 truncate text-neutral-700">
               {dataFile.name}{" "}
-              <span className={dataFile.pending ? "text-amber-700" : "text-green-700"}>
+              <span className={dataFile.pending ? "text-warning-strong" : "text-success-strong"}>
                 {dataFile.pending ? "· sera conservé à l'enregistrement" : "· conservé avec le modèle"}
               </span>
             </span>
@@ -230,7 +230,7 @@ export default function CardProduction({
               type="button"
               onClick={onRemoveData}
               disabled={busy}
-              className="shrink-0 text-neutral-500 underline hover:text-red-600"
+              className="shrink-0 text-neutral-500 underline hover:text-danger"
             >
               Retirer
             </button>
@@ -247,7 +247,7 @@ export default function CardProduction({
           </p>
         )}
         {missingColumns.length > 0 && (
-          <p className="text-xs text-amber-700">
+          <p className="text-xs text-warning-strong">
             Colonnes utilisées par les zones mais absentes du fichier : {missingColumns.join(", ")}.
           </p>
         )}
@@ -255,7 +255,7 @@ export default function CardProduction({
 
       {needsPhoto && (
         <div className="space-y-1 border-t border-neutral-100 pt-3">
-          <span className="block text-xs font-medium text-neutral-500">2. Photos</span>
+          <span className="label">2. Photos</span>
           <label className="block text-xs text-neutral-600">
             Colonne qui désigne la photo
             <select
@@ -299,14 +299,14 @@ export default function CardProduction({
                   setPhotoFiles([]);
                   onPhotos(new PhotoIndex([]));
                 }}
-                className="text-neutral-500 underline hover:text-pico-black"
+                className="text-neutral-500 underline hover:text-text"
               >
                 Retirer les photos
               </button>
             </div>
           )}
           {data && missingPhotos.length > 0 && (photos.size > 0 || photoColumn) && (
-            <details className="text-xs text-amber-700">
+            <details className="text-xs text-warning-strong">
               <summary className="cursor-pointer">
                 {missingPhotos.length} {missingPhotos.length > 1 ? vocab.rows : vocab.row} sans photo (zone photo laissée vide)
               </summary>
@@ -322,7 +322,7 @@ export default function CardProduction({
 
       {data && (
         <div className="space-y-2 border-t border-neutral-100 pt-3">
-          <span className="block text-xs font-medium text-neutral-500">
+          <span className="label">
             {needsPhoto ? "3" : "2"}. Ordre des {vocab.pages}
           </span>
           {sortKeys.length === 0 && <p className="text-xs text-neutral-500">Dans l&apos;ordre du fichier.</p>}
@@ -352,7 +352,7 @@ export default function CardProduction({
                     disabled={busy}
                     title={descending ? "Décroissant (Z → A, 9 → 1)" : "Croissant (A → Z, 1 → 9)"}
                     className={`px-2 py-1.5 ${
-                      key.descending === descending ? "bg-pico-black text-white" : "bg-white text-neutral-600 hover:bg-neutral-50"
+                      key.descending === descending ? "bg-pico-black text-white" : "bg-surface text-neutral-600 hover:bg-neutral-50"
                     }`}
                   >
                     {descending ? "Z → A" : "A → Z"}
@@ -364,7 +364,7 @@ export default function CardProduction({
                 onClick={() => setSortKeys((keys) => keys.filter((_, j) => j !== i))}
                 disabled={busy}
                 aria-label={`Retirer le critère ${i + 1}`}
-                className="shrink-0 rounded-lg p-1 text-neutral-400 hover:bg-red-50 hover:text-red-600"
+                className="shrink-0 rounded-lg p-1 text-neutral-400 hover:bg-danger-subtle hover:text-danger"
               >
                 <TrashIcon className="h-4 w-4" />
               </button>
@@ -376,7 +376,7 @@ export default function CardProduction({
                 type="button"
                 onClick={() => setSortKeys((keys) => [...keys, { column: "", descending: false }])}
                 disabled={busy}
-                className="text-neutral-600 underline hover:text-pico-black"
+                className="text-neutral-600 underline hover:text-text"
               >
                 {sortKeys.length === 0 ? "Trier selon une colonne" : "Ajouter un critère"}
               </button>
@@ -393,7 +393,7 @@ export default function CardProduction({
       )}
 
       <div className="space-y-2 border-t border-neutral-100 pt-3">
-        {error && <p className="text-xs text-red-600">{error}</p>}
+        {error && <p className="text-xs text-danger">{error}</p>}
         <button
           type="button"
           onClick={() => generate(false)}
@@ -411,7 +411,7 @@ export default function CardProduction({
           type="button"
           onClick={() => generate(true)}
           disabled={busy || !data || zones.length === 0}
-          className="w-full rounded-lg border border-neutral-300 px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
+          className="w-full btn-secondary disabled:opacity-50"
         >
           Essai : {vocab.Row.toLowerCase()} {previewIndex + 1} seulement
         </button>
@@ -429,7 +429,7 @@ export default function CardProduction({
         >
           <iframe src={result.url} title="Cartes" className="h-[60vh] w-full rounded border border-neutral-200" />
           {result.warnings.length > 0 && (
-            <details className="mt-3 text-sm text-amber-700" open={result.warnings.length <= 5}>
+            <details className="mt-3 text-sm text-warning-strong" open={result.warnings.length <= 5}>
               <summary className="cursor-pointer">
                 {result.warnings.length} avertissement{result.warnings.length > 1 ? "s" : ""}
               </summary>
@@ -443,7 +443,7 @@ export default function CardProduction({
           <a
             href={result.url}
             download={result.filename}
-            className="mt-4 flex items-center justify-center gap-2 rounded-lg bg-pico-maroon px-4 py-2 text-sm font-medium text-white hover:bg-pico-maroon-dark"
+            className="mt-4 flex items-center justify-center gap-2 btn-primary"
           >
             <DownloadIcon className="h-4 w-4" />
             Télécharger le PDF

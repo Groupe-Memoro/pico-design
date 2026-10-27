@@ -5,13 +5,24 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // Bourgogne : alias de --primary (même teinte, et suit le mode
+        // sombre). Noir et crème restent fixes.
         pico: {
           black: "#0a0a0a",
           cream: "#f8f1e9",
           accent: "#f07544",
-          maroon: "#631028",
-          "maroon-dark": "#4a0c1e",
+          maroon: "rgb(var(--primary-rgb) / <alpha-value>)",
+          "maroon-dark": "var(--primary-hover)",
         },
+        // Les gris de Tailwind remplacés par les gris chauds de PICO OS
+        // (app/globals.css) : tout l'existant s'accorde au fond beige, et
+        // s'inverse en mode sombre.
+        neutral: Object.fromEntries(
+          ["50", "100", "200", "300", "400", "500", "600", "700", "800", "900", "950"].map((step) => [
+            step,
+            `rgb(var(--neutral-${step}-rgb) / <alpha-value>)`,
+          ])
+        ),
         // Tokens portés de PICO OS (voir app/globals.css) — utilisables en
         // plus des couleurs pico.* existantes (ex. bg-background, text-text,
         // bg-primary, text-primary-hover...).
@@ -35,7 +46,10 @@ const config: Config = {
         warning: "var(--warning)",
         "warning-subtle": "var(--warning-subtle)",
         danger: "var(--danger)",
+        "danger-hover": "var(--danger-hover)",
         "danger-subtle": "var(--danger-subtle)",
+        "warning-strong": "var(--warning-strong)",
+        "success-strong": "var(--success-strong)",
         info: "var(--info)",
         "info-subtle": "var(--info-subtle)",
       },

@@ -23,7 +23,7 @@ export default async function DashboardPage() {
           pleine largeur (100vw) ici : elle déborderait sous le menu de gauche. */}
       <div className="py-2">
         <p className="text-xs font-semibold tracking-widest text-pico-accent">PICO DESIGN</p>
-        <h1 className="mt-2 font-heading text-3xl font-bold text-pico-black sm:text-4xl">
+        <h1 className="mt-2 font-heading text-3xl font-bold text-text sm:text-4xl">
           Bonjour, {firstName}.
         </h1>
         <p className="mt-2 text-neutral-600">Choisissez une page pour commencer.</p>

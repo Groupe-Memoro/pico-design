@@ -180,7 +180,7 @@ export default function TemplateForm({
           value={form.name}
           onChange={(e) => update("name", e.target.value)}
           placeholder="Ex. Cartes d'affaires 90×50mm"
-          className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
+          className="mt-1 w-full input"
         />
       </div>
 
@@ -189,7 +189,7 @@ export default function TemplateForm({
         <select
           value={form.category_id}
           onChange={(e) => update("category_id", e.target.value)}
-          className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
+          className="mt-1 w-full input"
         >
           {categories.map((c) => (
             <option key={c.id} value={c.id}>
@@ -198,7 +198,7 @@ export default function TemplateForm({
           ))}
         </select>
         {categories.length === 0 && (
-          <p className="mt-1 text-xs text-amber-700">
+          <p className="mt-1 text-xs text-warning-strong">
             Aucune catégorie disponible — crée-en une d&apos;abord.
           </p>
         )}
@@ -237,7 +237,7 @@ export default function TemplateForm({
               step="any"
               value={toDisplay(form.width_mm)}
               onChange={(e) => updateFromDisplay("width_mm", parseFloat(e.target.value) || 0)}
-              className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
+              className="mt-1 w-full input"
             />
           </div>
           <div>
@@ -249,7 +249,7 @@ export default function TemplateForm({
               step="any"
               value={toDisplay(form.height_mm)}
               onChange={(e) => updateFromDisplay("height_mm", parseFloat(e.target.value) || 0)}
-              className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
+              className="mt-1 w-full input"
             />
           </div>
           <div>
@@ -261,7 +261,7 @@ export default function TemplateForm({
               step="any"
               value={toDisplay(form.bleed_mm)}
               onChange={(e) => updateFromDisplay("bleed_mm", parseFloat(e.target.value) || 0)}
-              className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
+              className="mt-1 w-full input"
             />
           </div>
           <div>
@@ -270,7 +270,7 @@ export default function TemplateForm({
               type="number"
               value={form.dpi}
               onChange={(e) => update("dpi", parseInt(e.target.value, 10))}
-              className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
+              className="mt-1 w-full input"
             />
           </div>
           <div>
@@ -284,7 +284,7 @@ export default function TemplateForm({
               onChange={(e) =>
                 updateFromDisplay("safety_margin_x_mm", parseFloat(e.target.value) || 0)
               }
-              className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
+              className="mt-1 w-full input"
             />
           </div>
           <div>
@@ -298,7 +298,7 @@ export default function TemplateForm({
               onChange={(e) =>
                 updateFromDisplay("safety_margin_y_mm", parseFloat(e.target.value) || 0)
               }
-              className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
+              className="mt-1 w-full input"
             />
           </div>
           <div>
@@ -312,7 +312,7 @@ export default function TemplateForm({
               onChange={(e) =>
                 updateFromDisplay("print_margin_x_mm", parseFloat(e.target.value) || 0)
               }
-              className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
+              className="mt-1 w-full input"
             />
           </div>
           <div>
@@ -326,7 +326,7 @@ export default function TemplateForm({
               onChange={(e) =>
                 updateFromDisplay("print_margin_y_mm", parseFloat(e.target.value) || 0)
               }
-              className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
+              className="mt-1 w-full input"
             />
             <p className="mt-1 text-xs text-neutral-500">
               Agrandit la page du PDF final d&apos;une bande blanche en plus (l&apos;image
@@ -335,7 +335,7 @@ export default function TemplateForm({
             </p>
           </div>
         </div>
-        <label className="mt-3 flex items-center gap-2 text-sm text-pico-black">
+        <label className="mt-3 flex items-center gap-2 text-sm text-text">
           <input
             type="checkbox"
             checked={form.allow_orientation_change}
@@ -355,7 +355,7 @@ export default function TemplateForm({
         <select
           value={form.tool_module}
           onChange={(e) => update("tool_module", e.target.value as "design" | "photos")}
-          className="mt-1 w-full rounded border border-neutral-300 px-3 py-2 text-sm"
+          className="mt-1 w-full input"
         >
           <option value="design">Création de design</option>
           <option value="photos">Impression de photos</option>
@@ -371,7 +371,7 @@ export default function TemplateForm({
         <select
           value={form.imposition_profile_id}
           onChange={(e) => update("imposition_profile_id", e.target.value)}
-          className="mt-1 w-full rounded border border-neutral-300 px-3 py-2 text-sm"
+          className="mt-1 w-full input"
         >
           <option value="">Aucun (à imposer à la main)</option>
           {impositionProfiles.map((p) => (
@@ -419,13 +419,13 @@ export default function TemplateForm({
                   value={toDisplay(mm)}
                   onChange={(e) => updateFold("vertical", i, parseFloat(e.target.value) || 0)}
                   aria-label={`Distance du pli vertical ${i + 1} depuis le bord gauche`}
-                  className="w-full min-w-0 rounded border border-neutral-300 px-3 py-2 text-sm"
+                  className="w-full min-w-0 input"
                 />
                 <span className="shrink-0 text-xs text-neutral-500">{unit === "mm" ? "mm" : "po"}</span>
                 <button
                   type="button"
                   onClick={() => removeFold("vertical", i)}
-                  className="shrink-0 text-xs text-neutral-500 underline hover:text-pico-black"
+                  className="shrink-0 text-xs text-neutral-500 underline hover:text-text"
                 >
                   Retirer
                 </button>
@@ -452,13 +452,13 @@ export default function TemplateForm({
                   value={toDisplay(mm)}
                   onChange={(e) => updateFold("horizontal", i, parseFloat(e.target.value) || 0)}
                   aria-label={`Distance du pli horizontal ${i + 1} depuis le bord du haut`}
-                  className="w-full min-w-0 rounded border border-neutral-300 px-3 py-2 text-sm"
+                  className="w-full min-w-0 input"
                 />
                 <span className="shrink-0 text-xs text-neutral-500">{unit === "mm" ? "mm" : "po"}</span>
                 <button
                   type="button"
                   onClick={() => removeFold("horizontal", i)}
-                  className="shrink-0 text-xs text-neutral-500 underline hover:text-pico-black"
+                  className="shrink-0 text-xs text-neutral-500 underline hover:text-text"
                 >
                   Retirer
                 </button>
@@ -509,7 +509,7 @@ export default function TemplateForm({
       <div>
         <label className="mb-2 block text-sm font-medium">Logo Pico</label>
         <div className="flex flex-wrap gap-4">
-          <label className="flex items-center gap-2 text-sm text-pico-black">
+          <label className="flex items-center gap-2 text-sm text-text">
             <input
               type="checkbox"
               checked={form.logo_on_front}
@@ -518,7 +518,7 @@ export default function TemplateForm({
             Sur le recto
           </label>
           {form.two_sided && (
-            <label className="flex items-center gap-2 text-sm text-pico-black">
+            <label className="flex items-center gap-2 text-sm text-text">
               <input
                 type="checkbox"
                 checked={form.logo_on_back}
@@ -587,7 +587,7 @@ export default function TemplateForm({
                 step="any"
                 value={toDisplay(form.logo_width_mm)}
                 onChange={(e) => updateFromDisplay("logo_width_mm", parseFloat(e.target.value) || 0)}
-                className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
+                className="mt-1 w-full input"
               />
             </div>
             <div>
@@ -598,7 +598,7 @@ export default function TemplateForm({
                 value={toDisplay(form.logo_margin_x_mm)}
                 onChange={(e) => updateFromDisplay("logo_margin_x_mm", parseFloat(e.target.value) || 0)}
                 disabled={form.logo_h_align === "center"}
-                className="mt-1 w-full rounded border border-neutral-300 px-3 py-2 disabled:bg-neutral-100 disabled:text-neutral-400"
+                className="mt-1 w-full input disabled:bg-neutral-100 disabled:text-neutral-400"
               />
             </div>
             <div>
@@ -608,7 +608,7 @@ export default function TemplateForm({
                 step="any"
                 value={toDisplay(form.logo_margin_y_mm)}
                 onChange={(e) => updateFromDisplay("logo_margin_y_mm", parseFloat(e.target.value) || 0)}
-                className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
+                className="mt-1 w-full input"
               />
             </div>
           </div>
@@ -637,7 +637,7 @@ export default function TemplateForm({
             <button
               type="button"
               onClick={() => setRemoveOverlay(true)}
-              className="mt-2 text-sm text-red-600 hover:underline"
+              className="mt-2 text-sm text-danger hover:underline"
             >
               Retirer le gabarit
             </button>
@@ -654,7 +654,7 @@ export default function TemplateForm({
         plusieurs (le même produit sous différents angles).
       </p>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
 
       <button
         type="submit"
@@ -698,7 +698,7 @@ function FoldSection({
         <select
           value={fold?.type ?? ""}
           onChange={(e) => (e.target.value ? set({ type: e.target.value as FoldType }) : onChange(null))}
-          className="rounded border border-neutral-300 px-3 py-2 text-sm sm:col-span-2"
+          className="input sm:col-span-2"
           aria-label="Type de pli"
         >
           <option value="">Aucun pli (à plat)</option>
@@ -712,7 +712,7 @@ function FoldSection({
           <select
             value={fold.direction}
             onChange={(e) => set({ direction: e.target.value as FoldDirection })}
-            className="rounded border border-neutral-300 px-3 py-2 text-sm"
+            className="input"
             aria-label="Direction des plis"
           >
             <option value="vertical">Plis verticaux (volets côte à côte)</option>

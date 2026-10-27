@@ -22,7 +22,7 @@ export function UnitToggle({ unit, onChange }: { unit: Unit; onChange: (unit: Un
           key={u}
           type="button"
           onClick={() => onChange(u)}
-          className={`px-2.5 py-1 ${unit === u ? "bg-pico-maroon text-white" : "bg-white text-neutral-600 hover:bg-neutral-50"}`}
+          className={`px-2.5 py-1 ${unit === u ? "bg-pico-maroon text-white" : "bg-surface text-neutral-600 hover:bg-neutral-50"}`}
         >
           {u === "in" ? "po" : "mm"}
         </button>
@@ -51,7 +51,7 @@ export default function MeasureField({
   const [text, setText] = useState(String(toDisplayValue(valueMm, unit)));
   return (
     <div>
-      <label className="block text-xs font-medium text-neutral-500">{label}</label>
+      <label className="label">{label}</label>
       <input
         type="number"
         step="any"
@@ -62,7 +62,7 @@ export default function MeasureField({
           const n = parseFloat(e.target.value);
           if (Number.isFinite(n)) onChange(unit === "mm" ? n : inToMm(n));
         }}
-        className="mt-1 w-full rounded border border-neutral-300 px-3 py-2 text-sm"
+        className="mt-1 w-full input"
       />
     </div>
   );

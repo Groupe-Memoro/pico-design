@@ -84,7 +84,7 @@ export default function ProductMockupModal({
   return (
     <Modal title={`Mockup — ${productName}`} onClose={onClose}>
       {nothingToShow && error ? (
-        <p className="text-sm text-red-600">{error}</p>
+        <p className="text-sm text-danger">{error}</p>
       ) : (
         <MockupGallery views={views} activeKey={activeKey} onActiveKeyChange={setActiveKey} />
       )}
