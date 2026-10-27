@@ -242,8 +242,7 @@ export default function Nav() {
               Shopify peut porter un autre logo que l'administration, et une
               boutique le sien. La route renvoie le logo d'origine tant que rien
               n'est téléversé. */}
-          {/* Le logo suivi de l'initiale de l'application : « Pico D », comme
-              « Pico OS ». Le nom complet reste dans l'étiquette du lien. */}
+          {/* Le logo seul ; le nom complet reste dans l'étiquette du lien. */}
           {shopHome ? (
             <a href={shopHome} className="flex shrink-0 items-center gap-2.5" aria-label="Retour à la boutique">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -253,7 +252,6 @@ export default function Nav() {
             <Link href="/" className="flex shrink-0 items-center gap-2.5" aria-label="Pico Design — tableau de bord">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={`/api/settings/${logoScope}/asset/logo`} alt="" className="h-7 w-auto" />
-              <span className="font-heading text-2xl font-bold leading-none text-text">D</span>
             </Link>
           )}
           {/* Retour au tableau de bord, comme la grille à côté de « Pico OS ». */}
