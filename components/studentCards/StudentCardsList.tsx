@@ -221,9 +221,8 @@ export default function StudentCardsList({ templates }: { templates: StudentCard
               <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">{school}</h2>
               <ul className="divide-y divide-neutral-100 card">
                 {items.map((t) => {
-                  const missing = [!t.front_path && "fond du recto", t.two_sided && !t.back_path && "fond du verso", t.zones.length === 0 && "zones"]
-                    .filter(Boolean)
-                    .join(", ");
+                  // Le fond est facultatif : sans fond, la carte sort sur blanc.
+                  const missing = t.zones.length === 0 ? "zones" : "";
                   return (
                     <li
                       key={t.id}

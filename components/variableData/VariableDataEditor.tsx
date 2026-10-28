@@ -444,9 +444,9 @@ export default function VariableDataEditor({
     changeZones(zones.map((z) => (moved.has(z.id) ? clampZone({ ...z, ...moved.get(z.id)! }) : z)));
   }
 
-  // Image fixe d'une zone : envoyée tout de suite, la zone garde son chemin
-  // (enregistré avec les zones).
-  async function uploadZoneImage(zoneId: string, file: File | null) {
+  // Image fixe ou masque d'une zone : envoyé tout de suite, la zone garde son
+  // chemin (enregistré avec les zones).
+  async function uploadZoneImage(zoneId: string, file: File | null, field: "imagePath" | "maskPath" = "imagePath") {
     if (!file) return;
     setUploadingImage(true);
     setMessage(null);
@@ -459,7 +459,7 @@ export default function VariableDataEditor({
       setMessage({ tone: "error", text: json.error ?? "L'envoi de l'image a échoué." });
       return;
     }
-    updateZone(zoneId, { imagePath: json.path });
+    updateZone(zoneId, { [field]: json.path });
   }
 
   function addGuide(axis: "v" | "h") {
@@ -899,25 +899,40 @@ export default function VariableDataEditor({
                 const ch = turned ? z.width : z.height;
                 const transform = `translate(${z.x + z.width / 2} ${z.y + z.height / 2}) rotate(${z.rotation})`;
                 if (z.kind === "photo") {
+                  const maskId = z.maskPath ? `mask-${side}-${z.id}` : null;
                   return (
                     <g key={`c-${z.id}`} transform={transform} pointerEvents="none">
-                      {previewPhotoUrl ? (
-                        <image
-                          href={previewPhotoUrl}
-                          x={-cw / 2}
-                          y={-ch / 2}
-                          width={cw}
-                          height={ch}
-                          preserveAspectRatio="xMidYMid slice"
-                        />
-                      ) : (
-                        <>
-                          <rect x={-cw / 2} y={-ch / 2} width={cw} height={ch} fill="#e5e5e5" />
-                          <text fontSize={Math.min(cw, ch) / 5} fill="#737373" textAnchor="middle" dominantBaseline="central">
-                            Photo
-                          </text>
-                        </>
+                      {maskId && z.maskPath && (
+                        <mask id={maskId} style={{ maskType: "alpha" }}>
+                          <image
+                            href={`${apiBase}/${template.id}/image?path=${encodeURIComponent(z.maskPath)}`}
+                            x={-cw / 2}
+                            y={-ch / 2}
+                            width={cw}
+                            height={ch}
+                            preserveAspectRatio="xMidYMid meet"
+                          />
+                        </mask>
                       )}
+                      <g mask={maskId ? `url(#${maskId})` : undefined}>
+                        {previewPhotoUrl ? (
+                          <image
+                            href={previewPhotoUrl}
+                            x={-cw / 2}
+                            y={-ch / 2}
+                            width={cw}
+                            height={ch}
+                            preserveAspectRatio="xMidYMid slice"
+                          />
+                        ) : (
+                          <>
+                            <rect x={-cw / 2} y={-ch / 2} width={cw} height={ch} fill="#e5e5e5" />
+                            <text fontSize={Math.min(cw, ch) / 5} fill="#737373" textAnchor="middle" dominantBaseline="central">
+                              Photo
+                            </text>
+                          </>
+                        )}
+                      </g>
                     </g>
                   );
                 }
@@ -1497,10 +1512,38 @@ export default function VariableDataEditor({
                 )}
 
                 {selected.kind === "photo" && (
-                  <p className="text-xs text-neutral-500">
-                    La photo remplit la zone, recadrée au besoin (le visage est privilégié). Les photos se déposent
-                    plus bas, dans « Produire les {vocab.pages} ».
-                  </p>
+                  <div className="space-y-2">
+                    <p className="text-xs text-neutral-500">
+                      La photo remplit la zone, recadrée au besoin (le visage est privilégié). Les photos se déposent
+                      plus bas, dans « Produire les {vocab.pages} ».
+                    </p>
+                    <Field label="Masque (facultatif)">
+                      <input
+                        type="file"
+                        accept="image/svg+xml,image/png,image/webp"
+                        disabled={uploadingImage}
+                        onChange={(e) => {
+                          uploadZoneImage(selected.id, e.target.files?.[0] ?? null, "maskPath");
+                          e.target.value = "";
+                        }}
+                        className="mt-1 w-full text-xs"
+                      />
+                    </Field>
+                    {uploadingImage && <p className="text-xs text-neutral-600">Envoi…</p>}
+                    {selected.maskPath && (
+                      <button
+                        type="button"
+                        onClick={() => updateZone(selected.id, { maskPath: null })}
+                        className="rounded-lg border border-neutral-300 px-2 py-1 text-xs text-neutral-700 hover:bg-neutral-50"
+                      >
+                        Retirer le masque
+                      </button>
+                    )}
+                    <p className="text-xs text-neutral-500">
+                      Une forme en SVG (ou PNG transparent) : la photo ne paraît que dans ses parties pleines, le reste
+                      laisse voir le fond. La forme est posée entière et centrée dans la zone.
+                    </p>
+                  </div>
                 )}
 
                 <Field label="Rotation">

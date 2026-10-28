@@ -136,7 +136,7 @@ export async function patchVariableData(request: Request, id: string, cfg: Varia
   if (error) return json({ error: error.message }, 500);
   // Images de zones qui ne servent plus (zone supprimée, image remplacée).
   if (update.zones) {
-    const used = new Set((update.zones as CardZone[]).flatMap((z) => (z.imagePath ? [z.imagePath] : [])));
+    const used = new Set((update.zones as CardZone[]).flatMap((z) => [z.imagePath, z.maskPath].filter((p): p is string => !!p)));
     const storage = createAdminSupabaseClient().storage.from(cfg.bucket);
     const { data: files } = await storage.list(`${current.id}/images`);
     const unused = (files ?? []).map((f) => `${current.id}/images/${f.name}`).filter((path) => !used.has(path));
@@ -279,9 +279,10 @@ async function loadRenderFiles(doc: VariableDataRow, cfg: VariableDataConfig, wi
   const [front, back] = await Promise.all([load(doc.front_path), load(withBack ? doc.back_path : null)]);
   const images = new Map<string, Buffer>();
   for (const zone of doc.zones) {
-    if (zone.kind !== "image" || !zone.imagePath || !zone.imagePath.startsWith(`${doc.id}/images/`)) continue;
-    const bytes = await load(zone.imagePath);
-    if (bytes) images.set(zone.imagePath, Buffer.from(bytes));
+    const path = zone.kind === "image" ? zone.imagePath : zone.kind === "photo" ? zone.maskPath : null;
+    if (!path || !path.startsWith(`${doc.id}/images/`)) continue;
+    const bytes = await load(path);
+    if (bytes) images.set(path, Buffer.from(bytes));
   }
   return { front, back, images };
 }

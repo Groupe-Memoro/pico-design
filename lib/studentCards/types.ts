@@ -71,6 +71,10 @@ export interface CardZone {
   // recadrée pour la couvrir).
   imagePath: string | null;
   fit: "contain" | "cover";
+  // Photo : masque facultatif (SVG ou PNG converti, même dossier que les
+  // images fixes). La photo ne paraît que là où le masque est opaque ; il est
+  // posé entier et centré dans la zone, hors du masque la photo disparaît.
+  maskPath: string | null;
 }
 
 // Colonnes et une ligne du dernier CSV : l'éditeur montre l'aperçu sans qu'on
@@ -200,6 +204,7 @@ export function newCardZone(partial: Partial<CardZone> = {}): CardZone {
     showText: true,
     imagePath: null,
     fit: "contain",
+    maskPath: null,
     ...partial,
   };
 }
@@ -231,6 +236,7 @@ export function parseCardZones(raw: unknown, cardW: number, cardH: number): Card
       showText: z.showText !== false,
       imagePath: kind === "image" && typeof z.imagePath === "string" && ZONE_IMAGE_PATH.test(z.imagePath) ? z.imagePath : null,
       fit: z.fit === "cover" ? "cover" : "contain",
+      maskPath: kind === "photo" && typeof z.maskPath === "string" && ZONE_IMAGE_PATH.test(z.maskPath) ? z.maskPath : null,
     });
   }
   return zones;

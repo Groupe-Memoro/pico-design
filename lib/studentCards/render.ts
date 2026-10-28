@@ -116,17 +116,37 @@ function drawText(page: PDFPage, zone: CardZone, text: string, cardHeightMm: num
   page.pushOperators(popGraphicsState());
 }
 
-// La photo recadrée pour remplir la zone (comme une photo d'identité).
-async function drawPhoto(out: PDFDocument, page: PDFPage, zone: CardZone, photo: Buffer, cardHeightMm: number) {
+function photoPixels(zone: CardZone) {
   const size = contentSize(zone);
   const px = (mm: number) => Math.max(1, Math.round((mm / 25.4) * PHOTO_DPI));
-  const jpeg = await sharp(photo)
-    .rotate() // orientation EXIF des photos prises au téléphone
-    .resize(px(size.width), px(size.height), { fit: "cover", position: "attention" })
-    .flatten({ background: "#ffffff" })
-    .jpeg({ quality: 88 })
+  return { width: px(size.width), height: px(size.height) };
+}
+
+// Masque d'une zone photo, à la taille de la photo : sa couche alpha seule
+// (opaque : la photo paraît ; transparent : elle disparaît). Le masque est
+// posé entier et centré ; autour, tout est transparent.
+async function prepareMask(zone: CardZone, bytes: Buffer): Promise<Buffer> {
+  const { width, height } = photoPixels(zone);
+  return sharp(bytes)
+    .resize(width, height, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .ensureAlpha()
+    .extractChannel(3)
+    .raw()
     .toBuffer();
-  const image = await out.embedJpg(jpeg);
+}
+
+// La photo recadrée pour remplir la zone (comme une photo d'identité),
+// découpée par le masque de la zone s'il y en a un (PNG transparent).
+async function drawPhoto(out: PDFDocument, page: PDFPage, zone: CardZone, photo: Buffer, cardHeightMm: number, mask?: Buffer) {
+  const { width, height } = photoPixels(zone);
+  const pipeline = sharp(photo)
+    .rotate() // orientation EXIF des photos prises au téléphone
+    .resize(width, height, { fit: "cover", position: "attention" })
+    .flatten({ background: "#ffffff" });
+  const image = mask
+    ? await out.embedPng(await pipeline.joinChannel(mask, { raw: { width, height, channels: 1 } }).png().toBuffer())
+    : await out.embedJpg(await pipeline.jpeg({ quality: 88 }).toBuffer());
+  const size = contentSize(zone);
   const w = mmToPt(size.width);
   const h = mmToPt(size.height);
   enterZone(page, zone, cardHeightMm);
@@ -201,7 +221,8 @@ export async function renderStudentCards(
   template: VariableDataPage,
   backgrounds: { front: Uint8Array | null; back: Uint8Array | null },
   cards: CardInput[],
-  // Images fixes des zones, par chemin (voir CardZone.imagePath).
+  // Images fixes et masques des zones, par chemin (voir CardZone.imagePath
+  // et CardZone.maskPath).
   images: Map<string, Buffer> = new Map()
 ): Promise<{ pdf: Buffer; warnings: string[] }> {
   const textZones = template.zones.filter((z) => z.kind === "text");
@@ -227,6 +248,17 @@ export async function renderStudentCards(
       warnings.push("Une image du modèle est illisible : elle n'apparaît pas.");
     }
   }
+  // Masques des zones photo : préparés une fois, appliqués à chaque photo.
+  const photoMasks = new Map<string, Buffer>();
+  for (const zone of template.zones) {
+    const bytes = zone.kind === "photo" && zone.maskPath ? images.get(zone.maskPath) : undefined;
+    if (!bytes) continue;
+    try {
+      photoMasks.set(zone.id, await prepareMask(zone, bytes));
+    } catch {
+      warnings.push("Un masque de photo est illisible : la photo sort sans.");
+    }
+  }
 
   for (const card of cards) {
     for (const side of sides) {
@@ -246,7 +278,7 @@ export async function renderStudentCards(
         } else if (zone.kind === "photo") {
           if (!card.photo) continue;
           try {
-            await drawPhoto(out, page, zone, card.photo, H);
+            await drawPhoto(out, page, zone, card.photo, H, photoMasks.get(zone.id));
           } catch {
             warnings.push(`${card.label} : photo illisible.`);
           }
