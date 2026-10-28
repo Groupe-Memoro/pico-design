@@ -1,4 +1,4 @@
-import { createAdminSupabaseClient, createServerSupabaseClient } from "@/lib/supabase/server";
+import { getCurrentUser, loadAppSettingsCached } from "@/lib/supabase/server";
 import {
   COLOR_FIELDS,
   TYPOGRAPHY_DEFAULTS,
@@ -6,7 +6,6 @@ import {
   brandFontVar,
   googleFontsHref,
   isBrandFont,
-  loadAppSettings,
   type SettingsScope,
 } from "@/lib/appSettings";
 
@@ -27,11 +26,8 @@ export default async function AppSettingsStyle({ scope }: { scope: SettingsScope
   // Shopify n'aurait donc AUCUN habillage — pas même le jeu par défaut.
   // L'habillage n'est pas un secret : ce sont des couleurs et un logo, déjà
   // visibles de quiconque ouvre la page.
-  const supabase = createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const settings = await loadAppSettings(user ? supabase : createAdminSupabaseClient(), scope);
+  const user = await getCurrentUser();
+  const settings = await loadAppSettingsCached(scope, !user);
 
   const declarations: string[] = [];
   for (const field of COLOR_FIELDS) {

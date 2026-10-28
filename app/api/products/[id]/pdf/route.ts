@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { createServerSupabaseClient, createAdminSupabaseClient } from "@/lib/supabase/server";
-import { contentDisposition } from "@/lib/contentDisposition";
 
 export const runtime = "nodejs";
 
@@ -26,38 +25,33 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     );
   }
 
-  // Le stockage peut refuser un téléchargement de façon passagère (vu juste
-  // après la création d'un produit : échec, puis succès moins d'une minute
-  // plus tard). On réessaie avant d'abandonner, et la vraie raison part dans
-  // les journaux — le message « introuvable » laissait croire à un fichier perdu.
+  // Trop lourd pour passer dans la réponse (Vercel plafonne à 4,5 Mo) : on
+  // redirige vers une adresse signée du stockage, qui force le téléchargement.
+  // Le stockage peut refuser de façon passagère (vu juste après la création
+  // d'un produit) : on réessaie avant d'abandonner, et la vraie raison part
+  // dans les journaux.
+  const safeName = product.name.replace(/[\\/:*?"<>|\x00-\x1f]+/g, " ").trim() || "produit";
   const admin = createAdminSupabaseClient();
-  let file: Blob | null = null;
+  let signedUrl: string | null = null;
   let lastError: unknown = null;
   for (const delayMs of [0, 500, 1000]) {
     if (delayMs) await new Promise((resolve) => setTimeout(resolve, delayMs));
-    const { data, error: downloadError } = await admin.storage.from("outputs").download(product.pdf_path);
-    if (data) {
-      file = data;
+    const { data, error: signError } = await admin.storage
+      .from("outputs")
+      .createSignedUrl(product.pdf_path, 60 * 10, { download: `${safeName}.pdf` });
+    if (data?.signedUrl) {
+      signedUrl = data.signedUrl;
       break;
     }
-    lastError = downloadError;
+    lastError = signError;
   }
-  if (!file) {
-    console.error(`PDF du produit ${params.id} (${product.pdf_path}) : téléchargement impossible`, lastError);
+  if (!signedUrl) {
+    console.error(`PDF du produit ${params.id} (${product.pdf_path}) : adresse de téléchargement impossible`, lastError);
     return NextResponse.json(
       { error: "Le PDF n'est pas disponible pour l'instant. Réessayez dans un instant." },
       { status: 503 }
     );
   }
 
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const safeName = product.name.replace(/[\\/:*?"<>|\x00-\x1f]+/g, " ").trim() || "produit";
-
-  return new NextResponse(new Uint8Array(buffer), {
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": contentDisposition(`${safeName}.pdf`),
-      "Cache-Control": "private, no-store",
-    },
-  });
+  return NextResponse.redirect(signedUrl, { headers: { "Cache-Control": "private, no-store" } });
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Modal from "@/components/Modal";
@@ -360,6 +360,22 @@ export default function ImpositionTool({
   const thumbsRequested = useRef(new Set<string>());
   const thumbsRef = useRef(thumbs);
   thumbsRef.current = thumbs;
+  // File d'attente : au plus 3 miniatures demandées à la fois (une imposition
+  // peut compter des dizaines de fichiers, chaque appel est une fonction serveur).
+  const thumbQueue = useRef<(() => Promise<void>)[]>([]);
+  const thumbsRunning = useRef(0);
+  const unmounted = useRef(false);
+  // Ne lit que des refs : identité stable, sans dépendances.
+  const pumpThumbs = useCallback(() => {
+    while (thumbsRunning.current < 3 && thumbQueue.current.length) {
+      const job = thumbQueue.current.shift()!;
+      thumbsRunning.current++;
+      job().finally(() => {
+        thumbsRunning.current--;
+        pumpThumbs();
+      });
+    }
+  }, []);
   useEffect(() => {
     for (const item of items) {
       if (thumbsRequested.current.has(item.key)) continue;
@@ -369,15 +385,27 @@ export default function ImpositionTool({
       else if (item.storedPath) body.append("path", item.storedPath);
       else continue;
       thumbsRequested.current.add(item.key);
-      fetch("/api/imposition/thumbnail", { method: "POST", body })
-        .then((res) => (res.ok ? res.blob() : null))
-        .then((blob) => {
-          if (blob) setThumbs((current) => ({ ...current, [item.key]: URL.createObjectURL(blob) }));
-        })
-        .catch(() => {});
+      thumbQueue.current.push(() =>
+        fetch("/api/imposition/thumbnail", { method: "POST", body })
+          .then((res) => (res.ok ? res.blob() : null))
+          .then((blob) => {
+            // Outil fermé entre-temps : plus personne pour libérer l'adresse.
+            if (blob && !unmounted.current)
+              setThumbs((current) => ({ ...current, [item.key]: URL.createObjectURL(blob) }));
+          })
+          .catch(() => {})
+      );
     }
-  }, [items]);
-  useEffect(() => () => Object.values(thumbsRef.current).forEach((url) => URL.revokeObjectURL(url)), []);
+    pumpThumbs();
+  }, [items, pumpThumbs]);
+  useEffect(
+    () => () => {
+      unmounted.current = true;
+      thumbQueue.current = [];
+      Object.values(thumbsRef.current).forEach((url) => URL.revokeObjectURL(url));
+    },
+    []
+  );
 
   // Si le préréglage sélectionné a été supprimé (ou le premier vient d'être
   // créé), retombe sur un choix valide.

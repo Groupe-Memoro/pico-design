@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Modal from "@/components/Modal";
 import { DownloadIcon, EyeIcon, FilePenIcon, SendIcon, SpinnerIcon, TrashIcon } from "@/components/icons";
 
@@ -30,6 +30,32 @@ export default function ImpositionsTable({ rows }: { rows: ImpositionRow[] }) {
   const router = useRouter();
   const [viewing, setViewing] = useState<ImpositionRow | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  // Aperçu : le PDF est lu (la route redirige vers le stockage) puis affiché via
+  // une adresse blob:, car la CSP n'autorise dans un cadre que 'self' et blob:.
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewFailed, setPreviewFailed] = useState(false);
+  useEffect(() => {
+    if (!viewing) return;
+    let url: string | null = null;
+    let cancelled = false;
+    fetch(`/api/impositions/${viewing.id}/pdf`)
+      .then((res) => (res.ok ? res.blob() : null))
+      .then((blob) => {
+        if (cancelled) return;
+        if (!blob) return setPreviewFailed(true);
+        url = URL.createObjectURL(blob);
+        setPreviewUrl(url);
+      })
+      .catch(() => {
+        if (!cancelled) setPreviewFailed(true);
+      });
+    return () => {
+      cancelled = true;
+      if (url) URL.revokeObjectURL(url);
+      setPreviewUrl(null);
+      setPreviewFailed(false);
+    };
+  }, [viewing]);
 
   async function handleDelete(row: ImpositionRow) {
     if (!confirm(`Supprimer l'imposition « ${row.name} » ? Son PDF sera supprimé aussi.`)) return;
@@ -119,11 +145,21 @@ export default function ImpositionsTable({ rows }: { rows: ImpositionRow[] }) {
 
       {viewing && (
         <Modal title={viewing.name} onClose={() => setViewing(null)} wide>
-          <iframe
-            src={`/api/impositions/${viewing.id}/pdf`}
-            title={viewing.name}
-            className="h-[65vh] w-full rounded border border-neutral-200"
-          />
+          {previewUrl ? (
+            <iframe
+              src={previewUrl}
+              title={viewing.name}
+              className="h-[65vh] w-full rounded border border-neutral-200"
+            />
+          ) : (
+            <div className="flex h-[65vh] w-full items-center justify-center rounded border border-neutral-200">
+              {previewFailed ? (
+                <p className="text-sm text-text-subtle">Aperçu indisponible. Le téléchargement reste possible.</p>
+              ) : (
+                <SpinnerIcon className="h-5 w-5 animate-spin" />
+              )}
+            </div>
+          )}
           <a
             href={`/api/impositions/${viewing.id}/pdf?download=1`}
             className="mt-4 flex items-center justify-center gap-2 btn-primary"

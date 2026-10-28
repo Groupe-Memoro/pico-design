@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import Nav from "@/components/Nav";
 import { hasSidebar } from "@/lib/menuItems";
 import { ChromeVisibilityProvider, useChromeHidden } from "@/components/ChromeVisibility";
@@ -48,8 +48,15 @@ function AppShellContent({ children }: { children: React.ReactNode }) {
 }
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
+  // /design?template=… ouvre l'éditeur plein écran d'emblée (voir DesignTool) :
+  // on masque le chrome dès le premier rendu plutôt qu'à l'effet. Le layout
+  // racine est dynamique (headers()), donc useSearchParams n'y pose pas de
+  // contrainte de rendu statique.
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const startsInEditor = pathname === "/design" && searchParams.has("template");
   return (
-    <ChromeVisibilityProvider>
+    <ChromeVisibilityProvider initiallyHidden={startsInEditor}>
       <AppShellContent>{children}</AppShellContent>
     </ChromeVisibilityProvider>
   );

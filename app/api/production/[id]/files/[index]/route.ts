@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { createAdminSupabaseClient, createServerSupabaseClient } from "@/lib/supabase/server";
-import { contentDisposition } from "@/lib/contentDisposition";
 
 export const runtime = "nodejs";
 
@@ -15,13 +14,11 @@ export async function GET(_request: Request, { params }: { params: { id: string;
   const { data: batch } = await supabase.from("production_batches").select("files").eq("id", params.id).maybeSingle();
   const file = (batch?.files as { name: string; path: string }[] | undefined)?.[Number(params.index)];
   if (!file) return NextResponse.json({ error: "Fichier introuvable." }, { status: 404 });
-  const { data, error } = await createAdminSupabaseClient().storage.from("outputs").download(file.path);
-  if (error || !data) return NextResponse.json({ error: "Fichier introuvable." }, { status: 404 });
-  return new NextResponse(new Uint8Array(await data.arrayBuffer()), {
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": contentDisposition(`${file.name}.pdf`),
-      "Cache-Control": "private, no-store",
-    },
-  });
+  // Trop lourd pour passer dans la réponse (Vercel plafonne à 4,5 Mo) : on
+  // redirige vers une adresse signée du stockage, qui force le téléchargement.
+  const { data, error } = await createAdminSupabaseClient()
+    .storage.from("outputs")
+    .createSignedUrl(file.path, 60 * 10, { download: `${file.name}.pdf` });
+  if (error || !data?.signedUrl) return NextResponse.json({ error: "Fichier introuvable." }, { status: 404 });
+  return NextResponse.redirect(data.signedUrl, { headers: { "Cache-Control": "private, no-store" } });
 }

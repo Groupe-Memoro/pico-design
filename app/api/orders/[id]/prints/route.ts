@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { PDFDocument } from "pdf-lib";
+import { PDFDocument, PDFName } from "pdf-lib";
 import { createAdminSupabaseClient, createServerSupabaseClient } from "@/lib/supabase/server";
 import { formDataFromSubmission, type DesignSubmission } from "@/lib/design/submission";
 import { renderPdfFromForm } from "@/lib/design/renderPdf";
@@ -57,9 +57,27 @@ export async function POST(_request: Request, { params }: { params: { id: string
         bytes = new Uint8Array(await file.arrayBuffer());
       }
       const source = await PDFDocument.load(bytes);
-      const indices = source.getPageIndices();
+      // Les pages ne sont embarquées qu'une fois ; chaque tirage les redessine
+      // (sans dupliquer le flux de l'image) sur une page aux mêmes boîtes.
+      const sourcePages = source.getPages();
+      const embedded = await out.embedPages(sourcePages);
       for (let copy = 0; copy < Math.max(1, item.quantity); copy++) {
-        for (const page of await out.copyPages(source, indices)) out.addPage(page);
+        sourcePages.forEach((src, i) => {
+          const media = src.getMediaBox();
+          const page = out.addPage([media.width, media.height]);
+          // Mêmes boîtes que la page source (origine comprise) ; TrimBox/BleedBox
+          // seulement si la source les déclare, comme avec copyPages.
+          page.setMediaBox(media.x, media.y, media.width, media.height);
+          page.drawPage(embedded[i], { x: media.x, y: media.y, width: media.width, height: media.height });
+          if (src.node.has(PDFName.of("TrimBox"))) {
+            const t = src.getTrimBox();
+            page.setTrimBox(t.x, t.y, t.width, t.height);
+          }
+          if (src.node.has(PDFName.of("BleedBox"))) {
+            const bl = src.getBleedBox();
+            page.setBleedBox(bl.x, bl.y, bl.width, bl.height);
+          }
+        });
       }
     }
   } catch (err) {

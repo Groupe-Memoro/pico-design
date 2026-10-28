@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { apercu, gelica } from "@/lib/fonts";
 import "./globals.css";
 import AppShell from "@/components/AppShell";
@@ -19,11 +20,14 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  // La CSP (middleware.ts) impose un nonce sur les scripts : sans lui, le
+  // script de thème est bloqué en production et le mode sombre ne s'applique pas.
+  const nonce = headers().get("x-nonce") ?? undefined;
   return (
     // data-theme est posé par THEME_SCRIPT avant React : d'où suppressHydrationWarning.
     <html lang="fr" className={`${apercu.variable} ${gelica.variable}`} suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>
       <body>
         {/* Habillage de l'administration ; l'Outil Shopify pose le sien

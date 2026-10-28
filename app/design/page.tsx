@@ -2,6 +2,7 @@ import { loadIllustrations } from "@/lib/illustrationsData";
 import {
   createAdminSupabaseClient,
   createServerSupabaseClient,
+  loadAppSettingsCached,
   requireUser,
 } from "@/lib/supabase/server";
 import DesignTool from "@/components/DesignTool";
@@ -11,7 +12,6 @@ import { isAllowedReturnUrl } from "@/lib/shopify";
 import AppSettingsStyle from "@/components/AppSettingsStyle";
 import {
   assetUrl,
-  loadAppSettings,
   shopScopeOf,
 } from "@/lib/appSettings";
 import type { Metadata } from "next";
@@ -56,7 +56,7 @@ export async function generateMetadata({
   const scope = isAllowedReturnUrl(searchParams?.retour)
     ? (shopScopeOf(searchParams?.boutique, searchParams?.retour) ?? "tool")
     : "tool";
-  const settings = await loadAppSettings(createAdminSupabaseClient(), scope);
+  const settings = await loadAppSettingsCached(scope, true);
   return { icons: { icon: assetUrl(scope, "favicon", settings.updatedAt) } };
 }
 
@@ -123,6 +123,8 @@ export default async function DesignPage({
 
   await requireUser();
   const supabase = createServerSupabaseClient();
+  // Indépendant des requêtes suivantes : lancé tout de suite.
+  const illustrationsPromise = loadIllustrations(supabase);
   const [
     { data: templates },
     { data: categories },
@@ -160,7 +162,7 @@ export default async function DesignPage({
     backgroundUrl: (t.background_path && overlayUrls.get(t.background_path)) || null,
   }));
 
-  const illustrations = await loadIllustrations(supabase);
+  const illustrations = await illustrationsPromise;
 
   return (
     <DesignTool
@@ -195,6 +197,10 @@ async function publicTool(
   },
 ) {
   const admin = createAdminSupabaseClient();
+  // Indépendant des requêtes suivantes : lancé tout de suite (la promesse est
+  // attendue plus bas, ou ignorée si le modèle est introuvable).
+  const illustrationsPromise = loadIllustrations(admin);
+  illustrationsPromise.catch(() => {});
 
   const { data: template } = await admin
     .from("templates")
@@ -249,7 +255,7 @@ async function publicTool(
 
   // La banque d'illustrations, elle, est faite pour le client : contrairement
   // aux visuels, elle part aussi en mode public (en adresses signées).
-  const illustrations = await loadIllustrations(admin);
+  const illustrations = await illustrationsPromise;
 
   // Boutique d'origine du visiteur : son domaine public (`boutique`), sinon
   // celui de l'adresse de retour — validée plus haut par isAllowedReturnUrl,

@@ -12,7 +12,9 @@ export default async function OrdersPage() {
   const [{ data }, { data: batches }] = await Promise.all([
     supabase
       .from("orders")
-      .select("*, order_items(id, title, quantity, design_submission_id, product_id)")
+      .select(
+        "id, shopify_order_id, order_number, customer_email, financial_status, fulfillment_status, pico_status, shop_domain, archived_at, viewed_at, created_at, order_items(id, title, quantity, design_submission_id, product_id)"
+      )
       .order("created_at", { ascending: false })
       .limit(200),
     // Mises en production récentes : leurs PDF imposés, rattachés aux commandes.

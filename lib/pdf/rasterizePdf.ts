@@ -88,7 +88,7 @@ const multiply = (m: Matrix, n: Matrix): Matrix => [
  * page si elle déborde. null dès que la page contient autre chose — l'appelant
  * passe alors par pdf.js.
  */
-async function extractSingleImagePage(buffer: Buffer, pageNumber: number): Promise<Buffer | null> {
+export async function extractSingleImagePage(buffer: Buffer, pageNumber: number): Promise<Buffer | null> {
   const doc = await PDFDocument.load(buffer, { ignoreEncryption: true, updateMetadata: false });
   const page = doc.getPage(pageNumber - 1);
   if (page.getRotation().angle % 360 !== 0) return null;

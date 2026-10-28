@@ -1,6 +1,8 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { cache } from "react";
+import { loadAppSettings, type SettingsScope } from "@/lib/appSettings";
 import type { Database } from "../types";
 
 // Client Supabase utilisé dans les Server Components / routes API,
@@ -44,13 +46,32 @@ export function createServerSupabaseClient() {
 // sur les deux runtimes disponibles — voir l'historique de commits).
 // À appeler en tout début de chaque page protégée.
 export async function requireUser() {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  return user;
+}
+
+// Utilisateur connecté, lu UNE fois par requête (cache() de React : mémoïsé
+// le temps du rendu serveur) — getUser() est un aller-retour vers Supabase
+// Auth, et le layout, l'habillage et la page le demandaient chacun. Hors
+// rendu React (routes API), cache() n'a pas d'effet : chaque appel relit.
+export const getCurrentUser = cache(async () => {
   const supabase = createServerSupabaseClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
   return user;
-}
+});
+
+// Réglages d'un jeu, lus une fois par requête pour un (jeu, client) donné.
+// Les arguments sont des primitives : cache() compare par identité, un client
+// Supabase créé à chaque appel ne serait jamais « le même ». `admin` choisit
+// la clé de service (visiteur public sans session, RLS fermée) plutôt que la
+// session de l'utilisateur. Pas de cache entre requêtes : un enregistrement
+// se voit tout de suite.
+export const loadAppSettingsCached = cache((scope: SettingsScope, admin: boolean) =>
+  loadAppSettings(admin ? createAdminSupabaseClient() : createServerSupabaseClient(), scope)
+);
 
 // Protège une page (Server Component) réservée aux administrateurs (ex.
 // gestion des utilisateurs) — redirige les employés vers l'accueil.

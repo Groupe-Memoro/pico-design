@@ -371,7 +371,7 @@ export default function TemplateMockupsManager({ templateId }: { templateId: str
           </select>
           <p className="mt-1 text-xs text-text-subtle">
             Détermine la partie du visuel visible sur ce mockup. Une fois le mockup créé, « Cadrage du visuel » permet
-            d'affiner la position et l'échelle au pourcentage près.
+            d’affiner la position et l’échelle au pourcentage près.
           </p>
         </div>
 
@@ -447,8 +447,8 @@ function FramingPanel({
           <span>Étendue du visuel sur le produit</span>
         </div>
         <p className="mt-0.5 text-[11px] text-text-subtle">
-          Le mesh du bundle couvre souvent toute l'image alors que le produit n'en occupe qu'une partie : sans marge,
-          le visuel s'étale d'un bord à l'autre de l'image, ce qui le décale et l'agrandit.
+          Le mesh du bundle couvre souvent toute l’image alors que le produit n’en occupe qu’une partie : sans marge,
+          le visuel s’étale d’un bord à l’autre de l’image, ce qui le décale et l’agrandit.
         </p>
         <div className="mt-1.5 grid grid-cols-2 gap-2">
           {([
@@ -550,8 +550,8 @@ function FramingPanel({
           style={rangeFillStyle(framing.positionY, 0, 1)}
         />
         <p className="mt-1 text-[11px] text-text-subtle">
-          0 % = haut du visuel, 100 % = bas. Sans effet si le visuel n'a pas de marge verticale à cette échelle (il ne
-          déborde alors qu'en largeur) : augmente l'échelle pour dégager du jeu.
+          0 % = haut du visuel, 100 % = bas. Sans effet si le visuel n’a pas de marge verticale à cette échelle (il ne
+          déborde alors qu’en largeur) : augmente l’échelle pour dégager du jeu.
         </p>
       </div>
 
@@ -580,7 +580,7 @@ function FramingPanel({
         <div className="border-t border-border pt-3">
           <p className="text-xs font-medium text-text">Intensité des surcouches</p>
           <p className="mt-0.5 text-[11px] text-text-subtle">
-            Les effets posés par-dessus le visuel : ombres, reflets, matière du produit. 100 % = l'effet tel que le
+            Les effets posés par-dessus le visuel : ombres, reflets, matière du produit. 100 % = l’effet tel que le
             bundle le définit, 0 % = supprimé.
           </p>
           <div className="mt-2 space-y-2">

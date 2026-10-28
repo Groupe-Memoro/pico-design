@@ -26,15 +26,16 @@ Build and maintain a Next.js 14 application that allows employees to:
 - Prefer small, focused changes. Do not broaden the feature scope without reason.
 
 ## Working notes
-- Middleware redirects unauthenticated users to `/login`.
+- `middleware.ts` only sets a nonce-based CSP; it does NOT enforce auth. Every new page must call `requireUser()`/`requireAdmin()` (from `lib/supabase/server.ts`) and every new API route must check `auth.getUser()` itself.
 - The `products` API is the core workflow: validate template + file input, upload the source image, generate the PDF, and save output to Supabase storage. The public Shopify tool renders through `app/api/design/*`.
 - Product templates are stored in the `templates` table and contain print metadata (dimensions, bleed, DPI, and logo placement).
 - `lib/pdf/generate.ts` is the critical business logic file; changes here should preserve output dimensions and print quality.
-- The `assets/pico-noir.svg` file can be absent without breaking generation.
+- The `public/pico-noir.svg` file can be absent without breaking generation.
 
 ## Verification
 Before claiming completion, run the smallest relevant tool for the task:
 - `npm run lint` for general code health,
+- `npx tsc --noEmit` for type checking,
 - or a targeted build/test command when the change affects runtime behavior.
 
 Keep the repo easy to maintain and aligned with the existing Pico Design workflow.

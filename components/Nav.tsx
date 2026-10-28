@@ -99,19 +99,23 @@ export default function Nav() {
 
   // Nouvelles commandes (reçues, pas encore en production) : une pastille sur
   // « Commandes », mise à jour chaque minute, au retour sur l'onglet et à
-  // chaque changement de page (après avoir fait avancer une commande, par ex.).
-  const showsOrders = menuOrder.includes("orders");
+  // chaque signal `pico:orders-changed` (après avoir fait avancer une commande).
+  // Seulement une fois le rôle connu (profil chargé) : un client anonyme de
+  // l'Outil Shopify n'a pas de session, l'appel renverrait 401.
+  const showsOrders = role !== null && menuOrder.includes("orders");
   const [newOrders, setNewOrders] = useState(0);
   useEffect(() => {
     if (!showsOrders) return;
     let cancelled = false;
-    const refresh = () =>
-      fetch("/api/orders/new-count", { cache: "no-store" })
+    const refresh = () => {
+      if (document.hidden) return;
+      return fetch("/api/orders/new-count", { cache: "no-store" })
         .then((r) => (r.ok ? r.json() : null))
         .then((d) => {
           if (!cancelled && d && typeof d.count === "number") setNewOrders(d.count);
         })
         .catch(() => {});
+    };
     refresh();
     const timer = window.setInterval(refresh, 60_000);
     const onVisible = () => document.visibilityState === "visible" && refresh();
@@ -124,7 +128,7 @@ export default function Nav() {
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("pico:orders-changed", refresh);
     };
-  }, [showsOrders, pathname]);
+  }, [showsOrders]);
 
   const initials = name
     ? name

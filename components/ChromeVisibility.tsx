@@ -12,8 +12,17 @@ import { createContext, useContext, useEffect, useState } from "react";
 // changer de route (l'Outil Shopify reste une seule page, voir DesignTool).
 const ChromeVisibilityContext = createContext<{ hidden: boolean; setHidden: (hidden: boolean) => void } | null>(null);
 
-export function ChromeVisibilityProvider({ children }: { children: React.ReactNode }) {
-  const [hidden, setHidden] = useState(false);
+// `initiallyHidden` : chrome masqué dès le premier rendu (sinon la Nav
+// s'afficherait puis disparaîtrait à l'effet de useHideChrome — saut de mise
+// en page). useHideChrome remet la valeur exacte dès son montage.
+export function ChromeVisibilityProvider({
+  children,
+  initiallyHidden = false,
+}: {
+  children: React.ReactNode;
+  initiallyHidden?: boolean;
+}) {
+  const [hidden, setHidden] = useState(initiallyHidden);
   return (
     <ChromeVisibilityContext.Provider value={{ hidden, setHidden }}>{children}</ChromeVisibilityContext.Provider>
   );
@@ -31,8 +40,10 @@ export function useChromeHidden(): boolean {
 export function useHideChrome(hidden: boolean) {
   const ctx = useContext(ChromeVisibilityContext);
   useEffect(() => {
-    if (!ctx || !hidden) return;
-    ctx.setHidden(true);
+    if (!ctx) return;
+    // Même quand `hidden` est faux : annule un masquage initial supposé à tort
+    // (ex. `?template=` inconnu, donc galerie et non éditeur).
+    ctx.setHidden(hidden);
     return () => ctx.setHidden(false);
   }, [ctx, hidden]);
 }
