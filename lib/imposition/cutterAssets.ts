@@ -40,7 +40,10 @@ export async function applyCutterAssets(
       const { error } = await storage
         .from(BUCKET)
         .upload(path, bytes, { contentType: CONTENT_TYPES[kind], upsert: true });
-      if (error) throw new CutterAssetError(`Enregistrement de « ${file.name} » impossible : ${error.message}`);
+      if (error) {
+        console.error(`Enregistrement de « ${file.name} » impossible.`, error);
+        throw new CutterAssetError(`Enregistrement de « ${file.name} » impossible.`);
+      }
       // Un PNG remplacé par un PDF n'a pas le même chemin : l'ancien est retiré.
       if (previous && previous !== path) await storage.from(BUCKET).remove([previous]);
       changes[column] = path;

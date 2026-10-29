@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
-import { createAdminSupabaseClient, createServerSupabaseClient } from "@/lib/supabase/server";
+import { createAdminSupabaseClient } from "@/lib/supabase/server";
+import { requireApiUser, serverError } from "@/lib/api";
 
 export const runtime = "nodejs";
 
@@ -15,16 +16,14 @@ export const runtime = "nodejs";
  * imposition le range ensuite avec elle et retire la copie de dépôt.
  */
 export async function POST() {
-  const supabase = createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
+  const session = await requireApiUser();
+  if (session instanceof NextResponse) return session;
+  const { supabase, user } = session;
 
   const path = `staging/${user.id}/${randomUUID()}.pdf`;
   const { data, error } = await createAdminSupabaseClient().storage.from("imposition").createSignedUploadUrl(path);
   if (error || !data) {
-    return NextResponse.json({ error: error?.message ?? "Préparation de l'envoi impossible." }, { status: 500 });
+    return serverError(error, "Préparation de l'envoi impossible.");
   }
   return NextResponse.json({ path, token: data.token });
 }

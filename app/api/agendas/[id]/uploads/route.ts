@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import { agendaStorage, jsonError, sessionClient, thumbPathOf } from "@/lib/agendas/server";
+import { serverError } from "@/lib/api";
 
 export const runtime = "nodejs";
 
@@ -23,7 +24,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
   if (body.kind === "pdf") {
     const path = `${params.id}/pdfs/${randomUUID()}.pdf`;
     const { data, error } = await storage.createSignedUploadUrl(path);
-    if (error || !data) return jsonError(error?.message ?? "Préparation de l'envoi impossible.", 500);
+    if (error || !data) return serverError(error, "Préparation de l'envoi impossible.");
     return NextResponse.json({ pdf: { path, token: data.token } });
   }
 
@@ -35,7 +36,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     const thumbPath = thumbPathOf(photoPath);
     const [photo, thumb] = await Promise.all([storage.createSignedUploadUrl(photoPath), storage.createSignedUploadUrl(thumbPath)]);
     if (photo.error || thumb.error || !photo.data || !thumb.data) {
-      return jsonError(photo.error?.message ?? thumb.error?.message ?? "Préparation de l'envoi impossible.", 500);
+      return serverError(photo.error ?? thumb.error, "Préparation de l'envoi impossible.");
     }
     uploads.push({ photoPath, photoToken: photo.data.token, thumbPath, thumbToken: thumb.data.token });
   }

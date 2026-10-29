@@ -1,3 +1,4 @@
+import { serverError } from "@/lib/api";
 import { NextResponse } from "next/server";
 import { createServerSupabaseClient, createAdminSupabaseClient, getAuthorizedAdmin } from "@/lib/supabase/server";
 import { validatePassword } from "@/lib/passwordPolicy";
@@ -34,7 +35,13 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       ...(email ? { email, email_confirm: true } : {}),
       ...(password ? { password } : {}),
     });
-    if (authError) return NextResponse.json({ error: authError.message }, { status: 500 });
+    if (authError) {
+      // Courriel déjà pris : message utile à l'administrateur.
+      if (authError.code === "email_exists") {
+        return NextResponse.json({ error: "Un compte existe déjà avec ce courriel." }, { status: 500 });
+      }
+      return serverError(authError, "Impossible de modifier le compte.");
+    }
   }
 
   const update: Record<string, unknown> = {};
@@ -43,7 +50,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
   if (Object.keys(update).length > 0) {
     const { error: profileError } = await admin.from("profiles").update(update).eq("id", params.id);
-    if (profileError) return NextResponse.json({ error: profileError.message }, { status: 500 });
+    if (profileError) return serverError(profileError, "Impossible de modifier le profil.");
   }
 
   return NextResponse.json({ success: true });
@@ -62,7 +69,7 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   // La ligne `profiles` associée est supprimée automatiquement (foreign key
   // `on delete cascade` vers `auth.users`, voir 0001_init.sql).
   const { error } = await admin.auth.admin.deleteUser(params.id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error, "Impossible de supprimer le compte.");
 
   return NextResponse.json({ success: true });
 }

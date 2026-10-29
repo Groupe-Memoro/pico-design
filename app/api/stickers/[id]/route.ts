@@ -1,3 +1,4 @@
+import { serverError } from "@/lib/api";
 import { NextResponse } from "next/server";
 import { createAdminSupabaseClient, createServerSupabaseClient } from "@/lib/supabase/server";
 import { parseZones, type StickerTemplate } from "@/lib/stickers/types";
@@ -101,7 +102,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     .eq("id", current.id)
     .select()
     .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error, "Impossible de mettre à jour le sticker.");
   return NextResponse.json({ template: data });
 }
 
@@ -114,7 +115,7 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
     .delete()
     .eq("id", params.id)
     .select("artwork_path, marks_path, guide_path");
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error, "Impossible de supprimer le sticker.");
   if (!data || data.length === 0) return NextResponse.json({ error: "Modèle introuvable." }, { status: 404 });
   const files = data
     .flatMap((row) => [row.artwork_path, row.marks_path, row.guide_path])

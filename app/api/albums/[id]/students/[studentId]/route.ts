@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { isAlbumPath, jsonError, removeAlbumFiles, sessionClient, thumbPathOf, touchAlbum } from "@/lib/albums/server";
+import { serverError } from "@/lib/api";
 
 export const runtime = "nodejs";
 
@@ -33,7 +34,7 @@ export async function PATCH(request: Request, { params }: Params) {
   }
 
   const { error } = await supabase.from("album_students").update(update).eq("id", params.studentId);
-  if (error) return jsonError(error.message, 500);
+  if (error) return serverError(error, "Impossible d'enregistrer l'élève.");
   if (replacedPhoto && replacedPhoto !== update.photo_path) await removeAlbumFiles([replacedPhoto]);
   await touchAlbum(supabase, params.id);
   return NextResponse.json({ ok: true });

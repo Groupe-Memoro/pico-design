@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { isAlbumPath, jsonError, removeAlbumFiles, sessionClient, thumbPathOf, touchAlbum } from "@/lib/albums/server";
+import { serverError } from "@/lib/api";
 
 export const runtime = "nodejs";
 
@@ -44,7 +45,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
   if (rows.length > 0) {
     const { error } = await supabase.from("album_students").insert(rows);
-    if (error) return jsonError(error.message, 500);
+    if (error) return serverError(error, "Impossible d'enregistrer l'élève.");
   }
 
   // Photos pour des élèves déjà dans l'album (envoi de photos seul).

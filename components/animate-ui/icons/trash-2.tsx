@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { motion, type Variants } from 'motion/react';
+import { m, type Variants } from 'motion/react';
 
 import {
   getVariants,
@@ -78,7 +78,7 @@ const IconComponent = React.forwardRef<SVGSVGElement, Trash2Props>(function Icon
   const variants = getVariants(animations);
 
   return (
-    <motion.svg
+    <m.svg
       xmlns="http://www.w3.org/2000/svg"
       width={size}
       height={size}
@@ -91,27 +91,27 @@ const IconComponent = React.forwardRef<SVGSVGElement, Trash2Props>(function Icon
       {...props}
       ref={ref}
     >
-      <motion.g variants={variants.group} initial="initial" animate={controls}>
-        <motion.path
+      <m.g variants={variants.group} initial="initial" animate={controls}>
+        <m.path
           d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"
           variants={variants.path1}
           initial="initial"
           animate={controls}
         />
-        <motion.path
+        <m.path
           d="M3 6h18"
           variants={variants.path2}
           initial="initial"
           animate={controls}
         />
-      </motion.g>
-      <motion.path
+      </m.g>
+      <m.path
         d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"
         variants={variants.path3}
         initial="initial"
         animate={controls}
       />
-      <motion.line
+      <m.line
         x1={10}
         x2={10}
         y1={11}
@@ -120,7 +120,7 @@ const IconComponent = React.forwardRef<SVGSVGElement, Trash2Props>(function Icon
         initial="initial"
         animate={controls}
       />
-      <motion.line
+      <m.line
         x1={14}
         x2={14}
         y1={11}
@@ -129,7 +129,7 @@ const IconComponent = React.forwardRef<SVGSVGElement, Trash2Props>(function Icon
         initial="initial"
         animate={controls}
       />
-    </motion.svg>
+    </m.svg>
   );
 });
 

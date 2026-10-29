@@ -1,15 +1,14 @@
+import { requireApiUser, serverError } from "@/lib/api";
 import { NextResponse } from "next/server";
-import { createServerSupabaseClient, createAdminSupabaseClient } from "@/lib/supabase/server";
+import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { MENU_ITEMS } from "@/lib/menuItems";
 
 export const runtime = "nodejs";
 
 export async function PATCH(request: Request) {
-  const supabase = createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
+  const session = await requireApiUser();
+  if (session instanceof NextResponse) return session;
+  const { supabase, user } = session;
 
   const body = await request.json().catch(() => null);
   const order = Array.isArray(body?.order) ? body.order : null;
@@ -22,7 +21,7 @@ export async function PATCH(request: Request) {
   // restreint explicitement à `user.id`.
   const admin = createAdminSupabaseClient();
   const { error } = await admin.from("profiles").update({ menu_order: order }).eq("id", user.id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error, "Impossible d'enregistrer l'ordre du menu.");
 
   return NextResponse.json({ success: true });
 }

@@ -1,14 +1,12 @@
 import { NextResponse } from "next/server";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { serverError, readJson, requireApiUser } from "@/lib/api";
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
-  const supabase = createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
+  const session = await requireApiUser();
+  if (session instanceof NextResponse) return session;
+  const { supabase } = session;
 
-  const body = await request.json();
+  const body = await readJson(request);
   const name = typeof body?.name === "string" ? body.name.trim() : "";
   if (!name) {
     return NextResponse.json({ error: "Le nom est requis." }, { status: 400 });
@@ -21,16 +19,14 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error, "Impossible d'enregistrer la catégorie.");
   return NextResponse.json({ category: data });
 }
 
 export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
-  const supabase = createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
+  const session = await requireApiUser();
+  if (session instanceof NextResponse) return session;
+  const { supabase } = session;
 
   const { data, error } = await supabase
     .from("categories")
@@ -45,7 +41,7 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
         { status: 409 }
       );
     }
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return serverError(error, "Impossible de supprimer la catégorie.");
   }
   if (!data || data.length === 0) {
     return NextResponse.json(

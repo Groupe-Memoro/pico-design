@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { jsonError, sessionClient } from "@/lib/agendas/server";
 import { quebecHolidays } from "@/lib/agendas/calendar";
 import { AGENDA_FORMATS, DEFAULT_AGENDA_SETTINGS, defaultAgendaContent } from "@/lib/agendas/types";
+import { serverError } from "@/lib/api";
 
 export const runtime = "nodejs";
 
@@ -43,7 +44,7 @@ export async function POST(request: Request) {
     })
     .select("id")
     .single();
-  if (error || !agenda) return jsonError(error?.message ?? "Création impossible.", 500);
+  if (error || !agenda) return serverError(error, "Création impossible.");
 
   const cover = { ...defaultAgendaContent("cover"), title: yearLabel ? `Agenda ${yearLabel}` : "Agenda", subtitle: school };
   await supabase.from("agenda_pages").insert([

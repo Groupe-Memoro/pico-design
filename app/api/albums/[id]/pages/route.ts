@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { jsonError, sessionClient, touchAlbum } from "@/lib/albums/server";
 import { defaultContent, type AlbumPageKind } from "@/lib/albums/types";
+import { serverError } from "@/lib/api";
 
 export const runtime = "nodejs";
 
@@ -30,7 +31,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     .insert({ album_id: params.id, kind, position, content: defaultContent(kind) })
     .select("id")
     .single();
-  if (error) return jsonError(error.message, 500);
+  if (error) return serverError(error, "Impossible d'enregistrer la page.");
   await touchAlbum(supabase, params.id);
   return NextResponse.json({ id: data.id });
 }
@@ -50,7 +51,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     )
   );
   const failed = results.find((r) => r.error);
-  if (failed?.error) return jsonError(failed.error.message, 500);
+  if (failed?.error) return serverError(failed.error, "Impossible d'enregistrer la page.");
   await touchAlbum(session.supabase, params.id);
   return NextResponse.json({ ok: true });
 }

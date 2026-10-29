@@ -1,3 +1,4 @@
+import { serverError } from "@/lib/api";
 import { NextResponse } from "next/server";
 import { createAdminSupabaseClient, createServerSupabaseClient, getAuthorizedAdmin } from "@/lib/supabase/server";
 import { isShopScope } from "@/lib/appSettings";
@@ -40,7 +41,7 @@ export async function PUT(request: Request) {
   const { error } = await createAdminSupabaseClient()
     .from("shop_webhook_secrets")
     .upsert({ shop_domain: shop, secret, updated_at: new Date().toISOString(), updated_by: auth.userId });
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error, "Impossible d'enregistrer le secret du webhook.");
   return NextResponse.json({ ok: true });
 }
 
@@ -52,6 +53,6 @@ export async function DELETE(request: Request) {
   const shop = shopOf(new URL(request.url).searchParams.get("shop"));
   if (!shop) return NextResponse.json({ error: "Domaine de boutique invalide." }, { status: 400 });
   const { error } = await createAdminSupabaseClient().from("shop_webhook_secrets").delete().eq("shop_domain", shop);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error, "Impossible d'enregistrer le secret du webhook.");
   return NextResponse.json({ ok: true });
 }

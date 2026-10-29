@@ -1,3 +1,4 @@
+import { serverError } from "@/lib/api";
 import { NextResponse } from "next/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import {
@@ -66,7 +67,7 @@ export async function POST(request: Request) {
     .select("id")
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error, "Impossible d'enregistrer la commande.");
   const orderId = (saved as { id: string }).id;
 
   // Les lignes sont réécrites à chaque réception : c'est la charge utile qui
@@ -94,7 +95,7 @@ export async function POST(request: Request) {
         product_id: i.product_id && knownProducts.has(i.product_id) ? i.product_id : null,
       }))
     );
-    if (itemsError) return NextResponse.json({ error: itemsError.message }, { status: 500 });
+    if (itemsError) return serverError(itemsError, "Impossible d'enregistrer les articles de la commande.");
   }
 
   return NextResponse.json({ ok: true, lignes: items.length });

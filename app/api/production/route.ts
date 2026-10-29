@@ -1,6 +1,7 @@
+import { requireApiUser, serverError } from "@/lib/api";
 import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
-import { createAdminSupabaseClient, createServerSupabaseClient } from "@/lib/supabase/server";
+import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { formDataFromSubmission, type DesignSubmission } from "@/lib/design/submission";
 import { renderPdfFromForm } from "@/lib/design/renderPdf";
 import { mapLimit } from "@/lib/concurrency";
@@ -35,11 +36,9 @@ interface Piece {
  * design, ou dont le modèle n'a pas de profil, sont signalés et laissés de côté.
  */
 export async function POST(request: Request) {
-  const supabase = createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
+  const session = await requireApiUser();
+  if (session instanceof NextResponse) return session;
+  const { supabase, user } = session;
 
   const body = (await request.json().catch(() => ({}))) as { orderIds?: unknown };
   const orderIds = Array.isArray(body.orderIds) ? body.orderIds.filter((id): id is string => typeof id === "string").slice(0, 50) : [];
@@ -148,7 +147,10 @@ export async function POST(request: Request) {
       const { error: uploadError } = await admin.storage
         .from("outputs")
         .upload(path, built.pdf, { contentType: "application/pdf", upsert: true });
-      if (uploadError) throw new Error(uploadError.message);
+      if (uploadError) {
+        console.error("Enregistrement du PDF de production impossible.", uploadError);
+        throw new Error("Enregistrement du PDF de production impossible.");
+      }
       files.push({ name, path, sheets: built.sheetCount ?? 1, pieces: groupPieces.reduce((n, p) => n + p.copies, 0) });
     } catch (err) {
       errors.push(`${name} : ${err instanceof ImpositionError || err instanceof Error ? err.message : "erreur"}`);
@@ -169,7 +171,7 @@ export async function POST(request: Request) {
     skipped: [...skipped, ...errors],
     created_by: user.id,
   });
-  if (batchError) return NextResponse.json({ error: batchError.message }, { status: 500 });
+  if (batchError) return serverError(batchError, "Impossible de créer le lot de production.");
 
   // Les commandes avancent : en production, et vues.
   const now = new Date().toISOString();

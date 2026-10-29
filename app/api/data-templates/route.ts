@@ -1,16 +1,14 @@
+import { requireApiUser, serverError } from "@/lib/api";
 import { NextResponse } from "next/server";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
 // Crée un gabarit à données variables sur un modèle existant : son fond et
 // ses zones s'ajoutent ensuite, dans l'écran du gabarit.
 export async function POST(request: Request) {
-  const supabase = createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
+  const session = await requireApiUser();
+  if (session instanceof NextResponse) return session;
+  const { supabase, user } = session;
 
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
   const name = String(body.name ?? "").replace(/\s+/g, " ").trim().slice(0, 120);
@@ -27,6 +25,6 @@ export async function POST(request: Request) {
     .insert({ name, template_id: template.id, two_sided: template.two_sided, created_by: user.id })
     .select("id")
     .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error, "Impossible d'enregistrer le modèle de données.");
   return NextResponse.json({ id: (data as { id: string }).id });
 }

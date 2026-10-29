@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isAgendaPath, jsonError, removeAgendaFiles, sessionClient, touchAgenda } from "@/lib/agendas/server";
 import { agendaPageContent, agendaPageFiles, type AgendaPageKind } from "@/lib/agendas/types";
+import { serverError } from "@/lib/api";
 
 export const runtime = "nodejs";
 
@@ -27,7 +28,7 @@ export async function PATCH(request: Request, { params }: Params) {
   if (files.some((p) => !isAgendaPath(params.id, p))) return jsonError("Fichier invalide.");
 
   const { error } = await supabase.from("agenda_pages").update({ content }).eq("id", params.pageId);
-  if (error) return jsonError(error.message, 500);
+  if (error) return serverError(error, "Impossible d'enregistrer la page.");
 
   const before = agendaPageFiles(kind, agendaPageContent(kind, (page as { content: unknown }).content));
   await removeAgendaFiles(before.filter((p) => !files.includes(p)));

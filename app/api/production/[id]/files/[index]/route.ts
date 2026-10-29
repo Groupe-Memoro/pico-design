@@ -1,15 +1,14 @@
+import { requireApiUser } from "@/lib/api";
 import { NextResponse } from "next/server";
-import { createAdminSupabaseClient, createServerSupabaseClient } from "@/lib/supabase/server";
+import { createAdminSupabaseClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
 // Télécharge un PDF imposé d'une mise en production (voir app/api/production).
 export async function GET(_request: Request, { params }: { params: { id: string; index: string } }) {
-  const supabase = createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
+  const session = await requireApiUser();
+  if (session instanceof NextResponse) return session;
+  const { supabase } = session;
 
   const { data: batch } = await supabase.from("production_batches").select("files").eq("id", params.id).maybeSingle();
   const file = (batch?.files as { name: string; path: string }[] | undefined)?.[Number(params.index)];

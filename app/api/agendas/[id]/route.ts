@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { agendaStorage, jsonError, sessionClient } from "@/lib/agendas/server";
 import { agendaSettings } from "@/lib/agendas/types";
+import { serverError } from "@/lib/api";
 
 export const runtime = "nodejs";
 
@@ -35,7 +36,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   if (body.settings !== undefined) update.settings = agendaSettings(body.settings);
 
   const { error } = await session.supabase.from("agendas").update(update).eq("id", params.id);
-  if (error) return jsonError(error.message, 500);
+  if (error) return serverError(error, "Impossible d'enregistrer l'agenda.");
   return NextResponse.json({ ok: true });
 }
 
@@ -57,6 +58,6 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   }
 
   const { error } = await session.supabase.from("agendas").delete().eq("id", params.id);
-  if (error) return jsonError(error.message, 500);
+  if (error) return serverError(error, "Impossible de supprimer l'agenda.");
   return NextResponse.json({ ok: true });
 }

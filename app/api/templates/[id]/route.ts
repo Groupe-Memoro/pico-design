@@ -1,5 +1,5 @@
+import { requireApiUser, serverError } from "@/lib/api";
 import { NextResponse } from "next/server";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { uploadBeautyShotBundle } from "@/lib/templateBeautyShotUpload";
 import { parseOverlayOpacitiesField } from "@/lib/pdf/beautyShot";
 import { parseFoldField, parseFoldMarksField } from "@/lib/pdf/foldMarks";
@@ -28,11 +28,9 @@ const BOOLEAN_FIELDS = [
 ] as const;
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
-  const supabase = createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
+  const session = await requireApiUser();
+  if (session instanceof NextResponse) return session;
+  const { supabase } = session;
 
   const formData = await request.formData();
   const update: Record<string, unknown> = {};
@@ -119,16 +117,14 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error, "Impossible de mettre à jour le modèle.");
   return NextResponse.json({ template: data });
 }
 
 export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
-  const supabase = createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
+  const session = await requireApiUser();
+  if (session instanceof NextResponse) return session;
+  const { supabase } = session;
 
   const { data, error } = await supabase
     .from("templates")
@@ -136,7 +132,7 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
     .eq("id", params.id)
     .select();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error, "Impossible de supprimer le modèle.");
   if (!data || data.length === 0) {
     return NextResponse.json(
       { error: "Modèle introuvable ou suppression non autorisée." },

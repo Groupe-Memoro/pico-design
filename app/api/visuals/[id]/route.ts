@@ -1,16 +1,14 @@
+import { requireApiUser, serverError } from "@/lib/api";
 import { NextResponse } from "next/server";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { ALLOWED_VISUAL_TYPES, prepareUploadedFile } from "@/lib/visualUpload";
 import { storageFileName } from "@/lib/storageName";
 
 export const runtime = "nodejs"; // la rasterisation PDF a besoin du runtime Node, pas Edge.
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
-  const supabase = createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
+  const session = await requireApiUser();
+  if (session instanceof NextResponse) return session;
+  const { supabase } = session;
 
   const formData = await request.formData();
   const name = formData.get("name");
@@ -55,7 +53,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       .from("visuals")
       .upload(filePath, prepared.buffer, { contentType: prepared.contentType, upsert: true });
     if (uploadError) {
-      return NextResponse.json({ error: uploadError.message }, { status: 500 });
+      return serverError(uploadError, "Impossible d'enregistrer le visuel.");
     }
     update.file_path = filePath;
     update.mime_type = prepared.contentType;
@@ -73,7 +71,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     if (typeof update.file_path === "string") {
       await supabase.storage.from("visuals").remove([update.file_path]).catch(() => {});
     }
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return serverError(error, "Impossible de mettre à jour le visuel.");
   }
   // L'ancien fichier n'est plus référencé (les produits relisent le chemin du
   // visuel à chaque rendu) : le retirer, sans bloquer si ça échoue.
@@ -84,15 +82,13 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 }
 
 export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
-  const supabase = createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
+  const session = await requireApiUser();
+  if (session instanceof NextResponse) return session;
+  const { supabase } = session;
 
   const { data, error } = await supabase.from("visuals").delete().eq("id", params.id).select();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error, "Impossible de supprimer le visuel.");
   if (!data || data.length === 0) {
     return NextResponse.json(
       { error: "Visuel introuvable ou suppression non autorisée." },

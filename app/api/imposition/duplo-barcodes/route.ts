@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { MAX_BARCODE_BYTES, MAX_JOB_NO, barcodePath } from "@/lib/imposition/barcodes";
 import { detectMarksKind } from "@/lib/imposition/marks";
+import { requireApiUser, serverError } from "@/lib/api";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -10,11 +10,9 @@ export const maxDuration = 60;
 // longueur (le PDF et le numéro de job auquel il correspond). Un code-barres
 // déjà importé pour ce numéro est remplacé.
 export async function POST(request: Request) {
-  const supabase = createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
+  const session = await requireApiUser();
+  if (session instanceof NextResponse) return session;
+  const { supabase } = session;
 
   const formData = await request.formData();
   const files = formData.getAll("files");
@@ -41,7 +39,7 @@ export async function POST(request: Request) {
     const { error } = await supabase.storage
       .from("imposition")
       .upload(barcodePath(jobNo), bytes, { contentType: "application/pdf", upsert: true });
-    if (error) return NextResponse.json({ error: `« ${label} » : ${error.message}` }, { status: 500 });
+    if (error) return serverError(error, `« ${label} » : enregistrement impossible.`);
     count++;
   }
   return NextResponse.json({ count });

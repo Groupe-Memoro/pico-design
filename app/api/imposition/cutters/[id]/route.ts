@@ -1,18 +1,17 @@
 import { NextResponse } from "next/server";
-import { createAdminSupabaseClient, createServerSupabaseClient } from "@/lib/supabase/server";
+import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { parseCutterForm } from "@/lib/imposition/cutters";
 import { CutterAssetError, applyCutterAssets } from "@/lib/imposition/cutterAssets";
 import type { ImpositionCutter } from "@/lib/types";
+import { serverError, requireApiUser } from "@/lib/api";
 
 export const runtime = "nodejs";
 
 // Modifie un profil : ses champs, et ses fichiers (remplacés ou retirés, voir applyCutterAssets).
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
-  const supabase = createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
+  const session = await requireApiUser();
+  if (session instanceof NextResponse) return session;
+  const { supabase } = session;
 
   const form = await request.formData();
   const parsed = parseCutterForm(form);
@@ -39,23 +38,21 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     .eq("id", current.id)
     .select()
     .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error, "Impossible d'enregistrer la découpe.");
   return NextResponse.json({ cutter: data });
 }
 
 export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
-  const supabase = createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
+  const session = await requireApiUser();
+  if (session instanceof NextResponse) return session;
+  const { supabase } = session;
 
   const { data, error } = await supabase
     .from("imposition_cutters")
     .delete()
     .eq("id", params.id)
     .select("marks_path, guide_path");
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error, "Impossible de supprimer la découpe.");
   if (!data || data.length === 0) {
     return NextResponse.json({ error: "Profil introuvable ou suppression non autorisée." }, { status: 404 });
   }

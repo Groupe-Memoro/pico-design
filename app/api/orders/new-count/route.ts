@@ -1,5 +1,5 @@
+import { requireApiUser, serverError } from "@/lib/api";
 import { NextResponse } from "next/server";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -9,17 +9,15 @@ export const dynamic = "force-dynamic";
  * retirées. Le compte est le même pour toute l'équipe.
  */
 export async function GET() {
-  const supabase = createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
+  const session = await requireApiUser();
+  if (session instanceof NextResponse) return session;
+  const { supabase } = session;
 
   const { count, error } = await supabase
     .from("orders")
     .select("id", { count: "exact", head: true })
     .is("viewed_at", null)
     .is("archived_at", null);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error, "Impossible de compter les nouvelles commandes.");
   return NextResponse.json({ count: count ?? 0 }, { headers: { "Cache-Control": "no-store" } });
 }

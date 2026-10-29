@@ -1,6 +1,6 @@
+import { requireApiUser } from "@/lib/api";
 import { NextResponse } from "next/server";
 import sharp from "sharp";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -15,11 +15,9 @@ const THUMBNAIL_WIDTH_PX = 400;
 // Réservé aux employés connectés (comme la table `visuals`) ; l'outil public
 // Shopify ne reçoit aucun visuel.
 export async function GET(request: Request, { params }: { params: { id: string } }) {
-  const supabase = createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
+  const session = await requireApiUser();
+  if (session instanceof NextResponse) return session;
+  const { supabase } = session;
 
   const { data: visual } = await supabase.from("visuals").select("file_path, mime_type").eq("id", params.id).maybeSingle();
   if (!visual) return NextResponse.json({ error: "Introuvable." }, { status: 404 });

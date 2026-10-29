@@ -1,6 +1,7 @@
+import { requireApiUser, serverError } from "@/lib/api";
 import { NextResponse } from "next/server";
 import { randomUUID } from "crypto";
-import { createAdminSupabaseClient, createServerSupabaseClient } from "@/lib/supabase/server";
+import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { mockupFolder, parseBeautyShotXml, parseOverlayOpacitiesField } from "@/lib/pdf/beautyShot";
 import { loadMaskBounds } from "@/lib/pdf/beautyShotBundle";
 import {
@@ -22,11 +23,9 @@ import { uploadBeautyShotBundle } from "@/lib/templateBeautyShotUpload";
  * contenir qu'un — voir mockupFolder/beautyShotFolderOf.
  */
 export async function GET(request: Request) {
-  const supabase = createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
+  const session = await requireApiUser();
+  if (session instanceof NextResponse) return session;
+  const { supabase } = session;
 
   const templateId = new URL(request.url).searchParams.get("templateId");
   if (!templateId) return NextResponse.json({ error: "Modèle manquant." }, { status: 400 });
@@ -60,11 +59,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const supabase = createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
+  const session = await requireApiUser();
+  if (session instanceof NextResponse) return session;
+  const { supabase, user } = session;
 
   const formData = await request.formData();
   const templateId = formData.get("templateId");
@@ -130,6 +127,6 @@ export async function POST(request: Request) {
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error, "Impossible d'enregistrer le visuel du modèle.");
   return NextResponse.json({ mockup: data });
 }

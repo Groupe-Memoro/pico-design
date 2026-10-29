@@ -1,3 +1,4 @@
+import { serverError } from "@/lib/api";
 import { NextResponse } from "next/server";
 import { createAdminSupabaseClient, createServerSupabaseClient, getAuthorizedAdmin } from "@/lib/supabase/server";
 import {
@@ -111,7 +112,7 @@ export async function PATCH(request: Request, { params }: { params: { scope: str
     const { error } = await admin.storage
       .from("assets")
       .upload(storagePath, Buffer.from(await file.arrayBuffer()), { contentType: file.type, upsert: true });
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return serverError(error, "Impossible d'enregistrer les réglages.");
     update[upload.column] = storagePath;
   }
 
@@ -126,7 +127,7 @@ export async function PATCH(request: Request, { params }: { params: { scope: str
     .upsert({ scope, ...update }, { onConflict: "scope" })
     .select()
     .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error, "Impossible d'enregistrer les réglages.");
   return NextResponse.json({ settings: data });
 }
 
@@ -191,7 +192,7 @@ export async function DELETE(_request: Request, { params }: { params: { scope: s
     .delete()
     .eq("scope", scope)
     .select("scope");
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error, "Impossible d'enregistrer les réglages.");
   if (!supprimées || supprimées.length === 0) {
     return NextResponse.json(
       {

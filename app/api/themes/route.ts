@@ -1,6 +1,6 @@
+import { requireApiUser, serverError } from "@/lib/api";
 import { NextResponse } from "next/server";
 import { randomUUID } from "crypto";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { parseThemeSlotsField } from "@/lib/pdf/theme";
 import { MAX_THEME_SLOTS } from "@/lib/themeShapes";
 import { storageFileName } from "@/lib/storageName";
@@ -15,27 +15,23 @@ import { parseThemeGuidesField } from "@/lib/variableData/snap";
  * thèmes du modèle en cours, voir DesignTypePicker).
  */
 export async function GET(request: Request) {
-  const supabase = createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
+  const session = await requireApiUser();
+  if (session instanceof NextResponse) return session;
+  const { supabase } = session;
 
   const templateId = new URL(request.url).searchParams.get("templateId");
   let query = supabase.from("themes").select("*").order("name", { ascending: true });
   if (templateId) query = query.eq("template_id", templateId);
 
   const { data, error } = await query;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error, "Impossible de charger les thèmes.");
   return NextResponse.json({ themes: data });
 }
 
 export async function POST(request: Request) {
-  const supabase = createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
+  const session = await requireApiUser();
+  if (session instanceof NextResponse) return session;
+  const { supabase, user } = session;
 
   const formData = await request.formData();
   const templateId = formData.get("templateId");
@@ -66,7 +62,7 @@ export async function POST(request: Request) {
     .from("overlays")
     .upload(overlayPath, buffer, { contentType: overlayFile.type || "image/png", upsert: true });
   if (uploadError) {
-    return NextResponse.json({ error: uploadError.message }, { status: 500 });
+    return serverError(uploadError, "Impossible d'enregistrer l'image du thème.");
   }
 
   // Fond facultatif (voir 0068_theme_background.sql) : la colonne n'est
@@ -82,7 +78,7 @@ export async function POST(request: Request) {
         upsert: true,
       });
     if (backgroundError) {
-      return NextResponse.json({ error: backgroundError.message }, { status: 500 });
+      return serverError(backgroundError, "Impossible d'enregistrer l'arrière-plan du thème.");
     }
   }
 
@@ -104,6 +100,6 @@ export async function POST(request: Request) {
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error, "Impossible d'enregistrer le thème.");
   return NextResponse.json({ theme: data });
 }

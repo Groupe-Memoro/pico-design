@@ -1,16 +1,15 @@
 import { NextResponse } from "next/server";
-import { createServerSupabaseClient, createAdminSupabaseClient } from "@/lib/supabase/server";
+import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { pdfDownloadName } from "@/lib/imposition/saved";
+import { requireApiUser } from "@/lib/api";
 
 export const runtime = "nodejs";
 
 // PDF d'une imposition enregistrée : affiché dans le navigateur, ou téléchargé avec ?download=1.
 export async function GET(request: Request, { params }: { params: { id: string } }) {
-  const supabase = createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
+  const session = await requireApiUser();
+  if (session instanceof NextResponse) return session;
+  const { supabase } = session;
 
   const { data: row } = await supabase
     .from("impositions")

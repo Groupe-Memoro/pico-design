@@ -1,6 +1,7 @@
+import { requireApiUser } from "@/lib/api";
 import sharp from "sharp";
 import { NextResponse } from "next/server";
-import { createServerSupabaseClient, createAdminSupabaseClient } from "@/lib/supabase/server";
+import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { renderProductMockup } from "@/lib/products/mockup";
 import { listTemplateMockups } from "@/lib/templateMockups";
 import { mapLimit } from "@/lib/concurrency";
@@ -22,11 +23,9 @@ const URL_LIFETIME_S = 60 * 60 * 24 * 7;
  * progression et ne pas dépasser la durée maximale d'une requête.
  */
 export async function POST(_request: Request, { params }: { params: { id: string } }) {
-  const supabase = createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
+  const session = await requireApiUser();
+  if (session instanceof NextResponse) return session;
+  const { supabase } = session;
 
   const { data: product } = await supabase.from("products").select("*").eq("id", params.id).single<Product>();
   if (!product) return NextResponse.json({ error: "Produit introuvable." }, { status: 404 });
@@ -55,7 +54,10 @@ export async function POST(_request: Request, { params }: { params: { id: string
         .toBuffer();
       const path = `shopify-export/${product.id}/${i + 1}.png`;
       const { error } = await admin.storage.from("outputs").upload(path, image, { contentType: "image/png", upsert: true });
-      if (error) throw new Error(error.message);
+      if (error) {
+        console.error("Enregistrement de l'image Shopify impossible.", error);
+        throw new Error("enregistrement de l'image impossible");
+      }
       return path;
     });
     const urls = await signedUrls(admin, "outputs", paths, URL_LIFETIME_S);

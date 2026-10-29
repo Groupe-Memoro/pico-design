@@ -1,3 +1,4 @@
+import { serverError } from "@/lib/api";
 import { NextResponse } from "next/server";
 import { createServerSupabaseClient, createAdminSupabaseClient, getAuthorizedAdmin } from "@/lib/supabase/server";
 import { validatePassword } from "@/lib/passwordPolicy";
@@ -29,11 +30,11 @@ export async function POST(request: Request) {
     email_confirm: true,
     user_metadata: { full_name: fullName || null },
   });
+  if (error?.code === "email_exists") {
+    return NextResponse.json({ error: "Un compte existe déjà avec ce courriel." }, { status: 500 });
+  }
   if (error || !data.user) {
-    return NextResponse.json(
-      { error: error?.message ?? "Erreur lors de la création du compte." },
-      { status: 500 }
-    );
+    return serverError(error, "Erreur lors de la création du compte.");
   }
 
   // Le profil est créé automatiquement par le trigger `on_auth_user_created`
@@ -45,7 +46,7 @@ export async function POST(request: Request) {
       .update({ role })
       .eq("id", data.user.id);
     if (profileError) {
-      return NextResponse.json({ error: profileError.message }, { status: 500 });
+      return serverError(profileError, "Impossible d'attribuer le rôle.");
     }
   }
 

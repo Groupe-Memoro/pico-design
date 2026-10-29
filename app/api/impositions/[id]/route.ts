@@ -3,6 +3,7 @@ import { createServerSupabaseClient, createAdminSupabaseClient } from "@/lib/sup
 import { ImpositionError } from "@/lib/imposition/build";
 import { saveImposition } from "@/lib/imposition/persist";
 import { imposedPdfPath, sourcesDir, type SavedImposition } from "@/lib/imposition/saved";
+import { serverError } from "@/lib/api";
 
 export const runtime = "nodejs";
 export const maxDuration = 300; // plusieurs feuilles (fichier de plusieurs pages)
@@ -42,7 +43,7 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
 
   const { data, error } = await supabase.from("impositions").delete().eq("id", params.id).select("config");
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error, "Impossible de supprimer l'imposition.");
   if (!data || data.length === 0) {
     return NextResponse.json({ error: "Imposition introuvable ou suppression non autorisée." }, { status: 404 });
   }

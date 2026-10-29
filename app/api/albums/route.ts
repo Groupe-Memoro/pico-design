@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { jsonError, sessionClient } from "@/lib/albums/server";
 import { ALBUM_FORMATS, DEFAULT_ALBUM_SETTINGS, defaultContent } from "@/lib/albums/types";
+import { serverError } from "@/lib/api";
 
 export const runtime = "nodejs";
 
@@ -30,7 +31,7 @@ export async function POST(request: Request) {
     })
     .select("id")
     .single();
-  if (error || !album) return jsonError(error?.message ?? "Création impossible.", 500);
+  if (error || !album) return serverError(error, "Création impossible.");
 
   const cover = { ...defaultContent("cover"), title: year ? `Finissants ${year}` : "Finissants", subtitle: school };
   await supabase.from("album_pages").insert([

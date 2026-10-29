@@ -3,6 +3,7 @@ import { albumStorage, jsonError, loadAlbum, sessionClient } from "@/lib/albums/
 import { layoutAlbum } from "@/lib/albums/layout";
 import { renderPrintPdf } from "@/lib/print/render";
 import { pdfDownloadName } from "@/lib/imposition/saved";
+import { serverError } from "@/lib/api";
 
 export const runtime = "nodejs";
 // Un album de plusieurs centaines de photos : lecture, recadrage, assemblage.
@@ -43,7 +44,7 @@ export async function POST(_request: Request, { params }: { params: { id: string
 
   const path = `${params.id}/album.pdf`;
   const { error } = await storage.upload(path, pdf, { contentType: "application/pdf", upsert: true });
-  if (error) return jsonError(`Enregistrement du PDF impossible : ${error.message}`, 500);
+  if (error) return serverError(error, "Enregistrement du PDF impossible.");
   await session.supabase
     .from("albums")
     .update({ pdf_path: path, pdf_generated_at: new Date().toISOString() })

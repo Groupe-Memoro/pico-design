@@ -1,19 +1,17 @@
 import { NextResponse } from "next/server";
 import { randomUUID } from "crypto";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { ImpositionError } from "@/lib/imposition/build";
 import { saveImposition } from "@/lib/imposition/persist";
+import { requireApiUser } from "@/lib/api";
 
 export const runtime = "nodejs";
 export const maxDuration = 300; // plusieurs feuilles (fichier de plusieurs pages)
 
 // Enregistre une nouvelle imposition (nom, configuration et PDF).
 export async function POST(request: Request) {
-  const supabase = createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
+  const session = await requireApiUser();
+  if (session instanceof NextResponse) return session;
+  const { supabase, user } = session;
 
   try {
     const saved = await saveImposition(await request.formData(), randomUUID(), user.id, null);

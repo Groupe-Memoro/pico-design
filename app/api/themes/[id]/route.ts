@@ -1,5 +1,5 @@
+import { requireApiUser, serverError } from "@/lib/api";
 import { NextResponse } from "next/server";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { parseThemeSlotsField } from "@/lib/pdf/theme";
 import { MAX_THEME_SLOTS } from "@/lib/themeShapes";
 import { storageFileName } from "@/lib/storageName";
@@ -7,11 +7,9 @@ import { parseTextZonesField } from "@/lib/themeText";
 import { parseThemeGuidesField } from "@/lib/variableData/snap";
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
-  const supabase = createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
+  const session = await requireApiUser();
+  if (session instanceof NextResponse) return session;
+  const { supabase } = session;
 
   const formData = await request.formData();
   const update: Record<string, unknown> = {};
@@ -50,7 +48,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       .from("overlays")
       .upload(overlayPath, buffer, { contentType: overlayFile.type || "image/png", upsert: true });
     if (uploadError) {
-      return NextResponse.json({ error: uploadError.message }, { status: 500 });
+      return serverError(uploadError, "Impossible d'enregistrer l'image du thème.");
     }
     update.overlay_path = overlayPath;
   }
@@ -67,7 +65,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         upsert: true,
       });
     if (uploadError) {
-      return NextResponse.json({ error: uploadError.message }, { status: 500 });
+      return serverError(uploadError, "Impossible d'enregistrer l'image du thème.");
     }
     update.background_path = backgroundPath;
   } else if (formData.get("removeBackground") === "true") {
@@ -81,20 +79,18 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error, "Impossible de mettre à jour le thème.");
   return NextResponse.json({ theme: data });
 }
 
 export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
-  const supabase = createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
+  const session = await requireApiUser();
+  if (session instanceof NextResponse) return session;
+  const { supabase } = session;
 
   const { data, error } = await supabase.from("themes").delete().eq("id", params.id).select();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error, "Impossible de supprimer le thème.");
   if (!data || data.length === 0) {
     return NextResponse.json({ error: "Thème introuvable ou suppression non autorisée." }, { status: 404 });
   }

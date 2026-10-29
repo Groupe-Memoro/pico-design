@@ -3,6 +3,7 @@ import { agendaStorage, geometryOf, jsonError, loadAgenda, sessionClient } from 
 import { layoutAgenda } from "@/lib/agendas/layout";
 import { renderPrintPdf } from "@/lib/print/render";
 import { pdfDownloadName } from "@/lib/imposition/saved";
+import { serverError } from "@/lib/api";
 
 export const runtime = "nodejs";
 // Une année de semaines : quelques centaines de pages.
@@ -42,7 +43,7 @@ export async function POST(_request: Request, { params }: { params: { id: string
 
   const path = `${params.id}/agenda.pdf`;
   const { error } = await storage.upload(path, pdf, { contentType: "application/pdf", upsert: true });
-  if (error) return jsonError(`Enregistrement du PDF impossible : ${error.message}`, 500);
+  if (error) return serverError(error, "Enregistrement du PDF impossible.");
   await session.supabase.from("agendas").update({ pdf_path: path, pdf_generated_at: new Date().toISOString() }).eq("id", params.id);
 
   const { data: signed } = await storage.createSignedUrl(path, 60 * 30, { download: pdfDownloadName(agenda.name) });

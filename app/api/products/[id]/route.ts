@@ -1,8 +1,9 @@
+import { requireApiUser, serverError } from "@/lib/api";
 import { NextResponse } from "next/server";
 import { hydrateStagedFiles } from "@/lib/design/stagedFiles";
 import { panelsToSideImages } from "@/lib/products/panelsForm";
 import { parseLogoShadowForm } from "@/lib/logoShadowSettings";
-import { createServerSupabaseClient, createAdminSupabaseClient } from "@/lib/supabase/server";
+import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { planUploadedPdf, resolveProductImage } from "@/lib/pdf/productSource";
 import { isValidLogoColor } from "@/lib/pdf/logo";
 import { generateAndStoreProductPdf } from "@/lib/pdf/productPdf";
@@ -13,11 +14,9 @@ import { storageFileName } from "@/lib/storageName";
 export const runtime = "nodejs"; // sharp/pdf-lib ont besoin du runtime Node, pas Edge.
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
-  const supabase = createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
+  const session = await requireApiUser();
+  if (session instanceof NextResponse) return session;
+  const { supabase } = session;
 
   // Envoi direct au stockage pour les gros fichiers (voir stageLargeFiles), puis
   // composition par volet d'un produit plié, assemblée en une image par côté.
@@ -143,7 +142,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       .from("uploads")
       .upload(imagePath, resolved.buffer, { contentType: resolved.contentType, upsert: true });
     if (uploadError) {
-      return NextResponse.json({ error: uploadError.message }, { status: 500 });
+      return serverError(uploadError, "Impossible d'enregistrer l'image source.");
     }
     update.image_path = imagePath;
     update.visual_id = file instanceof File && file.size > 0 ? null : (visualId as string);
@@ -201,7 +200,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         upsert: true,
       });
     if (backUploadError) {
-      return NextResponse.json({ error: backUploadError.message }, { status: 500 });
+      return serverError(backUploadError, "Impossible d'enregistrer l'image du verso.");
     }
     update.back_image_path = backImagePath;
     const backIsFile = backFromPdf !== null || (backFile instanceof File && backFile.size > 0);
@@ -265,16 +264,14 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error, "Impossible de mettre à jour le produit.");
   return NextResponse.json({ product: data, pdfError, warnings });
 }
 
 export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
-  const supabase = createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
+  const session = await requireApiUser();
+  if (session instanceof NextResponse) return session;
+  const { supabase } = session;
 
   const { data, error } = await supabase
     .from("products")
@@ -282,7 +279,7 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
     .eq("id", params.id)
     .select();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error, "Impossible de supprimer le produit.");
   if (!data || data.length === 0) {
     return NextResponse.json(
       { error: "Produit introuvable ou suppression non autorisée." },

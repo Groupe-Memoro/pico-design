@@ -71,7 +71,11 @@ export async function POST(request: Request) {
   for (let i = 0; i < files.length; i++) {
     const path = `${day}/${randomUUID()}`;
     const { data, error } = await storage.createSignedUploadUrl(path);
-    if (error || !data) return errorResponse(error?.message ?? "Préparation de l'envoi impossible.", 500);
+    if (error || !data) {
+      // Route publique : le détail du stockage reste dans les journaux.
+      console.error("Préparation de l'envoi impossible.", error);
+      return errorResponse("Préparation de l'envoi impossible.", 500);
+    }
     uploads.push({ path, token: data.token, bucket });
   }
   return NextResponse.json({ uploads });

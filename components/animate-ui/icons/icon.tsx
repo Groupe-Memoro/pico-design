@@ -2,7 +2,8 @@
 
 import * as React from 'react';
 import {
-  motion,
+  LazyMotion,
+  m,
   useAnimation,
   type SVGMotionProps,
   type UseInViewOptions,
@@ -123,7 +124,7 @@ function composeEventHandlers<E extends React.SyntheticEvent<unknown>>(
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyProps = Record<string, any>;
 
-function AnimateIcon({
+function AnimateIconInner({
   asChild = false,
   animate = false,
   animateOnHover = false,
@@ -414,7 +415,7 @@ function AnimateIcon({
       {children}
     </Slot>
   ) : (
-    <motion.span
+    <m.span
       ref={inViewRef}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
@@ -423,7 +424,7 @@ function AnimateIcon({
       {...props}
     >
       {children}
-    </motion.span>
+    </m.span>
   );
 
   return (
@@ -445,10 +446,23 @@ function AnimateIcon({
   );
 }
 
+// Chargement différé du moteur d'animation : le code de motion n'est
+// téléchargé qu'après le premier rendu, hors du lot partagé de chaque route.
+const loadFeatures = () =>
+  import('@/components/animate-ui/features').then((mod) => mod.default);
+
+function AnimateIcon(props: AnimateIconProps) {
+  return (
+    <LazyMotion features={loadFeatures}>
+      <AnimateIconInner {...props} />
+    </LazyMotion>
+  );
+}
+
 const pathClassName =
   "[&_[stroke-dasharray='1px_1px']]:![stroke-dasharray:1px_0px]";
 
-function IconWrapper<T extends string>({
+function IconWrapperInner<T extends string>({
   size = 28,
   animation: animationProp,
   animate,
@@ -611,6 +625,14 @@ function IconWrapper<T extends string>({
       )}
       {...props}
     />
+  );
+}
+
+function IconWrapper<T extends string>(props: IconWrapperProps<T>) {
+  return (
+    <LazyMotion features={loadFeatures}>
+      <IconWrapperInner {...props} />
+    </LazyMotion>
   );
 }
 

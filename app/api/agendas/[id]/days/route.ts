@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { jsonError, sessionClient, touchAgenda } from "@/lib/agendas/server";
 import { DAY_KINDS } from "@/lib/agendas/types";
+import { serverError } from "@/lib/api";
 
 export const runtime = "nodejs";
 
@@ -30,11 +31,11 @@ export async function PUT(request: Request, { params }: { params: { id: string }
 
   if (clear.length > 0) {
     const { error } = await supabase.from("agenda_days").delete().eq("agenda_id", params.id).in("day", clear);
-    if (error) return jsonError(error.message, 500);
+    if (error) return serverError(error, "Impossible d'enregistrer les jours.");
   }
   if (set.length > 0) {
     const { error } = await supabase.from("agenda_days").upsert(set, { onConflict: "agenda_id,day" });
-    if (error) return jsonError(error.message, 500);
+    if (error) return serverError(error, "Impossible d'enregistrer les jours.");
   }
   await touchAgenda(supabase, params.id);
   return NextResponse.json({ ok: true });

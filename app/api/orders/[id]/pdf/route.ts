@@ -1,5 +1,6 @@
+import { requireApiUser } from "@/lib/api";
 import { NextResponse } from "next/server";
-import { createAdminSupabaseClient, createServerSupabaseClient } from "@/lib/supabase/server";
+import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { formDataFromSubmission, type DesignSubmission } from "@/lib/design/submission";
 import { renderPdfFromForm } from "@/lib/design/renderPdf";
 import { pdfDownloadName } from "@/lib/imposition/saved";
@@ -25,11 +26,9 @@ export const maxDuration = 60;
  * Réservé aux utilisateurs connectés — c'est un écran interne.
  */
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
-  const supabase = createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
+  const session = await requireApiUser();
+  if (session instanceof NextResponse) return session;
+  const { supabase } = session;
 
   const { data } = await supabase.from("design_submissions").select("*").eq("id", params.id).maybeSingle();
   if (!data) return NextResponse.json({ error: "Design introuvable." }, { status: 404 });

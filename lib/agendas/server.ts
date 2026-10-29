@@ -1,20 +1,9 @@
-import { NextResponse } from "next/server";
 import { createAdminSupabaseClient, createServerSupabaseClient } from "@/lib/supabase/server";
 import { AGENDAS_BUCKET, agendaPageContent, agendaSettings, type Agenda, type AgendaDay, type AgendaPage } from "./types";
 
+export { jsonError, sessionClient } from "@/lib/api";
+
 // Outils serveur du module Agendas, partagés par ses routes et sa page.
-
-export function jsonError(message: string, status = 400) {
-  return NextResponse.json({ error: message }, { status });
-}
-
-export async function sessionClient() {
-  const supabase = createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  return user ? { supabase, user } : null;
-}
 
 export function agendaStorage() {
   return createAdminSupabaseClient().storage.from(AGENDAS_BUCKET);

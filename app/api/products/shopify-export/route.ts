@@ -1,5 +1,5 @@
+import { requireApiUser } from "@/lib/api";
 import { NextResponse } from "next/server";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { contentDisposition } from "@/lib/contentDisposition";
 import type { Category, Product, ProductCollection, Sku, Template } from "@/lib/types";
 
@@ -68,11 +68,9 @@ interface ExportItem {
  * /api/products/[id]/shopify-images. Les produits arrivent en brouillon.
  */
 export async function POST(request: Request) {
-  const supabase = createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
+  const session = await requireApiUser();
+  if (session instanceof NextResponse) return session;
+  const { supabase } = session;
 
   const body = (await request.json().catch(() => ({}))) as { price?: unknown; items?: unknown };
   const price = Number(String(body.price ?? "").replace(",", "."));

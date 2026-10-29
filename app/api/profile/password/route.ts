@@ -1,3 +1,4 @@
+import { serverError } from "@/lib/api";
 import { NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { validatePassword } from "@/lib/passwordPolicy";
@@ -41,7 +42,7 @@ export async function POST(request: Request) {
   }
 
   const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
-  if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
+  if (updateError) return serverError(updateError, "Impossible de modifier le mot de passe.");
 
   return NextResponse.json({ success: true });
 }

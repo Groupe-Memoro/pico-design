@@ -1,5 +1,6 @@
+import { requireApiUser } from "@/lib/api";
 import { NextResponse } from "next/server";
-import { createServerSupabaseClient, createAdminSupabaseClient } from "@/lib/supabase/server";
+import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { generateTemplatePreviewPng } from "@/lib/pdf/preview";
 import { loadLogoImage } from "@/lib/pdf/logo";
 import type { Template } from "@/lib/types";
@@ -7,11 +8,9 @@ import type { Template } from "@/lib/types";
 export const runtime = "nodejs"; // sharp a besoin du runtime Node, pas Edge.
 
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
-  const supabase = createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
+  const session = await requireApiUser();
+  if (session instanceof NextResponse) return session;
+  const { supabase } = session;
 
   const { data: template, error } = await supabase
     .from("templates")

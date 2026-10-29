@@ -1,6 +1,7 @@
+import { requireApiUser, serverError } from "@/lib/api";
 import { NextResponse } from "next/server";
 import { PDFDocument, PDFName } from "pdf-lib";
-import { createAdminSupabaseClient, createServerSupabaseClient } from "@/lib/supabase/server";
+import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { formDataFromSubmission, type DesignSubmission } from "@/lib/design/submission";
 import { renderPdfFromForm } from "@/lib/design/renderPdf";
 import { mapLimit } from "@/lib/concurrency";
@@ -22,11 +23,9 @@ const BUCKET = "outputs";
  * dans le stockage, et une adresse de téléchargement est renvoyée.
  */
 export async function POST(_request: Request, { params }: { params: { id: string } }) {
-  const supabase = createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
+  const session = await requireApiUser();
+  if (session instanceof NextResponse) return session;
+  const { supabase } = session;
 
   const { data: order } = await supabase
     .from("orders")
@@ -103,7 +102,7 @@ export async function POST(_request: Request, { params }: { params: { id: string
   const number = ((order as { order_number: string | null }).order_number ?? "").replace(/^#/, "").trim();
   const path = `orders/${params.id}/tirages.pdf`;
   const { error } = await admin.storage.from(BUCKET).upload(path, await out.save(), { contentType: "application/pdf", upsert: true });
-  if (error) return NextResponse.json({ error: `Enregistrement du PDF impossible : ${error.message}` }, { status: 500 });
+  if (error) return serverError(error, "Enregistrement du PDF impossible.");
   const { data: signed } = await admin.storage
     .from(BUCKET)
     .createSignedUrl(path, 60 * 30, { download: pdfDownloadName(`${number || "commande"}-tirages`) });

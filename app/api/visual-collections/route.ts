@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { nextSortOrder } from "@/lib/nextSortOrder";
+import { serverError, readJson, requireApiUser } from "@/lib/api";
 
 export async function GET() {
   const supabase = createServerSupabaseClient();
@@ -9,18 +10,16 @@ export async function GET() {
     .select("*")
     .order("sort_order", { ascending: true });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error, "Impossible de charger la collection de visuels.");
   return NextResponse.json({ collections: data });
 }
 
 export async function POST(request: Request) {
-  const supabase = createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
+  const session = await requireApiUser();
+  if (session instanceof NextResponse) return session;
+  const { supabase, user } = session;
 
-  const body = await request.json();
+  const body = await readJson(request);
   const name = typeof body?.name === "string" ? body.name.trim() : "";
   if (!name) {
     return NextResponse.json({ error: "Le nom est requis." }, { status: 400 });
@@ -33,6 +32,6 @@ export async function POST(request: Request) {
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error, "Impossible d'enregistrer la collection de visuels.");
   return NextResponse.json({ collection: data });
 }

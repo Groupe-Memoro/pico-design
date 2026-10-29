@@ -1,17 +1,16 @@
 import { NextResponse } from "next/server";
-import { createAdminSupabaseClient, createServerSupabaseClient } from "@/lib/supabase/server";
+import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { CUTTER_ASSETS, cutterAssetPath, parseCutterForm } from "@/lib/imposition/cutters";
 import { CutterAssetError, applyCutterAssets } from "@/lib/imposition/cutterAssets";
+import { requireApiUser, serverError } from "@/lib/api";
 
 export const runtime = "nodejs";
 
 // Crée un profil de découpe Graphtec (champs + fichiers de marques et de gabarit, en multipart).
 export async function POST(request: Request) {
-  const supabase = createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
+  const session = await requireApiUser();
+  if (session instanceof NextResponse) return session;
+  const { supabase, user } = session;
 
   const form = await request.formData();
   const parsed = parseCutterForm(form);
@@ -22,7 +21,7 @@ export async function POST(request: Request) {
     .insert({ ...parsed.fields, machine: "graphtec", created_by: user.id })
     .select()
     .single();
-  if (error || !cutter) return NextResponse.json({ error: error?.message ?? "Création impossible." }, { status: 500 });
+  if (error || !cutter) return serverError(error, "Création impossible.");
 
   // Les fichiers se rangent sous l'id du profil : ils ne peuvent être envoyés qu'une fois la ligne créée.
   const storage = createAdminSupabaseClient().storage;
@@ -38,7 +37,11 @@ export async function POST(request: Request) {
       .eq("id", cutter.id)
       .select()
       .single();
-    if (updateError) throw new CutterAssetError(updateError.message);
+    if (updateError) {
+      // Erreur de la base, pas du fichier envoyé : détail aux journaux, 500 générique.
+      console.error("Mise à jour du profil de découpe impossible.", updateError);
+      throw new Error("Création impossible.");
+    }
     return NextResponse.json({ cutter: updated });
   } catch (err) {
     // Pas de profil à moitié créé : sans ses fichiers, on le retire, avec ce

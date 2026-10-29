@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import { albumStorage, jsonError, sessionClient, thumbPathOf } from "@/lib/albums/server";
+import { serverError } from "@/lib/api";
 
 export const runtime = "nodejs";
 
@@ -28,7 +29,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     const thumbPath = thumbPathOf(photoPath);
     const [photo, thumb] = await Promise.all([storage.createSignedUploadUrl(photoPath), storage.createSignedUploadUrl(thumbPath)]);
     if (photo.error || thumb.error || !photo.data || !thumb.data) {
-      return jsonError(photo.error?.message ?? thumb.error?.message ?? "Préparation de l'envoi impossible.", 500);
+      return serverError(photo.error ?? thumb.error, "Préparation de l'envoi impossible.");
     }
     uploads.push({ photoPath, photoToken: photo.data.token, thumbPath, thumbToken: thumb.data.token });
   }

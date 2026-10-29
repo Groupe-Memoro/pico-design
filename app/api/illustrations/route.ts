@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
-import { createAdminSupabaseClient, createServerSupabaseClient } from "@/lib/supabase/server";
+import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import {
   ILLUSTRATIONS_BUCKET,
   MAX_ILLUSTRATION_BYTES,
@@ -8,6 +8,7 @@ import {
   illustrationPath,
   nameFromFileName,
 } from "@/lib/illustrations";
+import { requireApiUser } from "@/lib/api";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -16,11 +17,9 @@ export const maxDuration = 60;
 // multipart). Chacune prend le nom de son fichier, modifiable ensuite. Un
 // fichier refusé n'empêche pas les autres d'entrer : la réponse liste les deux.
 export async function POST(request: Request) {
-  const supabase = createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
+  const session = await requireApiUser();
+  if (session instanceof NextResponse) return session;
+  const { supabase, user } = session;
 
   const form = await request.formData();
   const files = form.getAll("files").filter((f): f is File => f instanceof File && f.size > 0);
@@ -46,7 +45,7 @@ export async function POST(request: Request) {
     const path = illustrationPath(id, mime);
     const { error: uploadError } = await storage.upload(path, bytes, { contentType: mime, upsert: false });
     if (uploadError) {
-      refused.push({ name: file.name, reason: uploadError.message });
+      refused.push({ name: file.name, reason: "envoi impossible" });
       continue;
     }
     const { data, error } = await supabase
@@ -56,7 +55,7 @@ export async function POST(request: Request) {
       .single();
     if (error) {
       await storage.remove([path]);
-      refused.push({ name: file.name, reason: error.message });
+      refused.push({ name: file.name, reason: "enregistrement impossible" });
       continue;
     }
     created.push(data);

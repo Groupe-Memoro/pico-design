@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { jsonError, sessionClient, touchAgenda } from "@/lib/agendas/server";
 import { AGENDA_PAGE_LABELS, defaultAgendaContent, type AgendaPageKind } from "@/lib/agendas/types";
+import { serverError } from "@/lib/api";
 
 export const runtime = "nodejs";
 
@@ -30,7 +31,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     .insert({ agenda_id: params.id, kind, position, content: defaultAgendaContent(kind) })
     .select("id")
     .single();
-  if (error) return jsonError(error.message, 500);
+  if (error) return serverError(error, "Impossible d'enregistrer la page.");
   await touchAgenda(supabase, params.id);
   return NextResponse.json({ id: data.id });
 }
@@ -50,7 +51,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     )
   );
   const failed = results.find((r) => r.error);
-  if (failed?.error) return jsonError(failed.error.message, 500);
+  if (failed?.error) return serverError(failed.error, "Impossible d'enregistrer la page.");
   await touchAgenda(session.supabase, params.id);
   return NextResponse.json({ ok: true });
 }

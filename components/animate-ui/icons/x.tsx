@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { motion, type Variants } from 'motion/react';
+import { m, type Variants } from 'motion/react';
 
 import {
   getVariants,
@@ -84,7 +84,7 @@ const IconComponent = React.forwardRef<SVGSVGElement, XProps>(function IconCompo
   const variants = getVariants(animations);
 
   return (
-    <motion.svg
+    <m.svg
       xmlns="http://www.w3.org/2000/svg"
       width={size}
       height={size}
@@ -97,7 +97,7 @@ const IconComponent = React.forwardRef<SVGSVGElement, XProps>(function IconCompo
       {...props}
       ref={ref}
     >
-      <motion.line
+      <m.line
         x1={6}
         y1={18}
         x2={18}
@@ -106,7 +106,7 @@ const IconComponent = React.forwardRef<SVGSVGElement, XProps>(function IconCompo
         initial="initial"
         animate={controls}
       />
-      <motion.line
+      <m.line
         x1={6}
         y1={6}
         x2={18}
@@ -115,7 +115,7 @@ const IconComponent = React.forwardRef<SVGSVGElement, XProps>(function IconCompo
         initial="initial"
         animate={controls}
       />
-    </motion.svg>
+    </m.svg>
   );
 });
 

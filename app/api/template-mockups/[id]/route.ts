@@ -1,16 +1,14 @@
+import { requireApiUser, serverError } from "@/lib/api";
 import { NextResponse } from "next/server";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { mockupFolder, parseOverlayOpacitiesField } from "@/lib/pdf/beautyShot";
 import { parseMockupZoomValue, parsePositionValue, parseZoneMarginValue } from "@/lib/templateMockups";
 import { uploadBeautyShotBundle } from "@/lib/templateBeautyShotUpload";
 import type { TemplateMockup } from "@/lib/types";
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
-  const supabase = createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
+  const session = await requireApiUser();
+  if (session instanceof NextResponse) return session;
+  const { supabase } = session;
 
   const formData = await request.formData();
   const update: Record<string, unknown> = {};
@@ -89,22 +87,20 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error, "Impossible de mettre à jour le visuel du modèle.");
   return NextResponse.json({ mockup: data });
 }
 
 export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
-  const supabase = createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
+  const session = await requireApiUser();
+  if (session instanceof NextResponse) return session;
+  const { supabase } = session;
 
   // Comme pour les thèmes, les fichiers du bucket ne sont pas supprimés
   // (voir app/api/themes/[id]/route.ts) — seule la ligne disparaît.
   const { data, error } = await supabase.from("template_mockups").delete().eq("id", params.id).select();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error, "Impossible de supprimer le visuel du modèle.");
   if (!data || data.length === 0) {
     return NextResponse.json({ error: "Mockup introuvable ou suppression non autorisée." }, { status: 404 });
   }

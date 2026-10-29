@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isAlbumPath, jsonError, removeAlbumFiles, sessionClient, touchAlbum } from "@/lib/albums/server";
 import { pageContent, type AlbumPageKind, type CoverContent, type FreeContent } from "@/lib/albums/types";
+import { serverError } from "@/lib/api";
 
 export const runtime = "nodejs";
 
@@ -35,7 +36,7 @@ export async function PATCH(request: Request, { params }: Params) {
   if (photos.some((p) => !isAlbumPath(params.id, p))) return jsonError("Photo invalide.");
 
   const { error } = await supabase.from("album_pages").update({ content }).eq("id", params.pageId);
-  if (error) return jsonError(error.message, 500);
+  if (error) return serverError(error, "Impossible d'enregistrer la page.");
 
   const before = photosOf(kind, (page as { content: unknown }).content);
   await removeAlbumFiles(before.filter((p) => !photos.includes(p)));

@@ -1,6 +1,6 @@
+import { requireApiUser, serverError } from "@/lib/api";
 import { NextResponse } from "next/server";
 import { randomUUID } from "crypto";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { copyBeautyShotBundle } from "@/lib/templateBeautyShotUpload";
 import { mockupFolder } from "@/lib/pdf/beautyShot";
 import { listTemplateMockups } from "@/lib/templateMockups";
@@ -8,11 +8,9 @@ import { randomUUID as randomMockupId } from "crypto";
 import type { Template } from "@/lib/types";
 
 export async function POST(_request: Request, { params }: { params: { id: string } }) {
-  const supabase = createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
+  const session = await requireApiUser();
+  if (session instanceof NextResponse) return session;
+  const { supabase, user } = session;
 
   const { data: source, error: sourceError } = await supabase
     .from("templates")
@@ -90,7 +88,7 @@ export async function POST(_request: Request, { params }: { params: { id: string
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error, "Impossible de dupliquer le modèle.");
 
   // Les mockups du modèle source (table template_mockups) suivent la copie :
   // chacun a son propre dossier de bundle, donc une nouvelle ligne + une

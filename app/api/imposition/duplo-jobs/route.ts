@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { validateDuploJobs } from "@/lib/imposition/duplo";
+import { serverError } from "@/lib/api";
 
 async function currentUser() {
   const supabase = createServerSupabaseClient();
@@ -26,13 +27,13 @@ export async function PUT(request: Request) {
       parsed.rows.map((row) => ({ ...row, created_by: user.id })),
       { onConflict: "job_no" }
     );
-  if (upsertError) return NextResponse.json({ error: upsertError.message }, { status: 500 });
+  if (upsertError) return serverError(upsertError, "Impossible d'enregistrer les jobs Duplo.");
 
   const { error: deleteError } = await supabase
     .from("imposition_duplo_jobs")
     .delete()
     .not("job_no", "in", `(${parsed.rows.map((r) => r.job_no).join(",")})`);
-  if (deleteError) return NextResponse.json({ error: deleteError.message }, { status: 500 });
+  if (deleteError) return serverError(deleteError, "Impossible d'enregistrer les jobs Duplo.");
 
   return NextResponse.json({ count: parsed.rows.length });
 }
@@ -42,6 +43,6 @@ export async function DELETE() {
   const { supabase, user } = await currentUser();
   if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
   const { error } = await supabase.from("imposition_duplo_jobs").delete().gt("job_no", 0);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error, "Impossible de supprimer les jobs Duplo.");
   return NextResponse.json({ ok: true });
 }

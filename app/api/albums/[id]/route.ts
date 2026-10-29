@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { albumStorage, jsonError, sessionClient } from "@/lib/albums/server";
 import { albumSettings } from "@/lib/albums/types";
+import { serverError } from "@/lib/api";
 
 export const runtime = "nodejs";
 
@@ -29,7 +30,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   if (body.settings !== undefined) update.settings = albumSettings(body.settings);
 
   const { error } = await session.supabase.from("albums").update(update).eq("id", params.id);
-  if (error) return jsonError(error.message, 500);
+  if (error) return serverError(error, "Impossible d'enregistrer l'album.");
   return NextResponse.json({ ok: true });
 }
 
@@ -52,6 +53,6 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   }
 
   const { error } = await session.supabase.from("albums").delete().eq("id", params.id);
-  if (error) return jsonError(error.message, 500);
+  if (error) return serverError(error, "Impossible de supprimer l'album.");
   return NextResponse.json({ ok: true });
 }

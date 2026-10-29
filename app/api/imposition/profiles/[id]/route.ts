@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { parseProfileBody } from "@/lib/imposition/profiles";
+import { serverError } from "@/lib/api";
 
 async function currentUser() {
   const supabase = createServerSupabaseClient();
@@ -17,7 +18,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   const parsed = parseProfileBody(await request.json().catch(() => null));
   if ("error" in parsed) return NextResponse.json({ error: parsed.error }, { status: 400 });
   const { data, error } = await supabase.from("imposition_profiles").update(parsed.row).eq("id", params.id).select().single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error, "Impossible d'enregistrer le profil d'imposition.");
   return NextResponse.json({ profile: data });
 }
 
@@ -26,6 +27,6 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   const { supabase, user } = await currentUser();
   if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
   const { error } = await supabase.from("imposition_profiles").delete().eq("id", params.id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error, "Impossible de supprimer le profil d'imposition.");
   return NextResponse.json({ ok: true });
 }

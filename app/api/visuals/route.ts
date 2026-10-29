@@ -1,3 +1,4 @@
+import { requireApiUser, serverError } from "@/lib/api";
 import { NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -13,16 +14,14 @@ export async function GET() {
     .select("*")
     .order("name", { ascending: true });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error, "Impossible de charger les visuels.");
   return NextResponse.json({ visuals: data });
 }
 
 export async function POST(request: Request) {
-  const supabase = createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
+  const session = await requireApiUser();
+  if (session instanceof NextResponse) return session;
+  const { supabase, user } = session;
 
   const formData = await request.formData();
   const name = formData.get("name");
@@ -53,7 +52,7 @@ export async function POST(request: Request) {
     .from("visuals")
     .upload(filePath, prepared.buffer, { contentType: prepared.contentType, upsert: true });
   if (uploadError) {
-    return NextResponse.json({ error: uploadError.message }, { status: 500 });
+    return serverError(uploadError, "Impossible d'enregistrer le visuel.");
   }
 
   const { data, error } = await supabase
@@ -69,6 +68,6 @@ export async function POST(request: Request) {
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error, "Impossible d'enregistrer le visuel.");
   return NextResponse.json({ visual: data });
 }

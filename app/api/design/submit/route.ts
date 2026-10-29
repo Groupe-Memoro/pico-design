@@ -1,3 +1,4 @@
+import { serverError } from "@/lib/api";
 import { checkRateLimit, tooManyRequests } from "@/lib/rateLimit";
 import { NextResponse } from "next/server";
 import { hydrateStagedFiles } from "@/lib/design/stagedFiles";
@@ -99,10 +100,7 @@ export async function POST(request: Request) {
         upsert: true,
       });
     if (error)
-      return errorResponse(
-        `Impossible d'enregistrer le fichier : ${error.message}`,
-        500,
-      );
+      return serverError(error, "Impossible d'enregistrer le fichier.");
     sourcePaths.push({
       field: entry.field,
       path,
@@ -136,7 +134,7 @@ export async function POST(request: Request) {
     .select()
     .single();
 
-  if (error) return errorResponse(error.message, 500);
+  if (error) return serverError(error, "Impossible d'enregistrer la commande.");
   return NextResponse.json({ id: (data as { id: string }).id });
 }
 

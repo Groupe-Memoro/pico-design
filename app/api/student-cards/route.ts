@@ -1,16 +1,14 @@
+import { requireApiUser, serverError } from "@/lib/api";
 import { NextResponse } from "next/server";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
 // Crée un modèle de carte vide (nom, école, format, recto-verso) : son fond
 // et ses zones s'ajoutent ensuite, dans l'écran du modèle.
 export async function POST(request: Request) {
-  const supabase = createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
+  const session = await requireApiUser();
+  if (session instanceof NextResponse) return session;
+  const { supabase, user } = session;
 
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
   const clean = (v: unknown, max: number) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
@@ -28,6 +26,6 @@ export async function POST(request: Request) {
     .insert({ name, school, width_mm: width, height_mm: height, two_sided: body.two_sided === true, created_by: user.id })
     .select("id")
     .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error, "Impossible d'enregistrer la carte étudiante.");
   return NextResponse.json({ id: (data as { id: string }).id });
 }
