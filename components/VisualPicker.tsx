@@ -81,7 +81,7 @@ export default function VisualPicker({
                     <div className="flex h-28 items-center justify-center bg-neutral-50 p-2">
                       {v.fileUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={v.fileUrl} alt={v.name} className="max-h-full max-w-full object-contain" />
+                        <img src={`/api/visuals/${v.id}/thumbnail?v=${encodeURIComponent(v.file_path)}`} alt={v.name} loading="lazy" decoding="async" className="max-h-full max-w-full object-contain" />
                       ) : (
                         <div className="h-full w-full rounded bg-neutral-100" />
                       )}

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createAdminSupabaseClient, createServerSupabaseClient } from "@/lib/supabase/server";
 import { formDataFromSubmission, type DesignSubmission } from "@/lib/design/submission";
 import { renderPdfFromForm } from "@/lib/design/renderPdf";
+import { mapLimit } from "@/lib/concurrency";
 import { buildImposition, ImpositionError } from "@/lib/imposition/build";
 import { storageFileName } from "@/lib/storageName";
 import type { ImpositionProfile, Template } from "@/lib/types";
@@ -123,14 +124,21 @@ export async function POST(request: Request) {
       form.append("orientation", profile.orientation);
       form.append("flip", profile.flip);
       form.append("multiSheet", "1");
+      // Le PDF du design, fabriqué comme au téléchargement depuis la commande.
+      // Rendus 3 par 3 (sharp sur des images 300 dpi : la mémoire est limitée),
+      // puis ajoutés au formulaire dans l'ordre des articles.
+      const rendered = await mapLimit(groupPieces, 3, async (piece) =>
+        piece.productId
+          ? null
+          : renderPdfFromForm(admin, await formDataFromSubmission(admin, piece.submission!), piece.templateId, template)
+      );
       const specs = [];
       for (const [i, piece] of groupPieces.entries()) {
-        if (piece.productId) {
+        const pdf = rendered[i];
+        if (piece.productId || !pdf) {
           specs.push({ kind: "product", productId: piece.productId, copies: piece.copies, name: piece.label });
         } else {
-          // Le PDF du design, fabriqué comme au téléchargement depuis la commande.
-          const rendered = await renderPdfFromForm(admin, await formDataFromSubmission(admin, piece.submission!), piece.templateId);
-          form.append(`file${i}`, new File([new Uint8Array(rendered.pdf)], `${piece.label}.pdf`, { type: "application/pdf" }));
+          form.append(`file${i}`, new File([new Uint8Array(pdf.pdf)], `${piece.label}.pdf`, { type: "application/pdf" }));
           specs.push({ kind: "upload", field: `file${i}`, copies: piece.copies, name: piece.label });
         }
       }

@@ -57,12 +57,16 @@ export async function formDataFromSubmission(db: Db, submission: DesignSubmissio
   formData.append("rotated", String(submission.rotated));
   for (const [key, value] of Object.entries(submission.payload ?? {})) formData.append(key, value);
 
-  for (const entry of submission.source_paths ?? []) {
-    const { data } = await db.storage.from("uploads").download(entry.path);
-    if (!data) throw new Error(`Fichier introuvable pour ce design : ${entry.name}.`);
-    const buffer = Buffer.from(await data.arrayBuffer());
-    formData.append(entry.field, new File([new Uint8Array(buffer)], entry.name, { type: entry.type }));
-  }
+  // Téléchargements en parallèle, ajoutés dans l'ordre d'origine.
+  const files = await Promise.all(
+    (submission.source_paths ?? []).map(async (entry) => {
+      const { data } = await db.storage.from("uploads").download(entry.path);
+      if (!data) throw new Error(`Fichier introuvable pour ce design : ${entry.name}.`);
+      const buffer = Buffer.from(await data.arrayBuffer());
+      return { entry, file: new File([new Uint8Array(buffer)], entry.name, { type: entry.type }) };
+    })
+  );
+  for (const { entry, file } of files) formData.append(entry.field, file);
 
   return formData;
 }

@@ -160,7 +160,7 @@ export default function ThemesTable({
               <div className="flex h-32 items-center justify-center bg-neutral-50 p-3">
                 {t.overlayUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={t.overlayUrl} alt={t.name} className="max-h-full max-w-full object-contain" />
+                  <img src={t.overlayUrl} alt={t.name} loading="lazy" decoding="async" className="max-h-full max-w-full object-contain" />
                 ) : (
                   <div className="h-full w-full rounded bg-neutral-100" />
                 )}

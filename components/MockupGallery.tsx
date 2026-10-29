@@ -128,7 +128,7 @@ export default function MockupGallery({
                 <SpinnerIcon className="h-4 w-4 text-text-subtle" />
               ) : view.url ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={view.url} alt={view.label} className="h-full w-full object-cover" />
+                <img src={view.url} alt={view.label} loading="lazy" decoding="async" className="h-full w-full object-cover" />
               ) : (
                 <span className="px-1 text-[10px] leading-tight text-text-subtle">—</span>
               )}

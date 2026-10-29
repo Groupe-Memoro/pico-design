@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createServerSupabaseClient, createAdminSupabaseClient } from "@/lib/supabase/server";
 import { renderProductMockup } from "@/lib/products/mockup";
 import { listTemplateMockups } from "@/lib/templateMockups";
+import { mapLimit } from "@/lib/concurrency";
 import { signedUrls } from "@/lib/storageUrls";
 import type { Product, Template } from "@/lib/types";
 
@@ -42,8 +43,8 @@ export async function POST(_request: Request, { params }: { params: { id: string
   const mockupIds: (string | null)[] = mockups.length ? mockups.map((m) => m.id) : [null];
 
   try {
-    const paths: string[] = [];
-    for (const [i, mockupId] of mockupIds.entries()) {
+    // Mockups rendus 3 par 3 ; les chemins restent dans l'ordre des mockups.
+    const paths = await mapLimit(mockupIds, 3, async (mockupId, i) => {
       const png = await renderProductMockup(supabase, admin, product, template, { mockupId, flatFallback: true });
       // PNG (fond transparent conservé) en palette : 3 à 4 fois plus léger
       // qu'un PNG 24 bits, sans différence visible sur un mockup (~0,5 Mo
@@ -55,8 +56,8 @@ export async function POST(_request: Request, { params }: { params: { id: string
       const path = `shopify-export/${product.id}/${i + 1}.png`;
       const { error } = await admin.storage.from("outputs").upload(path, image, { contentType: "image/png", upsert: true });
       if (error) throw new Error(error.message);
-      paths.push(path);
-    }
+      return path;
+    });
     const urls = await signedUrls(admin, "outputs", paths, URL_LIFETIME_S);
     return NextResponse.json({ images: paths.flatMap((p) => (urls.has(p) ? [urls.get(p)!] : [])) });
   } catch (err) {

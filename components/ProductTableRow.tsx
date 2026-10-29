@@ -78,7 +78,7 @@ export default function ProductTableRow({
       <td className="p-4">
         {imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={imageUrl} alt={product.name} className="h-12 w-12 rounded-lg object-cover" />
+          <img src={imageUrl} alt={product.name} loading="lazy" decoding="async" className="h-12 w-12 rounded-lg object-cover" />
         ) : (
           <div className="h-12 w-12 rounded-lg bg-neutral-100" />
         )}

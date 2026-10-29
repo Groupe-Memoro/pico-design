@@ -86,6 +86,7 @@ export default function IllustrationPicker({
                     src={illustration.fileUrl}
                     alt=""
                     loading="lazy"
+                    decoding="async"
                     className="max-h-full max-w-full object-contain transition-transform duration-150 group-hover:scale-105"
                   />
                 )}

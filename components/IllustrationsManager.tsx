@@ -61,7 +61,7 @@ function IllustrationCard({ illustration, onChanged }: { illustration: Illustrat
       <div className="flex aspect-square items-center justify-center p-3" style={CHECKERBOARD}>
         {illustration.fileUrl && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={illustration.fileUrl} alt={illustration.name} className="max-h-full max-w-full object-contain" />
+          <img src={illustration.fileUrl} alt={illustration.name} loading="lazy" decoding="async" className="max-h-full max-w-full object-contain" />
         )}
       </div>
       <div className="flex items-center gap-1 border-t border-neutral-100 p-2">

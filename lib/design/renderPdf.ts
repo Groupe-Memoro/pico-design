@@ -75,7 +75,14 @@ export interface RenderedPdf {
   filename: string;
 }
 
-export async function renderPdfFromForm(db: Db, formData: FormData, templateId: string): Promise<RenderedPdf> {
+// `loadedTemplate` : le modèle déjà lu par l'appelant (évite de le relire à
+// chaque rendu d'un lot) ; sans lui, il est lu en base.
+export async function renderPdfFromForm(
+  db: Db,
+  formData: FormData,
+  templateId: string,
+  loadedTemplate?: Template
+): Promise<RenderedPdf> {
   const rotated = formData.get("rotated") === "true";
 
   // Optionnel : sans fichier, le recto se compose quand même — un canvas
@@ -94,15 +101,18 @@ export async function renderPdfFromForm(db: Db, formData: FormData, templateId: 
   const backPositionY = parsePositionValue(formData.get("backPositionY"));
   const backZoom = zoomValue(formData.get("backZoom"));
   const backImageRotation = rotationValue(formData.get("backImageRotation"));
-  const layers = await resolveLayersFromForm(formData, "front");
-  const backLayers = await resolveLayersFromForm(formData, "back");
-
-  const { data: rawTemplate, error: templateError } = await db
-    .from("templates")
-    .select("*")
-    .eq("id", templateId)
-    .single<Template>();
-  if (templateError || !rawTemplate) throw new Error("Modèle introuvable.");
+  // Calques et modèle sont indépendants : lus ensemble.
+  const [layers, backLayers, rawTemplate] = await Promise.all([
+    resolveLayersFromForm(formData, "front"),
+    resolveLayersFromForm(formData, "back"),
+    loadedTemplate
+      ? Promise.resolve(loadedTemplate)
+      : (async () => {
+          const { data, error } = await db.from("templates").select("*").eq("id", templateId).single<Template>();
+          if (error || !data) throw new Error("Modèle introuvable.");
+          return data;
+        })(),
+  ]);
   const template = applyOrientation(rawTemplate, rotated);
 
   // Code SKU (s'il y en a un) préfixé au nom de fichier — c'est justement

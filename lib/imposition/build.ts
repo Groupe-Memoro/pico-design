@@ -6,6 +6,7 @@ import { createServerSupabaseClient, createAdminSupabaseClient } from "@/lib/sup
 import { PDFDocument } from "pdf-lib";
 import {
   imposeToPdf,
+  imposeSheetsToPdf,
   impositionLayout,
   type ImposeInput,
   type ImpositionBarcode,
@@ -332,21 +333,15 @@ export async function buildImposition(
     // feuille, réunies dans un seul PDF.
     const machineLayout = impositionLayout(base).layout;
     if (documentOnMachine) {
-      const merged = await PDFDocument.create();
       const onSheets = await documentPlacement(sources[0], machineLayout, formData);
-      for (const onSheet of onSheets) {
-        const one = await imposeToPdf({ ...base, sources: onSheet });
-        const doc = await PDFDocument.load(one.pdf);
-        (await merged.copyPages(doc, doc.getPageIndices())).forEach((page) => merged.addPage(page));
-      }
-      return { pdf: Buffer.from(await merged.save()), sheet, duploJob, cutter, sources: built, sheetCount: onSheets.length };
+      const merged = await imposeSheetsToPdf(onSheets.map((onSheet) => ({ ...base, sources: onSheet })));
+      return { pdf: merged.pdf, sheet, duploJob, cutter, sources: built, sheetCount: onSheets.length };
     }
     const perSheet = machineLayout.cells.length;
     const pieceCount = sources.reduce((n, s) => n + s.copies, 0);
     if (formData.get("multiSheet") === "1" || pieceCount > perSheet) {
       const queue = sources.map((s) => ({ ...s }));
-      const merged = await PDFDocument.create();
-      let sheetCount = 0;
+      const sheetInputs: ImposeInput[] = [];
       while (queue.some((s) => s.copies > 0)) {
         let room = perSheet;
         const onSheet: ImpositionSource[] = [];
@@ -358,12 +353,10 @@ export async function buildImposition(
           s.copies -= take;
           room -= take;
         }
-        const one = await imposeToPdf({ ...base, sources: onSheet });
-        const doc = await PDFDocument.load(one.pdf);
-        (await merged.copyPages(doc, doc.getPageIndices())).forEach((page) => merged.addPage(page));
-        sheetCount += 1;
+        sheetInputs.push({ ...base, sources: onSheet });
       }
-      return { pdf: Buffer.from(await merged.save()), sheet, duploJob, cutter, sources: built, sheetCount };
+      const merged = await imposeSheetsToPdf(sheetInputs);
+      return { pdf: merged.pdf, sheet, duploJob, cutter, sources: built, sheetCount: sheetInputs.length };
     }
     const result = await imposeToPdf({ ...base, sources });
     return { pdf: result.pdf, sheet, duploJob, cutter, sources: built, sheetCount: 1 };

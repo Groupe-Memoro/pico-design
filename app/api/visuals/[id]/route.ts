@@ -26,7 +26,14 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     collection_id: typeof collectionId === "string" && collectionId ? collectionId : null,
   };
 
+  let previousPath: string | null = null;
   if (file instanceof File && file.size > 0) {
+    const { data: current } = await supabase
+      .from("visuals")
+      .select("file_path")
+      .eq("id", params.id)
+      .single<{ file_path: string | null }>();
+    previousPath = current?.file_path ?? null;
     if (!ALLOWED_VISUAL_TYPES.includes(file.type)) {
       return NextResponse.json(
         { error: "Format non supporté (SVG, PNG, JPG ou PDF uniquement)." },
@@ -40,7 +47,10 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       const message = err instanceof Error ? err.message : "Erreur lors du traitement du fichier.";
       return NextResponse.json({ error: message }, { status: 400 });
     }
-    const filePath = `${params.id}/${storageFileName(prepared.filename)}`;
+    // Chemin unique à chaque remplacement : la vignette est mise en cache par
+    // le navigateur selon ce chemin (voir thumbnail/route.ts), un fichier de
+    // même nom écrasé sur place resterait affiché avec l'ancienne image.
+    const filePath = `${params.id}/${Date.now().toString(36)}-${storageFileName(prepared.filename)}`;
     const { error: uploadError } = await supabase.storage
       .from("visuals")
       .upload(filePath, prepared.buffer, { contentType: prepared.contentType, upsert: true });
@@ -58,7 +68,18 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    // La ligne pointe toujours vers l'ancien fichier : retirer le nouveau, orphelin.
+    if (typeof update.file_path === "string") {
+      await supabase.storage.from("visuals").remove([update.file_path]).catch(() => {});
+    }
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+  // L'ancien fichier n'est plus référencé (les produits relisent le chemin du
+  // visuel à chaque rendu) : le retirer, sans bloquer si ça échoue.
+  if (previousPath && previousPath !== update.file_path) {
+    await supabase.storage.from("visuals").remove([previousPath]).catch(() => {});
+  }
   return NextResponse.json({ visual: data });
 }
 

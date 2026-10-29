@@ -3,6 +3,7 @@ import { PDFDocument, PDFName } from "pdf-lib";
 import { createAdminSupabaseClient, createServerSupabaseClient } from "@/lib/supabase/server";
 import { formDataFromSubmission, type DesignSubmission } from "@/lib/design/submission";
 import { renderPdfFromForm } from "@/lib/design/renderPdf";
+import { mapLimit } from "@/lib/concurrency";
 import { pdfDownloadName } from "@/lib/imposition/saved";
 
 export const runtime = "nodejs";
@@ -41,43 +42,58 @@ export async function POST(_request: Request, { params }: { params: { id: string
   const admin = createAdminSupabaseClient();
   const out = await PDFDocument.create();
   try {
-    for (const item of items) {
-      let bytes: Uint8Array;
+    // Tous les designs en une requête, au lieu d'une par ligne.
+    const submissionIds = Array.from(new Set(items.flatMap((i) => (i.design_submission_id ? [i.design_submission_id] : []))));
+    const { data: submissionRows } = submissionIds.length
+      ? await admin.from("design_submissions").select("*").in("id", submissionIds)
+      : { data: [] };
+    const submissionById = new Map(((submissionRows as DesignSubmission[] | null) ?? []).map((s) => [s.id, s]));
+
+    const loadItemPdf = async (item: (typeof items)[number]): Promise<Uint8Array> => {
       if (item.design_submission_id) {
-        const { data } = await admin.from("design_submissions").select("*").eq("id", item.design_submission_id).maybeSingle();
-        if (!data) throw new Error(`Design introuvable pour « ${item.title ?? "une ligne"} ».`);
-        const submission = data as DesignSubmission;
+        const submission = submissionById.get(item.design_submission_id);
+        if (!submission) throw new Error(`Design introuvable pour « ${item.title ?? "une ligne"} ».`);
         const { pdf } = await renderPdfFromForm(admin, await formDataFromSubmission(admin, submission), submission.template_id);
-        bytes = pdf;
-      } else {
-        const { data: product } = await admin.from("products").select("pdf_path").eq("id", item.product_id!).maybeSingle();
-        const path = (product as { pdf_path: string | null } | null)?.pdf_path;
-        const file = path ? (await admin.storage.from(BUCKET).download(path)).data : null;
-        if (!file) throw new Error(`PDF du produit introuvable pour « ${item.title ?? "une ligne"} ».`);
-        bytes = new Uint8Array(await file.arrayBuffer());
+        return pdf;
       }
-      const source = await PDFDocument.load(bytes);
-      // Les pages ne sont embarquées qu'une fois ; chaque tirage les redessine
-      // (sans dupliquer le flux de l'image) sur une page aux mêmes boîtes.
-      const sourcePages = source.getPages();
-      const embedded = await out.embedPages(sourcePages);
-      for (let copy = 0; copy < Math.max(1, item.quantity); copy++) {
-        sourcePages.forEach((src, i) => {
-          const media = src.getMediaBox();
-          const page = out.addPage([media.width, media.height]);
-          // Mêmes boîtes que la page source (origine comprise) ; TrimBox/BleedBox
-          // seulement si la source les déclare, comme avec copyPages.
-          page.setMediaBox(media.x, media.y, media.width, media.height);
-          page.drawPage(embedded[i], { x: media.x, y: media.y, width: media.width, height: media.height });
-          if (src.node.has(PDFName.of("TrimBox"))) {
-            const t = src.getTrimBox();
-            page.setTrimBox(t.x, t.y, t.width, t.height);
-          }
-          if (src.node.has(PDFName.of("BleedBox"))) {
-            const bl = src.getBleedBox();
-            page.setBleedBox(bl.x, bl.y, bl.width, bl.height);
-          }
-        });
+      const { data: product } = await admin.from("products").select("pdf_path").eq("id", item.product_id!).maybeSingle();
+      const path = (product as { pdf_path: string | null } | null)?.pdf_path;
+      const file = path ? (await admin.storage.from(BUCKET).download(path)).data : null;
+      if (!file) throw new Error(`PDF du produit introuvable pour « ${item.title ?? "une ligne"} ».`);
+      return new Uint8Array(await file.arrayBuffer());
+    };
+
+    // Rendus 3 par 3 (mémoire : sharp sur des images 300 dpi), assemblés lot
+    // par lot dans l'ordre des lignes : au plus 3 PDF sources en mémoire à la fois.
+    const BATCH = 3;
+    for (let start = 0; start < items.length; start += BATCH) {
+      const batch = items.slice(start, start + BATCH);
+      const batchBytes = await mapLimit(batch, BATCH, loadItemPdf);
+      for (const [n, bytes] of batchBytes.entries()) {
+        const item = batch[n];
+        const source = await PDFDocument.load(bytes);
+        // Les pages ne sont embarquées qu'une fois ; chaque tirage les redessine
+        // (sans dupliquer le flux de l'image) sur une page aux mêmes boîtes.
+        const sourcePages = source.getPages();
+        const embedded = await out.embedPages(sourcePages);
+        for (let copy = 0; copy < Math.max(1, item.quantity); copy++) {
+          sourcePages.forEach((src, i) => {
+            const media = src.getMediaBox();
+            const page = out.addPage([media.width, media.height]);
+            // Mêmes boîtes que la page source (origine comprise) ; TrimBox/BleedBox
+            // seulement si la source les déclare, comme avec copyPages.
+            page.setMediaBox(media.x, media.y, media.width, media.height);
+            page.drawPage(embedded[i], { x: media.x, y: media.y, width: media.width, height: media.height });
+            if (src.node.has(PDFName.of("TrimBox"))) {
+              const t = src.getTrimBox();
+              page.setTrimBox(t.x, t.y, t.width, t.height);
+            }
+            if (src.node.has(PDFName.of("BleedBox"))) {
+              const bl = src.getBleedBox();
+              page.setBleedBox(bl.x, bl.y, bl.width, bl.height);
+            }
+          });
+        }
       }
     }
   } catch (err) {

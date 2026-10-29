@@ -389,6 +389,7 @@ function drawRegMark(
 // le premier calque est dessiné en premier, les suivants passent par-dessus.
 interface Layer {
   key: string;
+  name: string;
   ref: PDFRef;
 }
 
@@ -398,10 +399,13 @@ class Layers {
   constructor(private out: PDFDocument) {}
 
   add(name: string): Layer {
+    // Un même calque sert à toutes les feuilles d'un PDF.
+    const existing = this.layers.find((l) => l.name === name);
+    if (existing) return existing;
     const ref = this.out.context.register(
       this.out.context.obj({ Type: "OCG", Name: PDFHexString.fromText(name.slice(0, 80)) })
     );
-    const layer = { key: `Calque${this.layers.length + 1}`, ref };
+    const layer = { key: `Calque${this.layers.length + 1}`, name, ref };
     this.layers.push(layer);
     return layer;
   }
@@ -528,6 +532,32 @@ export function impositionLayout(input: Omit<ImposeInput, "sources" | "marks" | 
 }
 
 export async function imposeToPdf(input: ImposeInput): Promise<ImposeResult> {
+  const { pdf, results } = await imposeSheetsToPdf([input]);
+  return { ...results[0], pdf };
+}
+
+/**
+ * Plusieurs feuilles dans un seul PDF : chaque PDF source n'est lu et intégré
+ * qu'une fois pour toutes les feuilles (même cache), sans aller-retour
+ * enregistrement / rechargement entre les feuilles.
+ */
+export async function imposeSheetsToPdf(inputs: ImposeInput[]): Promise<{ pdf: Buffer; results: Omit<ImposeResult, "pdf">[] }> {
+  const out = await PDFDocument.create();
+  const cache: SourceCache = { docs: new Map(), embedded: new Map() };
+  const layers = new Layers(out);
+  const results: Omit<ImposeResult, "pdf">[] = [];
+  for (const input of inputs) results.push(await drawSheets(out, input, cache, layers));
+  layers.finish();
+  return { pdf: Buffer.from(await out.save()), results };
+}
+
+// Dessine une feuille (recto, et verso s'il y en a un) à la suite du document.
+async function drawSheets(
+  out: PDFDocument,
+  input: ImposeInput,
+  cache: SourceCache,
+  layers: Layers
+): Promise<Omit<ImposeResult, "pdf">> {
   const { layout, duploPieces } = impositionLayout(input);
 
   const { assignment, overflow } = assignCells(input.sources, layout.cells.length);
@@ -539,9 +569,7 @@ export async function imposeToPdf(input: ImposeInput): Promise<ImposeResult> {
   const placed = assignment.filter((a) => a !== null).length;
   if (placed === 0) throw new Error("Aucune copie à placer sur la feuille.");
 
-  const out = await PDFDocument.create();
   const prepared: PreparedSource[] = [];
-  const cache: SourceCache = { docs: new Map(), embedded: new Map() };
   for (const source of input.sources) {
     prepared.push(await prepareSource(out, source, input.pieceWidth, input.pieceHeight, cache));
   }
@@ -549,7 +577,6 @@ export async function imposeToPdf(input: ImposeInput): Promise<ImposeResult> {
   const sheetWidthPt = mmToPt(input.sheetWidth);
   const sheetHeightPt = mmToPt(input.sheetHeight);
 
-  const layers = new Layers(out);
   const front = out.addPage([sheetWidthPt, sheetHeightPt]);
   // Un PDF déjà dans le sens de la cellule reste à l'endroit ; sinon (cellule
   // couchée, ou PDF fourni dans l'orientation inverse du format) on le tourne
@@ -629,6 +656,5 @@ export async function imposeToPdf(input: ImposeInput): Promise<ImposeResult> {
     }
   }
 
-  layers.finish();
-  return { pdf: Buffer.from(await out.save()), layout, placed, hasBack };
+  return { layout, placed, hasBack };
 }
