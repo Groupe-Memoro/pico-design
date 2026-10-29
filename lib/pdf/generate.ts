@@ -1,10 +1,10 @@
-import { PDFDocument, rgb } from "pdf-lib";
+import { PDFDocument, rgb, type PDFImage } from "pdf-lib";
 import sharp from "sharp";
 import { mmToPt, mmToPx } from "./units";
 import { rasterizeLogoToPng } from "./logo";
 import { addDropShadow } from "./logoShadow";
 import type { LogoShadowSettings } from "../logoShadowSettings";
-import { coverCropToBuffer } from "./crop";
+import { coverCropPipeline } from "./crop";
 import { compositeLayers, type ResolvedLayer } from "./layers";
 import type { LogoHAlign, LogoVAlign, Template } from "../types";
 
@@ -74,6 +74,9 @@ export async function generatePrintReadyPdf({
   const targetPxHeight = mmToPx(pageHeightMm, template.dpi);
 
   const pdfDoc = await PDFDocument.create();
+  // Recto et verso reçoivent souvent le même fichier de logo : rendu et
+  // intégré une seule fois, puis dessiné sur les deux pages.
+  const logos = new Map<Buffer, Promise<PreparedLogo>>();
 
   await addImagePage(
     pdfDoc,
@@ -85,6 +88,7 @@ export async function generatePrintReadyPdf({
     targetPxHeight,
     logoImage,
     logoShadow,
+    logos,
     zoom,
     imageRotation,
     layers
@@ -101,6 +105,7 @@ export async function generatePrintReadyPdf({
       targetPxHeight,
       backLogoImage,
       logoShadow,
+      logos,
       backZoom,
       backImageRotation,
       backLayers
@@ -121,6 +126,7 @@ async function addImagePage(
   targetPxHeight: number,
   logoImage: Buffer | null,
   logoShadow: LogoShadowSettings | null,
+  logos: Map<Buffer, Promise<PreparedLogo>>,
   zoom = 1,
   imageRotation = 0,
   layers: ResolvedLayer[] = []
@@ -134,8 +140,10 @@ async function addImagePage(
   // (fond perdu compris) à la résolution d'impression, au point focal
   // choisi par l'utilisateur, puis les calques additionnels (texte/image)
   // par-dessus, avant d'aplatir (l'image finale n'a plus besoin de canal
-  // alpha une fois les calques posés).
-  const cropped = await coverCropToBuffer(
+  // alpha une fois les calques posés). Un seul encodage avec perte, le JPEG
+  // final : sans calques, le recadrage est encodé directement ; avec, l'étape
+  // intermédiaire passe par un PNG (sans perte) que les calques recouvrent.
+  const { pipeline } = await coverCropPipeline(
     sourceImage,
     targetPxWidth,
     targetPxHeight,
@@ -144,11 +152,19 @@ async function addImagePage(
     zoom,
     imageRotation
   );
-  const withLayers = await compositeLayers(cropped, layers, targetPxWidth, targetPxHeight, template.dpi);
-  const fittedImage = await sharp(withLayers)
-    .flatten({ background: "#ffffff" })
-    .jpeg({ quality: 92 })
-    .toBuffer();
+  const base =
+    layers.length === 0
+      ? pipeline
+      : sharp(
+          await compositeLayers(
+            await pipeline.png({ compressionLevel: 1 }).toBuffer(),
+            layers,
+            targetPxWidth,
+            targetPxHeight,
+            template.dpi
+          )
+        );
+  const fittedImage = await base.flatten({ background: "#ffffff" }).jpeg({ quality: 92 }).toBuffer();
 
   // Marge d'impression : bande blanche ajoutée en plus, tout autour de la
   // page normale (fond perdu compris), pour certains formats qui en ont
@@ -183,10 +199,13 @@ async function addImagePage(
   if (!logoImage) return;
 
   const logoWidthPt = mmToPt(template.logo_width_mm);
-  const logoTargetPx = mmToPx(template.logo_width_mm, template.dpi);
-  const logoPng = await rasterizeLogoToPng(logoImage, logoTargetPx);
-  const embeddedLogo = await pdfDoc.embedPng(logoPng);
-  const logoAspect = embeddedLogo.height / embeddedLogo.width;
+  let prepared = logos.get(logoImage);
+  if (!prepared) {
+    prepared = prepareLogo(pdfDoc, logoImage, mmToPx(template.logo_width_mm, template.dpi), logoShadow);
+    logos.set(logoImage, prepared);
+  }
+  const logo = await prepared;
+  const logoAspect = logo.heightPx / logo.widthPx;
   const logoHeightPt = logoWidthPt * logoAspect;
   const marginXPt = mmToPt(template.logo_margin_x_mm + template.bleed_mm);
   const marginYPt = mmToPt(template.logo_margin_y_mm + template.bleed_mm);
@@ -202,28 +221,42 @@ async function addImagePage(
     marginYPt
   );
 
-  if (logoShadow) {
-    // Le canevas de l'image avec ombre déborde du logo de `pad` pixels de
-    // chaque côté : on le décale d'autant pour que le logo reste exactement
-    // à sa position.
-    const shadowed = await addDropShadow(logoPng, logoShadow);
-    const embeddedShadowed = await pdfDoc.embedPng(shadowed.png);
-    const ptPerPx = logoWidthPt / embeddedLogo.width;
-    page.drawImage(embeddedShadowed, {
-      x: x + printMarginXPt - shadowed.pad * ptPerPx,
-      y: y + printMarginYPt - shadowed.pad * ptPerPx,
-      width: embeddedShadowed.width * ptPerPx,
-      height: embeddedShadowed.height * ptPerPx,
-    });
-    return;
-  }
-
-  page.drawImage(embeddedLogo, {
-    x: x + printMarginXPt,
-    y: y + printMarginYPt,
-    width: logoWidthPt,
-    height: logoHeightPt,
+  // Avec ombre, le canevas déborde du logo de `pad` pixels de chaque côté :
+  // on le décale d'autant pour que le logo reste exactement à sa position
+  // (pad = 0 sans ombre, l'image est alors le logo lui-même).
+  const ptPerPx = logoWidthPt / logo.widthPx;
+  page.drawImage(logo.image, {
+    x: x + printMarginXPt - logo.pad * ptPerPx,
+    y: y + printMarginYPt - logo.pad * ptPerPx,
+    width: logo.image.width * ptPerPx,
+    height: logo.image.height * ptPerPx,
   });
+}
+
+interface PreparedLogo {
+  // Image intégrée au PDF : le logo seul, ou le logo avec son ombre.
+  image: PDFImage;
+  // Taille du logo seul (sans l'ombre), qui fixe l'échelle.
+  widthPx: number;
+  heightPx: number;
+  pad: number;
+}
+
+// N'intègre que l'image réellement dessinée : pdf-lib écrit dans le fichier
+// toute image intégrée, même jamais utilisée.
+async function prepareLogo(
+  pdfDoc: PDFDocument,
+  logoImage: Buffer,
+  targetPx: number,
+  logoShadow: LogoShadowSettings | null
+): Promise<PreparedLogo> {
+  const logoPng = await rasterizeLogoToPng(logoImage, targetPx);
+  const meta = await sharp(logoPng).metadata();
+  const widthPx = meta.width ?? targetPx;
+  const heightPx = meta.height ?? targetPx;
+  if (!logoShadow) return { image: await pdfDoc.embedPng(logoPng), widthPx, heightPx, pad: 0 };
+  const shadowed = await addDropShadow(logoPng, logoShadow);
+  return { image: await pdfDoc.embedPng(shadowed.png), widthPx, heightPx, pad: shadowed.pad };
 }
 
 function logoPosition(

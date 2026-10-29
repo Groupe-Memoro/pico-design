@@ -1,4 +1,4 @@
-import sharp from "sharp";
+import sharp, { type Sharp } from "sharp";
 
 // Extrait un point focal (0..1) d'une valeur de formulaire, avec repli sur
 // le centre (0.5) si absente/invalide.
@@ -42,21 +42,59 @@ export async function coverCropToBuffer(
   zoom = 1,
   rotation = 0
 ): Promise<Buffer> {
+  const { pipeline, inheritsFormat } = await coverCropPipeline(
+    image,
+    targetWidthPx,
+    targetHeightPx,
+    positionX,
+    positionY,
+    zoom,
+    rotation
+  );
+  // Recadrage simple : même format que la source (comportement d'origine).
+  // Fond blanc ajouté ou canvas synthétique : pas de format à hériter, il faut
+  // le préciser, sinon le buffer n'est pas une image ré-décodable.
+  return inheritsFormat ? pipeline.toBuffer() : pipeline.png().toBuffer();
+}
+
+/**
+ * Même recadrage que `coverCropToBuffer`, mais renvoyé comme pipeline sharp
+ * non encodé : l'appelant choisit l'encodage final. Le PDF d'impression
+ * (generate.ts) encode ainsi une seule fois, en JPEG 92, au lieu de passer
+ * par un JPEG intermédiaire (qualité 80 par défaut de sharp) puis de le
+ * ré-encoder — chaque génération JPEG dégrade un peu l'image.
+ *
+ * Orientation EXIF, rotation, redimensionnement, découpe et fond blanc sont
+ * enchaînés dans un seul pipeline (un seul décodage). Le fond blanc du
+ * dézoom aplatit la transparence, comme le faisait la composition sur un
+ * canvas blanc.
+ */
+export async function coverCropPipeline(
+  image: Buffer | null,
+  targetWidthPx: number,
+  targetHeightPx: number,
+  positionX = 0.5,
+  positionY = 0.5,
+  zoom = 1,
+  rotation = 0
+): Promise<{ pipeline: Sharp; inheritsFormat: boolean }> {
   if (!image) {
-    return sharp({
-      create: { width: targetWidthPx, height: targetHeightPx, channels: 3, background: "#ffffff" },
-    })
-      .png()
-      .toBuffer();
+    return {
+      pipeline: sharp({
+        create: { width: targetWidthPx, height: targetHeightPx, channels: 3, background: "#ffffff" },
+      }),
+      inheritsFormat: false,
+    };
   }
   // Orientation EXIF (photo de téléphone) d'abord : le navigateur la respecte
-  // à l'écran, le recadrage doit partir de la même image droite.
-  const exif = (await sharp(image).metadata().catch(() => null))?.orientation ?? 1;
-  const upright = exif > 1 ? await sharp(image).rotate().toBuffer() : image;
-  const source = rotation ? await sharp(upright).rotate(rotation).toBuffer() : upright;
-  const meta = await sharp(source).metadata();
-  const origW = meta.width ?? targetWidthPx;
-  const origH = meta.height ?? targetHeightPx;
+  // à l'écran, le recadrage doit partir de la même image droite. sharp admet
+  // l'orientation automatique suivie d'une rotation dans le même pipeline.
+  const meta = await sharp(image).metadata();
+  const quarterTurn = rotation % 180 !== 0;
+  const uprightW = meta.autoOrient?.width ?? meta.width ?? targetWidthPx;
+  const uprightH = meta.autoOrient?.height ?? meta.height ?? targetHeightPx;
+  const origW = quarterTurn ? uprightH : uprightW;
+  const origH = quarterTurn ? uprightW : uprightH;
   const coverScale = Math.max(targetWidthPx / origW, targetHeightPx / origH);
   const scale = coverScale * Math.max(0.1, zoom);
   const scaledW = Math.max(1, Math.round(origW * scale));
@@ -64,48 +102,48 @@ export async function coverCropToBuffer(
 
   const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
 
+  let pipeline = sharp(image).rotate();
+  if (rotation) pipeline = pipeline.rotate(rotation);
+  pipeline = pipeline.resize(scaledW, scaledH);
+
   if (scaledW >= targetWidthPx && scaledH >= targetHeightPx) {
     // Comportement d'origine : l'image dépasse (ou remplit tout juste) la
-    // cible dans les deux sens, on découpe l'excédent. Redimensionnement et
-    // découpe en un seul passage (extract après resize) : un encodage de
-    // moins, donc plus rapide et sans perte JPEG intermédiaire.
+    // cible dans les deux sens, on découpe l'excédent (extract après resize).
     const left = Math.round((scaledW - targetWidthPx) * clamp01(positionX));
     const top = Math.round((scaledH - targetHeightPx) * clamp01(positionY));
-    return sharp(source)
-      .resize(scaledW, scaledH)
-      .extract({ left, top, width: targetWidthPx, height: targetHeightPx })
-      .toBuffer();
+    return {
+      pipeline: pipeline.extract({ left, top, width: targetWidthPx, height: targetHeightPx }),
+      inheritsFormat: true,
+    };
   }
 
-  const resized = await sharp(source).resize(scaledW, scaledH).toBuffer();
-
   // Dézoomé : l'image est plus petite que la cible dans au moins un sens —
-  // la composer sur un fond blanc à la taille cible plutôt que d'extraire
+  // la poser sur un fond blanc à la taille cible plutôt que d'extraire
   // (sharp refuse un extract plus grand que la source). Si un seul des deux
   // sens dépasse encore (image très étirée), le ramener d'abord à la taille
-  // cible : sharp refuse aussi de composer une image plus grande que le fond.
+  // cible.
   const clampedW = Math.min(scaledW, targetWidthPx);
   const clampedH = Math.min(scaledH, targetHeightPx);
-  const toComposite =
-    clampedW < scaledW || clampedH < scaledH
-      ? await sharp(resized)
-          .extract({
-            left: Math.round((scaledW - clampedW) * clamp01(positionX)),
-            top: Math.round((scaledH - clampedH) * clamp01(positionY)),
-            width: clampedW,
-            height: clampedH,
-          })
-          .toBuffer()
-      : resized;
+  if (clampedW < scaledW || clampedH < scaledH) {
+    pipeline = pipeline.extract({
+      left: Math.round((scaledW - clampedW) * clamp01(positionX)),
+      top: Math.round((scaledH - clampedH) * clamp01(positionY)),
+      width: clampedW,
+      height: clampedH,
+    });
+  }
   const left = Math.round((targetWidthPx - clampedW) * clamp01(positionX));
   const top = Math.round((targetHeightPx - clampedH) * clamp01(positionY));
-  return sharp({
-    create: { width: targetWidthPx, height: targetHeightPx, channels: 3, background: "#ffffff" },
-  })
-    .composite([{ input: toComposite, left, top }])
-    // Synthétique (`create`) : pas de format à hériter d'un fichier source
-    // comme dans la branche ci-dessus — il faut le préciser explicitement,
-    // sinon le buffer renvoyé n'est pas une image ré-décodable par l'appelant.
-    .png()
-    .toBuffer();
+  return {
+    pipeline: pipeline
+      .flatten({ background: "#ffffff" })
+      .extend({
+        left,
+        top,
+        right: targetWidthPx - clampedW - left,
+        bottom: targetHeightPx - clampedH - top,
+        background: "#ffffff",
+      }),
+    inheritsFormat: false,
+  };
 }
