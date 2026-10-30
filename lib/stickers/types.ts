@@ -1,7 +1,7 @@
 // Module Autocollants : modèles de planches et zones de texte. Types et règles
 // pures, partagés entre l'éditeur de modèle (écran) et le rendu PDF (serveur).
 
-import { FONT_OPTIONS, isKnownFontId } from "@/lib/design/fonts";
+import { FONT_OPTIONS, isKnownFontId, sanitizeWeight } from "@/lib/design/fonts";
 
 export const STICKER_ASSETS = ["artwork", "marks", "guide"] as const;
 export type StickerAsset = (typeof STICKER_ASSETS)[number];
@@ -37,6 +37,9 @@ export interface StickerZone {
   height: number;
   fontId: string;
   bold: boolean;
+  // Graisse choisie (100 à 900, voir fontWeight dans lib/design/fonts.ts).
+  // Absente = `bold` décide (gras ou normal), comme avant.
+  weight?: number;
   uppercase: boolean;
   color: string; // #rrggbb
   align: ZoneAlign;
@@ -123,6 +126,7 @@ export function parseZones(raw: unknown, sheetW: number, sheetH: number): Sticke
       x, y, width: w, height: h,
       fontId: isKnownFontId(z.fontId) ? z.fontId : FONT_OPTIONS[0].id,
       bold: z.bold === true,
+      ...(sanitizeWeight(z.weight) ? { weight: sanitizeWeight(z.weight) } : {}),
       uppercase: z.uppercase === true,
       color: typeof z.color === "string" && /^#[0-9a-f]{6}$/i.test(z.color) ? z.color : "#1a1613",
       align: z.align === "left" || z.align === "right" ? z.align : "center",

@@ -30,6 +30,7 @@ import { FontSizeInput, FontUnitToggle, LengthInput, LengthUnitToggle, formatLen
 import { allowsPanels, foldLines, panelThemeFormat, panelThemePlacement, parseFold, parsePanelKey } from "@/lib/folds";
 import { checkThemeFile, fillToCover, themePagePx, type ThemePage } from "@/lib/themeFit";
 import { formatInMm, formatSizeInMm } from "@/lib/pdf/units";
+import FontWeightSelect from "@/components/FontWeightSelect";
 
 const MIN_RATIO = 0.05;
 // Distance (px à l'écran) sous laquelle un cadre s'aimante à un repère.
@@ -1119,6 +1120,15 @@ export default function ThemeForm({
                           />
                         </div>
                       </div>
+                      <label className="block">
+                        <span className="text-neutral-600">Graisse</span>
+                        <FontWeightSelect
+                          fontId={zone.fontId}
+                          value={zone}
+                          onChange={(patch) => updateZone(i, patch)}
+                          className="mt-1 w-full rounded border border-neutral-300 bg-surface px-2 py-1"
+                        />
+                      </label>
                       <label className="flex items-center gap-1.5 text-neutral-600">
                         Rotation
                         <input
@@ -1167,7 +1177,12 @@ export default function ThemeForm({
                           ] as const
                         ).map(([key, label]) => (
                           <label key={key} className="flex items-center gap-1">
-                            <input type="checkbox" checked={zone[key]} onChange={(e) => updateZone(i, { [key]: e.target.checked })} />
+                            <input
+                              type="checkbox"
+                              checked={zone[key]}
+                              // Gras : retour au gras ou au normal de la police (sans graisse choisie).
+                              onChange={(e) => updateZone(i, key === "bold" ? { bold: e.target.checked, weight: undefined } : { [key]: e.target.checked })}
+                            />
                             {label}
                           </label>
                         ))}

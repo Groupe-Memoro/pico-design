@@ -141,6 +141,9 @@ export interface ThemeTextZone {
   fontId: string;
   fontSizeMm: number;
   bold: boolean;
+  // Graisse choisie (100 à 900, voir fontWeight dans lib/design/fonts.ts).
+  // Absente = `bold` décide (gras ou normal), comme avant.
+  weight?: number;
   italic: boolean;
   color: string;
   align: ThemeTextAlign;

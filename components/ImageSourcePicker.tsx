@@ -14,7 +14,7 @@ import { filePreviewUrl } from "@/lib/design/filePreview";
 import FabricLayerCanvas from "@/components/FabricLayerCanvas";
 import { foldAxisLength, foldPanels, parseFold } from "@/lib/folds";
 import { SpinnerIcon, UploadIcon } from "@/components/icons";
-import { fontOptionById } from "@/lib/design/fonts";
+import { fontOptionById, fontWeight } from "@/lib/design/fonts";
 import { maxTextSizeMmForTemplate, type DesignLayer, type ImageLayer } from "@/lib/design/layers";
 import { ensureFontCss } from "@/lib/design/fontLoader";
 
@@ -1871,7 +1871,7 @@ export default function ImageSourcePicker({
                             fontFamily: font.family,
                             fontSize: fontSizePx,
                             lineHeight: 1.25,
-                            fontWeight: designLayer.bold ? font.weightBold : font.weightRegular,
+                            fontWeight: fontWeight(font, designLayer),
                             // Même dessin qu'à l'impression (pas de « taille optique » auto).
                             fontOpticalSizing: "none",
                             fontStyle: designLayer.italic ? "italic" : "normal",

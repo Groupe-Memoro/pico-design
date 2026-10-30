@@ -3,11 +3,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CopyIcon, SpinnerIcon, TrashIcon } from "@/components/icons";
+import { ChevronDownIcon, ChevronUpIcon, CopyIcon, SpinnerIcon, TrashIcon } from "@/components/icons";
 import FontPicker from "@/components/FontPicker";
 import ColorPickerButton from "@/components/ColorPickerButton";
 import { FontSizeInput, LengthInput, UnitsBar, formatLength, unitLabel, useFontUnit, useLengthUnit } from "@/components/UnitInputs";
-import { fontOptionById } from "@/lib/design/fonts";
+import { fontOptionById, fontWeight } from "@/lib/design/fonts";
 import { loadFont } from "@/lib/design/fontLoader";
 import {
   BARCODE_TYPES,
@@ -36,6 +36,7 @@ import { measureInk } from "@/lib/design/inkMeasure";
 import { alignBoxes, boundsOf, edgesX, edgesY, snapAxis, type AlignMode, type Box, type UserGuide } from "@/lib/variableData/snap";
 import CardProduction from "@/components/studentCards/CardProduction";
 import { longestRowIndex } from "@/lib/studentCards/sort";
+import FontWeightSelect from "@/components/FontWeightSelect";
 
 const MIN_ZONE_MM = 1.5;
 const MAX_ZOOM = 8;
@@ -62,7 +63,7 @@ function useTextMeasure(fontsVersion: number) {
     (zone: CardZone, text: string) => {
       const font = fontOptionById(zone.fontId);
       // Encre mesurée au pixel (voir measureInk) : fiable dans tous les navigateurs.
-      const ink = measureInk(`${zone.bold ? font.weightBold : font.weightRegular} "${font.family}"`, text, fontsVersion);
+      const ink = measureInk(`${fontWeight(font, zone)} "${font.family}"`, text, fontsVersion);
       return { widthPerMm: ink.left + ink.right, heightPerMm: ink.height, left: ink.left, right: ink.right };
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -122,6 +123,14 @@ function AlignBar({ count, onAlign }: { count: number; onAlign: (mode: AlignMode
       </div>
     </div>
   );
+}
+
+// Nom d'une zone dans la liste des calques : ce qu'elle affiche.
+function zoneLayerName(z: CardZone): string {
+  if (z.kind === "photo") return "Photo de la ligne";
+  // Rangée sous un identifiant (voir lib/variableData/handlers.ts) : pas de nom.
+  if (z.kind === "image") return z.imagePath ? "Image fixe" : "Image à choisir";
+  return z.content.trim() || "Contenu à choisir";
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -239,6 +248,8 @@ export default function VariableDataEditor({
   // Zones sélectionnées (Maj ou ⌘ + clic pour en ajouter) ; le panneau de
   // réglages s'ouvre quand il n'y en a qu'une.
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  // Calque glissé dans la liste, et où il tomberait (au-dessus ou en dessous de quelle ligne).
+  const [layerDrag, setLayerDrag] = useState<{ id: string; overId: string | null; below: boolean } | null>(null);
   const selectedId = selectedIds.length === 1 ? selectedIds[0] : null;
   const setSelectedId = (id: string | null) => setSelectedIds(id ? [id] : []);
   const [userGuides, setUserGuides] = useState<UserGuide[]>(template.guides ?? []);
@@ -342,7 +353,7 @@ export default function VariableDataEditor({
   // Polices de l'aperçu : la mesure du texte n'est juste qu'une fois chargées.
   const [fontsVersion, setFontsVersion] = useState(0);
   const usedFonts = useMemo(
-    () => Array.from(new Set(zones.filter((z) => z.kind === "text").map((z) => `${z.fontId}:${z.bold}`))).join(","),
+    () => Array.from(new Set(zones.filter((z) => z.kind === "text").map((z) => `${z.fontId}:${z.bold}:${z.weight ?? ""}`))).join(","),
     [zones]
   );
   useEffect(() => {
@@ -350,7 +361,7 @@ export default function VariableDataEditor({
       .filter((z) => z.kind === "text")
       .map((z) => {
         const f = fontOptionById(z.fontId);
-        return loadFont(z.fontId, `${z.bold ? f.weightBold : f.weightRegular} 20px "${f.family}"`);
+        return loadFont(z.fontId, `${fontWeight(f, z)} 20px "${f.family}"`);
       });
     Promise.all(loads)
       .then(() => setFontsVersion((v) => v + 1))
@@ -395,6 +406,37 @@ export default function VariableDataEditor({
   }
   function removeZone(id: string) {
     removeZones([id]);
+  }
+  // Ordre des calques : la zone échange sa place avec la suivante (+1, par-
+  // dessus) ou la précédente (-1) de la même face — l'ordre du tableau est
+  // l'ordre de dessin (voir lib/studentCards/render.ts).
+  function moveZoneLayer(id: string, direction: 1 | -1) {
+    const index = zones.findIndex((z) => z.id === id);
+    if (index < 0) return;
+    let other = index + direction;
+    while (other >= 0 && other < zones.length && zones[other].side !== zones[index].side) other += direction;
+    if (other < 0 || other >= zones.length) return;
+    const next = zones.slice();
+    [next[index], next[other]] = [next[other], next[index]];
+    changeZones(next);
+  }
+  // Glisser-déposer dans la liste des calques : `id` prend la place de
+  // `overId`, juste au-dessus (avant, dans la liste) ou en dessous. La liste
+  // montre la face de la plus en avant à la plus en arrière, l'inverse de
+  // l'ordre de dessin ; les zones de l'autre face gardent leurs places.
+  function dropZoneLayer(id: string, overId: string, below: boolean) {
+    if (id === overId) return;
+    const side = zones.find((z) => z.id === id)?.side;
+    const listed = zones.filter((z) => z.side === side).reverse();
+    const dragged = listed.find((z) => z.id === id);
+    if (!dragged) return;
+    const rest = listed.filter((z) => z.id !== id);
+    const at = rest.findIndex((z) => z.id === overId);
+    if (at < 0) return;
+    rest.splice(below ? at + 1 : at, 0, dragged);
+    const drawOrder = rest.reverse();
+    let k = 0;
+    changeZones(zones.map((z) => (z.side === side ? drawOrder[k++] : z)));
   }
   function removeZones(ids: string[]) {
     changeZones(zones.filter((z) => !ids.includes(z.id)));
@@ -627,7 +669,7 @@ export default function VariableDataEditor({
         const zone = clampZone(
           newCardZone({
             ...(tool === "text" && lastText
-              ? { fontId: lastText.fontId, bold: lastText.bold, color: lastText.color, align: lastText.align, uppercase: lastText.uppercase }
+              ? { fontId: lastText.fontId, bold: lastText.bold, weight: lastText.weight, color: lastText.color, align: lastText.align, uppercase: lastText.uppercase }
               : {}),
             side,
             kind: tool,
@@ -998,7 +1040,7 @@ export default function VariableDataEditor({
                       y={0}
                       transform={`scale(${size / 100})`}
                       fontFamily={`"${font.family}"`}
-                      fontWeight={z.bold ? font.weightBold : font.weightRegular}
+                      fontWeight={fontWeight(font, z)}
                       fontSize={100}
                       fill={z.color}
                       textAnchor="start"
@@ -1041,8 +1083,9 @@ export default function VariableDataEditor({
                     {folds.h.map((f) => (
                       <line key={`h${f}`} y1={b + f} y2={b + f} x1={0} x2={W} stroke="#2563eb" strokeWidth={strokeMm * 0.8} strokeDasharray={`${strokeMm * 4} ${strokeMm * 2}`} />
                     ))}
-                    {/* Ligne de coupe, par-dessus tout. */}
-                    <rect x={b} y={b} width={W - b * 2} height={H - b * 2} stroke="#e11d48" strokeWidth={strokeMm} />
+                    {/* Ligne de coupe, par-dessus tout. Sans fond perdu (carte
+                        PVC imprimée bord à bord), rien n'est coupé : pas de ligne. */}
+                    {b > 0 && <rect x={b} y={b} width={W - b * 2} height={H - b * 2} stroke="#e11d48" strokeWidth={strokeMm} />}
                   </g>
                 );
               })()}
@@ -1119,11 +1162,13 @@ export default function VariableDataEditor({
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-neutral-600">
               <label className="flex items-center gap-1.5">
                 <input type="checkbox" checked={showGuides} onChange={(e) => setShowGuides(e.target.checked)} />
-                Coupe et marges
+                {guides.bleed > 0 ? "Coupe et marges" : "Marges"}
               </label>
-              <span className="flex items-center gap-1.5">
-                <span className="inline-block h-0.5 w-5 bg-rose-600" /> Coupe
-              </span>
+              {guides.bleed > 0 && (
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-block h-0.5 w-5 bg-rose-600" /> Coupe
+                </span>
+              )}
               {guides.bleed > 0 && (
                 <span className="flex items-center gap-1.5">
                   <span className="inline-block h-3 w-5 border border-rose-300 bg-rose-100" /> Fond perdu (
@@ -1193,6 +1238,28 @@ export default function VariableDataEditor({
         </div>
 
         <div className="space-y-4">
+          <CardProduction
+            templateId={template.id}
+            apiBase={apiBase}
+            vocab={vocab}
+            templateName={name}
+            zones={zones}
+            data={data}
+            onData={onData}
+            dataFile={dataFile ? { name: dataFile.name, pending: Boolean(dataFile.pending) } : null}
+            onRemoveData={onRemoveData}
+            loadingData={loadingData}
+            photos={photos}
+            onPhotos={setPhotos}
+            photoColumn={photoColumn}
+            onPhotoColumn={(c) => {
+              setPhotoColumn(c);
+              setDirty(true);
+            }}
+            previewIndex={previewIndex}
+            missingColumns={missingColumns}
+            beforeGenerate={async () => (dirty ? save() : true)}
+          >
           {/* Fond de la face affichée */}
           <section className="space-y-2 card p-4 shadow-sm">
             <div className="flex items-center justify-between gap-2">
@@ -1271,7 +1338,6 @@ export default function VariableDataEditor({
                     <TrashIcon className="h-3.5 w-3.5" /> Supprimer
                   </button>
                 </div>
-                <AlignBar count={selectedIds.length} onAlign={align} />
                 <p className="text-xs text-neutral-500">
                   Glissez l&apos;une d&apos;elles pour déplacer le groupe ; flèches pour l&apos;ajuster. Maj ou ⌘ + clic
                   ajoute ou retire une zone.
@@ -1285,7 +1351,6 @@ export default function VariableDataEditor({
               </p>
             ) : (
               <div className="space-y-3">
-                <AlignBar count={1} onAlign={align} />
                 <UnitsBar font={selected.kind === "text"} />
                 <div className="grid grid-cols-4 gap-2">
                   {(["x", "y", "width", "height"] as const).map((key) => (
@@ -1392,13 +1457,23 @@ export default function VariableDataEditor({
 
                 {selected.kind === "text" && (
                   <>
-                    <Field label="Police">
-                      <FontPicker
-                        value={selected.fontId}
-                        onChange={(fontId) => updateZone(selected.id, { fontId })}
-                        className={inputClass}
-                      />
-                    </Field>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Field label="Police">
+                        <FontPicker
+                          value={selected.fontId}
+                          onChange={(fontId) => updateZone(selected.id, { fontId })}
+                          className={inputClass}
+                        />
+                      </Field>
+                      <Field label="Graisse">
+                        <FontWeightSelect
+                          fontId={selected.fontId}
+                          value={selected}
+                          onChange={(patch) => updateZone(selected.id, patch)}
+                          className={inputClass}
+                        />
+                      </Field>
+                    </div>
                     <div className="grid grid-cols-2 gap-2">
                       <Field label="Couleur">
                         <div className="mt-1 flex h-9 items-center gap-2">
@@ -1436,7 +1511,7 @@ export default function VariableDataEditor({
                         <input
                           type="checkbox"
                           checked={selected.bold}
-                          onChange={(e) => updateZone(selected.id, { bold: e.target.checked })}
+                          onChange={(e) => updateZone(selected.id, { bold: e.target.checked, weight: undefined })}
                         />
                         Gras
                       </label>
@@ -1561,6 +1636,98 @@ export default function VariableDataEditor({
                 </Field>
               </div>
             )}
+            {sideZones.length > 0 && (
+              // Calques, sous les réglages de la zone sélectionnée : les zones
+              // de la face, la plus en avant en haut (dessinée par-dessus les
+              // autres). Clic : sélectionner ; Maj ou ⌘ + clic : ajouter à la
+              // sélection ; glisser : réordonner.
+              <ul className="mt-1 divide-y divide-neutral-100 overflow-hidden rounded-lg border border-neutral-200">
+                {[...sideZones].reverse().map((z, i, list) => {
+                  const isSelected = selectedIds.includes(z.id);
+                  return (
+                    <li
+                      key={z.id}
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.effectAllowed = "move";
+                        e.dataTransfer.setData("text/plain", z.id);
+                        setLayerDrag({ id: z.id, overId: null, below: false });
+                      }}
+                      onDragOver={(e) => {
+                        if (!layerDrag) return;
+                        e.preventDefault();
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const below = e.clientY > rect.top + rect.height / 2;
+                        if (layerDrag.overId !== z.id || layerDrag.below !== below) setLayerDrag({ ...layerDrag, overId: z.id, below });
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        if (layerDrag?.overId) dropZoneLayer(layerDrag.id, layerDrag.overId, layerDrag.below);
+                        setLayerDrag(null);
+                      }}
+                      onDragEnd={() => setLayerDrag(null)}
+                      className={`flex cursor-grab items-center gap-1 pr-1 text-xs active:cursor-grabbing ${
+                        isSelected ? "bg-primary-subtle" : "hover:bg-neutral-50"
+                      } ${layerDrag?.id === z.id ? "opacity-40" : ""} ${
+                        layerDrag && layerDrag.overId === z.id && layerDrag.id !== z.id
+                          ? layerDrag.below
+                            ? "shadow-[inset_0_-2px_0_0_#2563eb]"
+                            : "shadow-[inset_0_2px_0_0_#2563eb]"
+                          : ""
+                      }`}
+                    >
+                      <span className="pl-1.5 text-neutral-300" aria-hidden="true">
+                        ⋮⋮
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) =>
+                          e.shiftKey || e.metaKey
+                            ? setSelectedIds((sel) => (sel.includes(z.id) ? sel.filter((id) => id !== z.id) : [...sel, z.id]))
+                            : setSelectedId(z.id)
+                        }
+                        className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left"
+                      >
+                        <span className="w-20 shrink-0 text-neutral-500">{CARD_ZONE_LABELS[z.kind]}</span>
+                        <span className="min-w-0 truncate text-text">{zoneLayerName(z)}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => moveZoneLayer(z.id, 1)}
+                        disabled={i === 0}
+                        title="Avancer (par-dessus)"
+                        aria-label="Avancer la zone"
+                        className="rounded p-1 text-neutral-400 hover:text-text disabled:opacity-30"
+                      >
+                        <ChevronUpIcon className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => moveZoneLayer(z.id, -1)}
+                        disabled={i === list.length - 1}
+                        title="Reculer (par-dessous)"
+                        aria-label="Reculer la zone"
+                        className="rounded p-1 text-neutral-400 hover:text-text disabled:opacity-30"
+                      >
+                        <ChevronDownIcon className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeZone(z.id)}
+                        title="Supprimer"
+                        aria-label="Supprimer la zone"
+                        className="rounded p-1 text-neutral-400 hover:bg-danger-subtle hover:text-danger"
+                      >
+                        <TrashIcon className="h-3.5 w-3.5" />
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            {/* Alignements, après les calques : sur la page pour une zone,
+                entre elles pour plusieurs. */}
+            {selectedIds.length > 0 && <AlignBar count={selectedIds.length} onAlign={align} />}
           </section>
 
           {/* Repères et magnétisme */}
@@ -1617,29 +1784,7 @@ export default function VariableDataEditor({
               imprimés.
             </p>
           </section>
-
-          <CardProduction
-            templateId={template.id}
-            apiBase={apiBase}
-            vocab={vocab}
-            templateName={name}
-            zones={zones}
-            data={data}
-            onData={onData}
-            dataFile={dataFile ? { name: dataFile.name, pending: Boolean(dataFile.pending) } : null}
-            onRemoveData={onRemoveData}
-            loadingData={loadingData}
-            photos={photos}
-            onPhotos={setPhotos}
-            photoColumn={photoColumn}
-            onPhotoColumn={(c) => {
-              setPhotoColumn(c);
-              setDirty(true);
-            }}
-            previewIndex={previewIndex}
-            missingColumns={missingColumns}
-            beforeGenerate={async () => (dirty ? save() : true)}
-          />
+          </CardProduction>
         </div>
       </div>
     </div>

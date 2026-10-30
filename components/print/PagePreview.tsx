@@ -1,6 +1,6 @@
 "use client";
 
-import { fontOptionById } from "@/lib/design/fonts";
+import { fontOptionById, fontWeight } from "@/lib/design/fonts";
 import { estimateFitSize, type LaidOutPage, type PrintGeometry } from "@/lib/print/elements";
 import { ensureFontCss } from "@/lib/design/fontLoader";
 
@@ -89,7 +89,7 @@ export default function PagePreview({
             style={{
               ...box(el.x, el.y, el.w, el.h),
               fontFamily: `"${font.family}"`,
-              fontWeight: el.bold ? font.weightBold : font.weightRegular,
+              fontWeight: fontWeight(font, el),
               // Même dessin qu'à l'impression (pas de « taille optique » auto).
               fontOpticalSizing: "none",
               fontSize: cqw(size * PT_TO_MM),

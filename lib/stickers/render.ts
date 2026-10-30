@@ -45,7 +45,7 @@ function hexToRgb(hex: string) {
 // Mesures d'un texte pour 1 mm de corps : largeur, et hauteur ascendante →
 // descendante (pour le centrage vertical et l'ajustement en hauteur).
 function measureZoneText(zone: StickerZone, text: string) {
-  const font = loadInstance(fontOptionById(zone.fontId), false, zone.bold);
+  const font = loadInstance(fontOptionById(zone.fontId), false, zone);
   const run = font.layout(text);
   const advance = run.glyphs.reduce((sum, g) => sum + g.advanceWidth, 0);
   // Approche de la première et de la dernière lettre : retirée, pour que le
@@ -113,7 +113,7 @@ export async function renderStickerSheets(
   layout: StickerSheetLayout
 ): Promise<Buffer> {
   // Polices Google Fonts des zones, téléchargées avant le rendu.
-  await preloadFonts(template.zones.map((z) => ({ fontId: z.fontId, bold: z.bold })));
+  await preloadFonts(template.zones.map((z) => ({ fontId: z.fontId, bold: z.bold, weight: z.weight })));
   const out = await PDFDocument.create();
   const widthPt = mmToPt(layout.sheetWidth);
   const heightPt = mmToPt(layout.sheetHeight);

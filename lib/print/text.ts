@@ -82,7 +82,7 @@ function linePath(font: Font, text: string): string {
 
 export function drawText(page: PDFPage, el: TextElement, pageHeightPt: number) {
   if (!el.text.trim()) return;
-  const font = loadInstance(fontOptionById(el.font), false, el.bold) as Font;
+  const font = loadInstance(fontOptionById(el.font), false, el) as Font;
   const { lines, size } = fitText(font, el);
   const scale = size / font.unitsPerEm;
   const ascent = font.ascent * scale;

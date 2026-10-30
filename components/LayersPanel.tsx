@@ -30,6 +30,7 @@ import {
 import { rangeFillStyle } from "@/components/ui/rangeFill";
 import type { IllustrationWithUrl } from "@/lib/types";
 import FontPicker from "@/components/FontPicker";
+import FontWeightSelect from "@/components/FontWeightSelect";
 
 const SHAPE_OPTIONS: { value: ShapeKind; icon: (props: { className?: string }) => JSX.Element; label: string }[] = [
   { value: "rectangle", icon: SquareIcon, label: "Rectangle" },
@@ -342,6 +343,12 @@ export default function LayersPanel({
             onChange={(fontId) => updateLayer(selectedLayer.id, { fontId })}
             className="w-full rounded-lg border border-border px-2 py-1.5 text-sm"
           />
+          <FontWeightSelect
+            fontId={selectedLayer.fontId}
+            value={selectedLayer}
+            onChange={(patch) => updateLayer(selectedLayer.id, patch)}
+            className="w-full rounded-lg border border-border bg-surface px-2 py-1.5 text-sm"
+          />
 
           <div className="flex items-center gap-3">
             <span className="text-xs text-text-subtle">Taille</span>
@@ -369,7 +376,8 @@ export default function LayersPanel({
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => updateLayer(selectedLayer.id, { bold: !selectedLayer.bold })}
+              // Gras : retour au gras ou au normal de la police (sans graisse choisie).
+              onClick={() => updateLayer(selectedLayer.id, { bold: !selectedLayer.bold, weight: undefined })}
               className={`flex-1 rounded-lg border px-2 py-1.5 text-sm font-bold ${
                 selectedLayer.bold ? "border-primary bg-primary text-text-on-brand" : "border-border text-text-muted hover:bg-surface-muted"
               }`}

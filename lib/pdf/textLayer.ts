@@ -6,7 +6,7 @@
 import { create, openSync, type Font } from "fontkit";
 import path from "path";
 import { mmToPx } from "./units";
-import { fontOptionById, resolveFontFile, type FontOption } from "../design/fonts";
+import { fontOptionById, fontWeight, resolveFontFile, type FontOption } from "../design/fonts";
 import type { TextLayer } from "../design/layers";
 import type { ThemeTextZone } from "../types";
 import { THEME_TEXT_LINE_HEIGHT, fitThemeTextSize, themeTextBlockTop } from "../themeText";
@@ -42,8 +42,7 @@ const googleFontCache = new Map<string, Font>();
 const googleFontPending = new Map<string, Promise<void>>();
 
 // Graisse et style réellement disponibles pour une police Google.
-function googleVariant(font: FontOption, italic: boolean, bold: boolean): { weight: number; ital: 0 | 1; key: string } {
-  const weight = bold ? font.weightBold : font.weightRegular;
+function googleVariant(font: FontOption, italic: boolean, weight: number): { weight: number; ital: 0 | 1; key: string } {
   const ital = italic && (font.italicWeights?.length ?? 0) > 0 ? 1 : 0;
   return { weight, ital, key: `${font.family}|${weight}|${ital}` };
 }
@@ -54,12 +53,14 @@ function googleVariant(font: FontOption, italic: boolean, bold: boolean): { weig
  * fichier TrueType unique, lisible par fontkit. Une police introuvable n'est
  * pas bloquante : le texte retombe sur Inter (voir loadInstance).
  */
-export async function preloadFonts(requests: { fontId: string; italic?: boolean; bold?: boolean }[]): Promise<void> {
+export async function preloadFonts(
+  requests: { fontId: string; italic?: boolean; bold?: boolean; weight?: number | null }[]
+): Promise<void> {
   await Promise.all(
-    requests.map(({ fontId, italic = false, bold = false }) => {
+    requests.map(({ fontId, italic = false, bold = false, weight: chosen }) => {
       const font = fontOptionById(fontId);
       if (!font.google) return Promise.resolve();
-      const { weight, ital, key } = googleVariant(font, italic, bold);
+      const { weight, ital, key } = googleVariant(font, italic, fontWeight(font, { bold, weight: chosen }));
       if (googleFontCache.has(key)) return Promise.resolve();
       let pending = googleFontPending.get(key);
       if (!pending) {
@@ -84,15 +85,16 @@ export async function preloadFonts(requests: { fontId: string; italic?: boolean;
   );
 }
 
-export function loadInstance(font: FontOption, italic: boolean, bold: boolean): Font {
+// `style` : le gras d'avant et/ou la graisse choisie (voir fontWeight).
+export function loadInstance(font: FontOption, italic: boolean, style: { bold?: boolean; weight?: number | null }): Font {
+  const weight = fontWeight(font, style);
   if (font.google) {
-    const cached = googleFontCache.get(googleVariant(font, italic, bold).key);
+    const cached = googleFontCache.get(googleVariant(font, italic, weight).key);
     if (cached) return cached;
     // Non chargée (voir preloadFonts) : Inter plutôt qu'un rendu en erreur.
-    return loadInstance(fontOptionById("inter"), italic, bold);
+    return loadInstance(fontOptionById("inter"), italic, style);
   }
   const filePath = resolveFontFile(font, italic);
-  const weight = bold ? font.weightBold : font.weightRegular;
   const key = `${filePath}:${weight}`;
   const cached = variationCache.get(key);
   if (cached) return cached;
@@ -143,7 +145,7 @@ export function textLayerToSvgGroup(
   dpi: number
 ): string {
   const fontOption = fontOptionById(layer.fontId);
-  const instance = loadInstance(fontOption, layer.italic, layer.bold);
+  const instance = loadInstance(fontOption, layer.italic, layer);
   const fontSizePx = mmToPx(layer.fontSizeMm, dpi);
   // Interligne courant (1.25×) — les polices n'exposent pas toutes une
   // valeur d'interligne "recommandée" fiable pour du texte court comme ici.
@@ -226,7 +228,7 @@ export function themeTextToSvgGroup(
   dpi: number
 ): string {
   if (!text.trim()) return "";
-  const instance = loadInstance(fontOptionById(zone.fontId), zone.italic, zone.bold);
+  const instance = loadInstance(fontOptionById(zone.fontId), zone.italic, zone);
   const boxW = zone.widthRatio * targetWidthPx;
   const boxH = zone.heightRatio * targetHeightPx;
   const baseSizePx = mmToPx(zone.fontSizeMm, dpi);

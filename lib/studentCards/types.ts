@@ -2,7 +2,7 @@
 // Types et règles pures, partagés entre l'éditeur (écran) et le rendu PDF
 // (serveur). Voir supabase/migrations/0079_student_cards.sql.
 
-import { FONT_OPTIONS, isKnownFontId } from "@/lib/design/fonts";
+import { FONT_OPTIONS, isKnownFontId, sanitizeWeight } from "@/lib/design/fonts";
 
 export type CardSide = "front" | "back";
 export const CARD_SIDES: CardSide[] = ["front", "back"];
@@ -60,6 +60,9 @@ export interface CardZone {
   // Texte
   fontId: string;
   bold: boolean;
+  // Graisse choisie (100 à 900, voir fontWeight dans lib/design/fonts.ts).
+  // Absente = `bold` décide (gras ou normal), comme avant.
+  weight?: number;
   uppercase: boolean;
   color: string; // #rrggbb
   align: ZoneAlign;
@@ -228,6 +231,7 @@ export function parseCardZones(raw: unknown, cardW: number, cardH: number): Card
       content: typeof z.content === "string" ? z.content.slice(0, 500) : "",
       fontId: isKnownFontId(z.fontId) ? z.fontId : FONT_OPTIONS[0].id,
       bold: z.bold === true,
+      ...(sanitizeWeight(z.weight) ? { weight: sanitizeWeight(z.weight) } : {}),
       uppercase: z.uppercase === true,
       color: typeof z.color === "string" && /^#[0-9a-f]{6}$/i.test(z.color) ? z.color : "#1a1613",
       align: z.align === "center" || z.align === "right" ? z.align : "left",

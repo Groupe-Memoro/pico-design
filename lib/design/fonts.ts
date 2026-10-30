@@ -31,6 +31,48 @@ export interface FontOption {
   // graisse variable — une seule et même police, instanciée différemment).
   weightRegular: number;
   weightBold: number;
+  // Toutes les graisses proposées (voir fontWeight) ; absent = normal et gras.
+  weights?: number[];
+}
+
+// Nom d'usage des graisses, pour les menus.
+export const WEIGHT_LABELS: Record<number, string> = {
+  100: "Thin",
+  200: "Extra-light",
+  300: "Light",
+  400: "Regular",
+  500: "Medium",
+  600: "Semibold",
+  700: "Bold",
+  800: "Extra-bold",
+  900: "Black",
+  1000: "Extra-black",
+};
+
+// Graisses offertes par une police : celles du catalogue Google (aussi pour
+// les polices fournies à graisse variable, de la même famille), sinon normal
+// et gras.
+export function fontWeights(font: FontOption): number[] {
+  if (font.weights?.length) return font.weights;
+  const entry = googleEntry(font.family);
+  if (entry) return entry[2].split(",").map(Number);
+  return Array.from(new Set([font.weightRegular, font.weightBold]));
+}
+
+/**
+ * Graisse réelle d'un texte : la graisse choisie (`weight`, ramenée à la plus
+ * proche que la police propose), sinon le gras ou le normal de la police —
+ * les textes enregistrés avant le choix de la graisse n'ont que `bold`.
+ */
+export function fontWeight(font: FontOption, style: { bold?: boolean; weight?: number | null }): number {
+  if (typeof style.weight === "number" && Number.isFinite(style.weight)) return nearest(fontWeights(font), style.weight);
+  return style.bold ? font.weightBold : font.weightRegular;
+}
+
+// Graisse reçue d'un formulaire ou de la base : un nombre de 100 à 1000, sinon absente.
+export function sanitizeWeight(raw: unknown): number | undefined {
+  const n = Number(raw);
+  return raw != null && raw !== "" && Number.isFinite(n) && n >= 100 && n <= 1000 ? Math.round(n / 100) * 100 : undefined;
 }
 
 export const FONT_OPTIONS: FontOption[] = [
@@ -292,6 +334,7 @@ function googleOption([family, category, weights, italicWeights]: GoogleFontEntr
     weightBold: heavier.length ? nearest(heavier, 700) : regular,
     google: true,
     italicWeights: italicWeights ? italicWeights.split(",").map(Number) : [],
+    weights: list,
   };
 }
 

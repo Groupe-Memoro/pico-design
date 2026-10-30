@@ -53,6 +53,7 @@ import {
 import type { PdfPagePlan } from "@/lib/pdf/pdfPages";
 import FontPicker from "@/components/FontPicker";
 import { templateSizeLabel } from "@/lib/templateLabel";
+import FontWeightSelect from "@/components/FontWeightSelect";
 
 // En dessous de ce zoom (voir ImageSourcePicker : 1 = cadrage "cover", pile
 // à la limite), une marge blanche apparaît autour du visuel — il ne couvre
@@ -574,7 +575,8 @@ export default function DesignEditor({
   }
   function toggleBold() {
     if (selectedLayer?.type !== "text") return;
-    updateTextLayer({ bold: !selectedLayer.bold });
+    // Gras : retour au gras ou au normal de la police (sans graisse choisie).
+    updateTextLayer({ bold: !selectedLayer.bold, weight: undefined });
   }
   function toggleItalic() {
     if (selectedLayer?.type !== "text") return;
@@ -1382,6 +1384,12 @@ export default function DesignEditor({
                 value={selectedLayer.fontId}
                 onChange={(fontId) => updateTextLayer({ fontId })}
                 className="w-44 rounded-lg border border-border bg-surface px-2 py-1.5 text-sm"
+              />
+              <FontWeightSelect
+                fontId={selectedLayer.fontId}
+                value={selectedLayer}
+                onChange={(patch) => updateTextLayer(patch)}
+                className="w-32 rounded-lg border border-border bg-surface px-2 py-1.5 text-sm"
               />
               <FontSizeInput
                 valueMm={selectedLayer.fontSizeMm}

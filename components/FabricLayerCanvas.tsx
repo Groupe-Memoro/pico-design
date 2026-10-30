@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Canvas, FabricObject } from "fabric";
-import { fontOptionById } from "@/lib/design/fonts";
+import { fontOptionById, fontWeight } from "@/lib/design/fonts";
 import type { DesignLayer } from "@/lib/design/layers";
 import { loadFont } from "@/lib/design/fontLoader";
 
@@ -159,14 +159,14 @@ export default function FabricLayerCanvas({
 
   // Polices : le canevas mesure le texte à sa création ; une police chargée
   // après coup demande de le remesurer.
-  const fontsKey = layers.map((l) => (l.type === "text" ? `${l.fontId}:${l.bold}:${l.italic}` : "")).join("|");
+  const fontsKey = layers.map((l) => (l.type === "text" ? `${l.fontId}:${l.bold}:${l.weight ?? ""}:${l.italic}` : "")).join("|");
   useEffect(() => {
     const loads = layers
       .filter((l): l is Extract<DesignLayer, { type: "text" }> => l.type === "text")
       .map((l) => {
         const f = fontOptionById(l.fontId);
         // Police Google : sa feuille de style d'abord (voir fontLoader).
-        return loadFont(l.fontId, `${l.italic ? "italic " : ""}${l.bold ? f.weightBold : f.weightRegular} 32px "${f.family}"`);
+        return loadFont(l.fontId, `${l.italic ? "italic " : ""}${fontWeight(f, l)} 32px "${f.family}"`);
       });
     Promise.all(loads).then(() => setFontsTick((t) => t + 1)).catch(() => undefined);
   }, [fontsKey]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -210,7 +210,7 @@ export default function FabricLayerCanvas({
           ...common,
           fontFamily: font.family,
           fontSize,
-          fontWeight: layer.bold ? font.weightBold : font.weightRegular,
+          fontWeight: fontWeight(font, layer),
           fontStyle: layer.italic ? ("italic" as const) : ("normal" as const),
           fill: layer.color,
           lineHeight: 1.25,

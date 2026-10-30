@@ -79,6 +79,9 @@ export interface TextLayer extends BaseLayer {
   // cohérent quel que soit le DPI d'impression ou le zoom de l'aperçu).
   fontSizeMm: number;
   bold: boolean;
+  // Graisse choisie (100 à 900, voir fontWeight dans lib/design/fonts.ts).
+  // Absente = `bold` décide (gras ou normal), comme avant.
+  weight?: number;
   italic: boolean;
   // Espacement entre les lettres, en mm (0 = normal, négatif = resserré) —
   // même principe que fontSizeMm : une unité physique, cohérente quel que

@@ -103,7 +103,7 @@ export async function composeThemeImage(
   composites.push({ input: overlayResized, left: 0, top: 0 });
 
   if (text && text.zones.length > 0) {
-    await preloadFonts(text.zones.map((z) => ({ fontId: z.fontId, italic: z.italic, bold: z.bold })));
+    await preloadFonts(text.zones.map((z) => ({ fontId: z.fontId, italic: z.italic, bold: z.bold, weight: z.weight })));
     const groups = text.zones
       .map((zone, i) => themeTextToSvgGroup(zone, themeZoneText(zone, text.texts[i]), targetWidthPx, targetHeightPx, text.dpi))
       .join("");

@@ -1,4 +1,4 @@
-import { isKnownFontId } from "@/lib/design/fonts";
+import { isKnownFontId, sanitizeWeight } from "@/lib/design/fonts";
 import { normalizeRotation } from "@/lib/themeShapes";
 import type { ThemeTextAlign, ThemeTextVerticalAlign, ThemeTextZone } from "@/lib/types";
 
@@ -81,6 +81,7 @@ function sanitizeTextZone(raw: unknown, index: number): ThemeTextZone | null {
     fontId,
     fontSizeMm: clamp(num(r.fontSizeMm, 10), 1, 500),
     bold: r.bold === true,
+    ...(sanitizeWeight(r.weight) ? { weight: sanitizeWeight(r.weight) } : {}),
     italic: r.italic === true,
     color,
     align,

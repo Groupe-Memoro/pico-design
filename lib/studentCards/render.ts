@@ -85,7 +85,7 @@ function enterZone(page: PDFPage, zone: CardZone, cardHeightMm: number) {
 // le dessin des lettres touche le bord de la zone (l'approche de la première
 // et de la dernière lettre est retirée).
 function drawText(page: PDFPage, zone: CardZone, text: string, cardHeightMm: number) {
-  const font = loadInstance(fontOptionById(zone.fontId), false, zone.bold);
+  const font = loadInstance(fontOptionById(zone.fontId), false, zone);
   const run = font.layout(text);
   const advance = run.glyphs.reduce((sum, g) => sum + g.advanceWidth, 0);
   const first = run.glyphs[0];
@@ -226,7 +226,7 @@ export async function renderStudentCards(
   images: Map<string, Buffer> = new Map()
 ): Promise<{ pdf: Buffer; warnings: string[] }> {
   const textZones = template.zones.filter((z) => z.kind === "text");
-  await preloadFonts(textZones.map((z) => ({ fontId: z.fontId, bold: z.bold })));
+  await preloadFonts(textZones.map((z) => ({ fontId: z.fontId, bold: z.bold, weight: z.weight })));
   const out = await PDFDocument.create();
   const W = Number(template.width_mm);
   const H = Number(template.height_mm);

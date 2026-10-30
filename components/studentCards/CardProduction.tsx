@@ -44,6 +44,7 @@ export default function CardProduction({
   previewIndex,
   missingColumns,
   beforeGenerate,
+  children,
 }: {
   templateId: string;
   // « /api/student-cards » ou « /api/data-templates ».
@@ -66,6 +67,9 @@ export default function CardProduction({
   previewIndex: number;
   missingColumns: string[];
   beforeGenerate: () => Promise<boolean>;
+  // Le reste de la colonne (fond, zones, repères), entre le fichier des
+  // données — par où l'on commence — et la production, par où l'on finit.
+  children?: React.ReactNode;
 }) {
   const [photoFiles, setPhotoFiles] = useState<File[]>([]);
   const [loadingPhotos, setLoadingPhotos] = useState(false);
@@ -202,11 +206,11 @@ export default function CardProduction({
 
   const busy = progress !== null;
   return (
+    <>
     <section className="space-y-3 card p-4 shadow-sm">
-      <h2 className="text-sm font-semibold text-text">Produire les {vocab.pages}</h2>
+      <h2 className="text-sm font-semibold text-text">Fichier des {vocab.rows} (Excel ou CSV)</h2>
 
       <div className="space-y-1">
-        <span className="label">1. Fichier des {vocab.rows} (Excel ou CSV)</span>
         <input
           type="file"
           accept=".csv,.txt,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -255,7 +259,7 @@ export default function CardProduction({
 
       {needsPhoto && (
         <div className="space-y-1 border-t border-neutral-100 pt-3">
-          <span className="label">2. Photos</span>
+          <span className="label">Photos</span>
           <label className="block text-xs text-neutral-600">
             Colonne qui désigne la photo
             <select
@@ -320,11 +324,15 @@ export default function CardProduction({
         </div>
       )}
 
+    </section>
+
+    {children}
+
+    <section className="space-y-3 card p-4 shadow-sm">
+      <h2 className="text-sm font-semibold text-text">Produire les {vocab.pages}</h2>
       {data && (
-        <div className="space-y-2 border-t border-neutral-100 pt-3">
-          <span className="label">
-            {needsPhoto ? "3" : "2"}. Ordre des {vocab.pages}
-          </span>
+        <div className="space-y-2">
+          <span className="label">Ordre des {vocab.pages}</span>
           {sortKeys.length === 0 && <p className="text-xs text-neutral-500">Dans l&apos;ordre du fichier.</p>}
           {sortKeys.map((key, i) => (
             <div key={i} className="flex items-center gap-2">
@@ -392,7 +400,7 @@ export default function CardProduction({
         </div>
       )}
 
-      <div className="space-y-2 border-t border-neutral-100 pt-3">
+      <div className={`space-y-2 ${data ? "border-t border-neutral-100 pt-3" : ""}`}>
         {error && <p className="text-xs text-danger">{error}</p>}
         <button
           type="button"
@@ -451,5 +459,6 @@ export default function CardProduction({
         </Modal>
       )}
     </section>
+    </>
   );
 }

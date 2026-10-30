@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Modal from "@/components/Modal";
 import { CopyIcon, DownloadIcon, SpinnerIcon, TrashIcon } from "@/components/icons";
-import { fontOptionById } from "@/lib/design/fonts";
+import { fontOptionById, fontWeight } from "@/lib/design/fonts";
 import { sheetLabel } from "@/lib/imposition/presets";
 import { stickerSheetLayout } from "@/lib/stickers/layout";
 import type { ImpositionCutter, ImpositionSheet } from "@/lib/types";
@@ -27,6 +27,7 @@ import { FontSizeInput, LengthInput, UnitsBar, unitLabel, useFontUnit, useLength
 import { loadFont } from "@/lib/design/fontLoader";
 import { measureInk } from "@/lib/design/inkMeasure";
 import { formatInMm } from "@/lib/pdf/units";
+import FontWeightSelect from "@/components/FontWeightSelect";
 
 const ASSET_HELP: Record<StickerAsset, string> = {
   artwork: "La planche du graphiste, sans le nom. Imprimée sous le texte.",
@@ -53,7 +54,7 @@ function useTextMeasure(fontsVersion: number) {
     (zone: StickerZone, text: string) => {
       const font = fontOptionById(zone.fontId);
       // Encre mesurée au pixel (voir measureInk) : fiable dans tous les navigateurs.
-      const ink = measureInk(`${zone.bold ? font.weightBold : font.weightRegular} "${font.family}"`, text, fontsVersion);
+      const ink = measureInk(`${fontWeight(font, zone)} "${font.family}"`, text, fontsVersion);
       return { widthPerMm: ink.left + ink.right, heightPerMm: ink.height, left: ink.left, right: ink.right };
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -111,11 +112,11 @@ export default function StickerTemplateEditor({
 
   // Polices de l'aperçu : la mesure du texte n'est juste qu'une fois chargées.
   const [fontsVersion, setFontsVersion] = useState(0);
-  const usedFonts = useMemo(() => Array.from(new Set(zones.map((z) => `${z.fontId}:${z.bold}`))).join(","), [zones]);
+  const usedFonts = useMemo(() => Array.from(new Set(zones.map((z) => `${z.fontId}:${z.bold}:${z.weight ?? ""}`))).join(","), [zones]);
   useEffect(() => {
     const loads = zones.map((z) => {
       const f = fontOptionById(z.fontId);
-      return loadFont(z.fontId, `${z.bold ? f.weightBold : f.weightRegular} 20px "${f.family}"`);
+      return loadFont(z.fontId, `${fontWeight(f, z)} 20px "${f.family}"`);
     });
     Promise.all(loads)
       .then(() => setFontsVersion((v) => v + 1))
@@ -245,7 +246,7 @@ export default function StickerTemplateEditor({
         const last = zones[zones.length - 1];
         const zone = clampZone(
           newZone({
-            ...(last ? { fontId: last.fontId, bold: last.bold, uppercase: last.uppercase, color: last.color, align: last.align } : {}),
+            ...(last ? { fontId: last.fontId, bold: last.bold, weight: last.weight, uppercase: last.uppercase, color: last.color, align: last.align } : {}),
             x,
             y,
             width,
@@ -472,7 +473,7 @@ export default function StickerTemplateEditor({
                       y={0}
                       transform={`scale(${size / 100})`}
                       fontFamily={`"${font.family}"`}
-                      fontWeight={z.bold ? font.weightBold : font.weightRegular}
+                      fontWeight={fontWeight(font, z)}
                       fontSize={100}
                       fill={z.color}
                       textAnchor="start"
@@ -673,13 +674,23 @@ export default function StickerTemplateEditor({
                     </Field>
                   ))}
                 </div>
-                <Field label="Police">
-                  <FontPicker
-                    value={selected.fontId}
-                    onChange={(fontId) => updateZone(selected.id, { fontId })}
-                    className={inputClass}
-                  />
-                </Field>
+                <div className="grid grid-cols-2 gap-2">
+                  <Field label="Police">
+                    <FontPicker
+                      value={selected.fontId}
+                      onChange={(fontId) => updateZone(selected.id, { fontId })}
+                      className={inputClass}
+                    />
+                  </Field>
+                  <Field label="Graisse">
+                    <FontWeightSelect
+                      fontId={selected.fontId}
+                      value={selected}
+                      onChange={(patch) => updateZone(selected.id, patch)}
+                      className={inputClass}
+                    />
+                  </Field>
+                </div>
                 <div className="grid grid-cols-3 gap-2">
                   <Field label="Couleur">
                     <div className="mt-1 flex h-9 items-center">
@@ -728,7 +739,7 @@ export default function StickerTemplateEditor({
                     <input
                       type="checkbox"
                       checked={selected.bold}
-                      onChange={(e) => updateZone(selected.id, { bold: e.target.checked })}
+                      onChange={(e) => updateZone(selected.id, { bold: e.target.checked, weight: undefined })}
                     />
                     Gras
                   </label>

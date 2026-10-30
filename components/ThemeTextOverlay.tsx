@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { fontOptionById } from "@/lib/design/fonts";
+import { fontOptionById, fontWeight } from "@/lib/design/fonts";
 import { MAX_THEME_TEXT_LENGTH, THEME_TEXT_LINE_HEIGHT, fitThemeTextSize, themeTextBlockTop, themeZoneText } from "@/lib/themeText";
 import type { ThemeTextZone } from "@/lib/types";
 import { loadFont } from "@/lib/design/fontLoader";
@@ -84,7 +84,7 @@ export default function ThemeTextOverlay({
               textAlign: zone.align,
               color: zone.color,
               fontFamily: `"${font.family}"`,
-              fontWeight: zone.bold ? font.weightBold : font.weightRegular,
+              fontWeight: fontWeight(font, zone),
               fontStyle: zone.italic ? "italic" : "normal",
               fontSize: size,
               lineHeight: THEME_TEXT_LINE_HEIGHT,
@@ -135,7 +135,7 @@ function EditableZone({
   const font = fontOptionById(zone.fontId);
   const textStyle: React.CSSProperties = {
     fontFamily: `"${font.family}"`,
-    fontWeight: zone.bold ? font.weightBold : font.weightRegular,
+    fontWeight: fontWeight(font, zone),
     fontStyle: zone.italic ? "italic" : "normal",
     fontSize: size,
     lineHeight: THEME_TEXT_LINE_HEIGHT,
@@ -202,7 +202,7 @@ function EditableZone({
 
 function fontSpec(zone: ThemeTextZone, sizePx: number): string {
   const font = fontOptionById(zone.fontId);
-  return `${zone.italic ? "italic " : ""}${zone.bold ? font.weightBold : font.weightRegular} ${sizePx}px "${font.family}"`;
+  return `${zone.italic ? "italic " : ""}${fontWeight(font, zone)} ${sizePx}px "${font.family}"`;
 }
 
 let measureCanvas: HTMLCanvasElement | null = null;

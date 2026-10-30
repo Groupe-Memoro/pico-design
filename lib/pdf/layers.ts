@@ -2,6 +2,7 @@ import sharp from "sharp";
 import type { Blend, OverlayOptions } from "sharp";
 import { preloadFonts, textLayerToSvgGroup } from "./textLayer";
 import { shapeLayerToSvgGroup } from "./shapeLayer";
+import { sanitizeWeight } from "../design/fonts";
 import {
   layerImageFieldName,
   type BlendMode,
@@ -49,7 +50,7 @@ export async function compositeLayers(
   if (layers.length === 0) return base;
   // Polices Google Fonts des calques de texte, téléchargées avant le rendu.
   await preloadFonts(
-    layers.flatMap((r) => (r.type === "text" ? [{ fontId: r.layer.fontId, italic: r.layer.italic, bold: r.layer.bold }] : []))
+    layers.flatMap((r) => (r.type === "text" ? [{ fontId: r.layer.fontId, italic: r.layer.italic, bold: r.layer.bold, weight: r.layer.weight }] : []))
   );
 
   const overlays: OverlayOptions[] = [];
@@ -175,6 +176,7 @@ function coerceTextLayer(raw: Record<string, unknown>): TextLayer | null {
     fontId: typeof raw.fontId === "string" ? raw.fontId : "inter",
     fontSizeMm: typeof raw.fontSizeMm === "number" && raw.fontSizeMm > 0 ? raw.fontSizeMm : 10,
     bold: Boolean(raw.bold),
+    ...(sanitizeWeight(raw.weight) ? { weight: sanitizeWeight(raw.weight) } : {}),
     italic: Boolean(raw.italic),
     letterSpacingMm: typeof raw.letterSpacingMm === "number" && Number.isFinite(raw.letterSpacingMm) ? raw.letterSpacingMm : 0,
     color: isHexColor(raw.color) ? raw.color : "#000000",

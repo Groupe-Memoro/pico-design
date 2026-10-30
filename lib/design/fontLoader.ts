@@ -1,8 +1,8 @@
-import { fontOptionById } from "@/lib/design/fonts";
+import { fontOptionById, fontWeights } from "@/lib/design/fonts";
 
 /**
  * Navigateur : feuille de style Google Fonts d'une police du catalogue
- * (normal, gras et leurs italiques disponibles), ajoutée une seule fois à la
+ * (toutes ses graisses et leurs italiques disponibles), ajoutée une seule fois à la
  * page. La promesse se résout quand la feuille est chargée — ses @font-face
  * existent alors, et document.fonts.load peut attendre la police elle-même.
  * Sans effet pour les polices fournies (déclarées dans globals.css).
@@ -18,7 +18,8 @@ export function ensureFontCss(fontId: string): Promise<void> {
 
   const nearest = (list: number[], target: number) =>
     list.reduce((best, w) => (Math.abs(w - target) < Math.abs(best - target) ? w : best), list[0]);
-  const weights = Array.from(new Set([font.weightRegular, font.weightBold]));
+  // Toutes les graisses de la famille : le navigateur ne télécharge que celles affichées.
+  const weights = fontWeights(font).slice();
   const italics = font.italicWeights?.length
     ? Array.from(new Set(weights.map((w) => nearest(font.italicWeights!, w))))
     : [];
