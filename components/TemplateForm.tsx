@@ -118,8 +118,7 @@ export default function TemplateForm({
   // Les dimensions sont toujours stockées en mm ; ces helpers ne font que
   // convertir l'affichage/la saisie selon l'unité choisie.
   function toDisplay(mm: number): number {
-    if (unit === "mm") return mm;
-    return Math.round(mmToIn(mm) * 1000) / 1000;
+    return Math.round((unit === "mm" ? mm : mmToIn(mm)) * 1000) / 1000;
   }
 
   function updateFromDisplay(
@@ -683,7 +682,7 @@ function FoldSection({
   unit: Unit;
   onChange: (fold: FoldConfig | null) => void;
 }) {
-  const fmt = (mm: number) => (unit === "mm" ? `${Math.round(mm * 10) / 10} mm` : `${Math.round(mmToIn(mm) * 1000) / 1000} po`);
+  const fmt = (mm: number) => (unit === "mm" ? `${Math.round(mm * 1000) / 1000} mm` : `${Math.round(mmToIn(mm) * 1000) / 1000} po`);
   const set = (patch: Partial<FoldConfig>) => onChange(parseFold({ ...(fold ?? {}), ...patch }));
   const length = fold ? foldAxisLength(fold, widthMm, heightMm) : 0;
 
@@ -759,7 +758,7 @@ function FoldSection({
               type="number"
               step="any"
               min={0}
-              value={unit === "mm" ? fold.safetyMm : Math.round(mmToIn(fold.safetyMm) * 1000) / 1000}
+              value={Math.round((unit === "mm" ? fold.safetyMm : mmToIn(fold.safetyMm)) * 1000) / 1000}
               onChange={(e) => set({ safetyMm: unit === "mm" ? Number(e.target.value) : inToMm(Number(e.target.value)) })}
               className="w-24 rounded border border-neutral-300 px-2 py-1.5"
             />

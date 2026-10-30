@@ -11,7 +11,7 @@ function round(value: number, decimals: number): number {
 }
 
 function toDisplayValue(mm: number, unit: Unit): number {
-  return unit === "mm" ? round(mm, 2) : round(mmToIn(mm), 3);
+  return unit === "mm" ? round(mm, 3) : round(mmToIn(mm), 3);
 }
 
 export function UnitToggle({ unit, onChange }: { unit: Unit; onChange: (unit: Unit) => void }) {

@@ -2,6 +2,7 @@ import { requireApiUser, serverError } from "@/lib/api";
 import { NextResponse } from "next/server";
 import { ALLOWED_VISUAL_TYPES, prepareUploadedFile } from "@/lib/visualUpload";
 import { storageFileName } from "@/lib/storageName";
+import { detectPattern } from "@/lib/visualPattern";
 
 export const runtime = "nodejs"; // la rasterisation PDF a besoin du runtime Node, pas Edge.
 
@@ -14,6 +15,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   const name = formData.get("name");
   const file = formData.get("file");
   const collectionId = formData.get("collectionId");
+  const isPattern = formData.get("isPattern");
 
   if (typeof name !== "string") {
     return NextResponse.json({ error: "Paramètre manquant (name)." }, { status: 400 });
@@ -23,6 +25,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     name,
     collection_id: typeof collectionId === "string" && collectionId ? collectionId : null,
   };
+  // Absent = inchangé ; "auto" = deviné d'après l'image (voir plus bas).
+  if (isPattern === "true" || isPattern === "false") update.is_pattern = isPattern === "true";
 
   let previousPath: string | null = null;
   if (file instanceof File && file.size > 0) {
@@ -57,6 +61,17 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     }
     update.file_path = filePath;
     update.mime_type = prepared.contentType;
+    if (isPattern === "auto") update.is_pattern = await detectPattern(prepared.buffer, prepared.contentType);
+  }
+  if (isPattern === "auto" && update.is_pattern === undefined) {
+    // Pas de nouveau fichier : détection sur le fichier actuel.
+    const { data: current } = await supabase
+      .from("visuals")
+      .select("file_path, mime_type")
+      .eq("id", params.id)
+      .single<{ file_path: string; mime_type: string }>();
+    const { data: blob } = current ? await supabase.storage.from("visuals").download(current.file_path) : { data: null };
+    if (current && blob) update.is_pattern = await detectPattern(Buffer.from(await blob.arrayBuffer()), current.mime_type);
   }
 
   const { data, error } = await supabase

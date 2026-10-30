@@ -13,6 +13,18 @@ import type { Visual, VisualCollection } from "@/lib/types";
 
 export type VisualWithUrl = Visual & { fileUrl: string | null };
 
+// Pastille « Motif » des visuels répétables (banque et sélecteur de visuel).
+export function PatternBadge({ className = "" }: { className?: string }) {
+  return (
+    <span
+      title="Motif répétable"
+      className={`rounded-full bg-pico-maroon px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white ${className}`}
+    >
+      Motif
+    </span>
+  );
+}
+
 type ModalState =
   | { mode: "create" }
   | { mode: "edit"; visual: VisualWithUrl }
@@ -30,10 +42,12 @@ export default function VisualsGrid({
   const [isPending, startTransition] = useTransition();
   const [search, setSearch] = useState("");
   const [collectionId, setCollectionId] = useState("");
+  const [kind, setKind] = useState<"" | "pattern" | "single">("");
   const [modal, setModal] = useState<ModalState>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const selection = useSelection();
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [detecting, setDetecting] = useState(false);
 
   function refresh() {
     startTransition(() => router.refresh());
@@ -48,8 +62,9 @@ export default function VisualsGrid({
     () =>
       visuals
         .filter((v) => (collectionId ? v.collection_id === collectionId : true))
+        .filter((v) => (kind === "pattern" ? v.is_pattern : kind === "single" ? !v.is_pattern : true))
         .filter((v) => v.name.toLowerCase().includes(search.trim().toLowerCase())),
-    [visuals, search, collectionId]
+    [visuals, search, collectionId, kind]
   );
 
   function handleSuccess() {
@@ -68,6 +83,28 @@ export default function VisualsGrid({
       return;
     }
     refresh();
+  }
+
+  // Détection des motifs répétables : sur la sélection, sinon sur toute la banque.
+  async function detectPatterns(ids?: string[]) {
+    setDetecting(true);
+    const res = await fetch("/api/visuals/detect-patterns", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(ids ? { ids } : {}),
+    });
+    const data = await res.json().catch(() => ({}));
+    setDetecting(false);
+    if (!res.ok) {
+      alert(data.error ?? "Erreur lors de la détection.");
+      return;
+    }
+    refresh();
+    alert(
+      data.marked > 0
+        ? `${data.marked} motif${data.marked > 1 ? "s" : ""} répétable${data.marked > 1 ? "s" : ""} détecté${data.marked > 1 ? "s" : ""} sur ${data.checked} visuel${data.checked > 1 ? "s" : ""} analysé${data.checked > 1 ? "s" : ""}.`
+        : `Aucun motif répétable détecté (${data.checked} visuel${data.checked > 1 ? "s" : ""} analysé${data.checked > 1 ? "s" : ""}).`
+    );
   }
 
   async function handleBulkDelete() {
@@ -145,12 +182,30 @@ export default function VisualsGrid({
               ))}
             </select>
           </div>
+          <div>
+            <label className="label">Type</label>
+            <select value={kind} onChange={(e) => setKind(e.target.value as typeof kind)} className="mt-1 input">
+              <option value="">— Tous —</option>
+              <option value="pattern">Motifs répétables</option>
+              <option value="single">Visuels simples</option>
+            </select>
+          </div>
           <button
             type="button"
             onClick={() => setModal({ mode: "collections" })}
             className="rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-50"
           >
             Gérer les collections
+          </button>
+          <button
+            type="button"
+            onClick={() => detectPatterns()}
+            disabled={detecting}
+            title="Analyse les visuels qui ne sont pas encore marqués comme motifs"
+            className="flex items-center gap-2 rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-50 disabled:opacity-50"
+          >
+            {detecting && <SpinnerIcon className="h-4 w-4" />}
+            Détecter les motifs
           </button>
           {filtered.length > 0 && (
             <button
@@ -170,7 +225,17 @@ export default function VisualsGrid({
         deleting={bulkDeleting}
         onDelete={handleBulkDelete}
         onClear={selection.clear}
-      />
+      >
+        <button
+          type="button"
+          onClick={() => detectPatterns([...selection.selected])}
+          disabled={detecting}
+          className="flex items-center gap-2 rounded-lg border border-neutral-300 bg-surface px-3 py-1.5 text-neutral-600 hover:bg-neutral-50 disabled:opacity-50"
+        >
+          {detecting && <SpinnerIcon className="h-4 w-4" />}
+          Détecter les motifs
+        </button>
+      </BulkActionsBar>
 
       {filtered.length === 0 ? (
         <p className="card p-4 text-sm text-neutral-500">
@@ -192,6 +257,7 @@ export default function VisualsGrid({
                   onChange={() => selection.toggle(v.id)}
                   className="absolute left-2 top-2 h-4 w-4"
                 />
+                {v.is_pattern && <PatternBadge className="absolute right-2 top-2" />}
                 {v.fileUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={`/api/visuals/${v.id}/thumbnail?v=${encodeURIComponent(v.file_path)}`} alt={v.name} loading="lazy" decoding="async" className="max-h-full max-w-full object-contain" />

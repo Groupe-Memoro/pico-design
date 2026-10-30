@@ -9,6 +9,8 @@ import Link from "next/link";
 import ImageSourcePicker, {
   type ImageSourceValue,
 } from "@/components/ImageSourcePicker";
+import ThemePartFiller, { emptyFill, renderThemePart, type CardTheme, type ThemePartFill } from "@/components/ThemePartFiller";
+import { partSide, themePartChoices, themeParts } from "@/lib/themeParts";
 import type { VisualWithUrl } from "@/components/VisualsGrid";
 import type { ThemeWithOverlayUrl } from "@/components/ThemesTable";
 import type { Category, Template, ThemeSlotAdjust, IllustrationWithUrl } from "@/lib/types";
@@ -40,6 +42,7 @@ import { rangeFillStyle } from "@/components/ui/rangeFill";
 import FileVisualCard from "@/components/ui/FileVisualCard";
 import LayersPanel from "@/components/LayersPanel";
 import ColorPickerButton from "@/components/ColorPickerButton";
+import { FontSizeInput, useFontUnit } from "@/components/UnitInputs";
 import {
   layersFullyCoverCanvas,
   maxTextSizeMmForTemplate,
@@ -285,6 +288,8 @@ export default function DesignEditor({
   onRotatedChange,
   visuals,
   themesForTemplate,
+  cardTheme = null,
+  setCardTheme,
   illustrations,
   front,
   back,
@@ -315,6 +320,10 @@ export default function DesignEditor({
   onRotatedChange: (rotated: boolean) => void;
   visuals: VisualWithUrl[];
   themesForTemplate: ThemeWithOverlayUrl[];
+  // Thème en parties choisi (carte pliée, ou thème avec un verso — voir
+  // lib/themeParts.ts) et ce que le client a mis dans chaque partie.
+  cardTheme?: CardTheme | null;
+  setCardTheme: React.Dispatch<React.SetStateAction<CardTheme | null>>;
   illustrations: IllustrationWithUrl[];
   front: ImageSourceValue;
   back: ImageSourceValue;
@@ -432,6 +441,34 @@ export default function DesignEditor({
   const activeOnChangeLayers =
     side === "front" ? onChangeFrontLayers : onChangeBackLayers;
   const maxFontSizeMm = maxTextSizeMmForTemplate(template);
+  const [fontUnit, setFontUnit] = useFontUnit();
+  // Valeurs les plus récentes, pour les rendus asynchrones des parties du thème.
+  const latest = useRef({ front, back, cardTheme });
+  latest.current = { front, back, cardTheme };
+  // Pose l'image rendue d'une partie du thème à sa place : la face entière
+  // (« front », « back ») ou la case de son volet (« back:0 »). Ignorée si le
+  // client a changé de thème, ou cette partie, pendant le rendu.
+  function placeThemePart(themeId: string, key: string, fill: ThemePartFill, file: File) {
+    const cur = latest.current;
+    const stored = cur.cardTheme?.fills[key];
+    if (cur.cardTheme?.theme.id !== themeId || (stored && stored !== fill)) return;
+    setCardTheme((ct) => (ct && ct.theme.id === themeId ? { ...ct, fills: { ...ct.fills, [key]: { ...fill, renderedFile: file } } } : ct));
+    const back = key === "back" || key.startsWith("back:");
+    const onChange = back ? onChangeBack : onChangeFront;
+    const value = back ? cur.back : cur.front;
+    const panelIndex = key.includes(":") ? Number(key.split(":")[1]) : null;
+    if (panelIndex === null) {
+      onChange({ file, positionX: 0.5, positionY: 0.5, scale: undefined, rotation: 0 });
+      return;
+    }
+    const count = Math.max(panelIndex + 1, value.mosaicFiles?.length ?? 0);
+    const files = Array.from({ length: count }, (_, j) => value.mosaicFiles?.[j] ?? null);
+    files[panelIndex] = file;
+    // Le volet rendu remplit exactement sa case : cadrage centré.
+    const adjust = Array.from({ length: count }, (_, j) => value.mosaicCellAdjust?.[j] ?? { positionX: 0.5, positionY: 0.5, scale: 1 });
+    adjust[panelIndex] = { positionX: 0.5, positionY: 0.5, scale: 1 };
+    onChange({ mosaicFiles: files, mosaicCellAdjust: adjust });
+  }
   const anyUncovered = !frontCovers || (template.two_sided && !backCovers);
   const uncoveredLabel = !template.two_sided
     ? "Ton visuel ne couvre"
@@ -713,7 +750,7 @@ export default function DesignEditor({
                       onChangeDesignType("panels");
                     }}
                     className={`flex flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-full px-1.5 py-2 font-medium ${
-                      designType === "panels"
+                      designType === "panels" && !cardTheme
                         ? "bg-primary text-text-on-brand shadow-sm"
                         : "text-text-muted hover:text-text"
                     }`}
@@ -729,7 +766,7 @@ export default function DesignEditor({
                     onChangeDesignType("single");
                   }}
                   className={`flex flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-full px-1.5 py-2 font-medium ${
-                    designType === "single"
+                    designType === "single" && !cardTheme
                       ? "bg-primary text-text-on-brand shadow-sm"
                       : "text-text-muted hover:text-text"
                   }`}
@@ -761,7 +798,7 @@ export default function DesignEditor({
                   <LayoutGridIcon className="h-3.5 w-3.5 shrink-0" /> Mosaïque
                 </button>
                 )}
-                {allowsSheet(fold) && themesForTemplate.length > 0 && (
+                {themesForTemplate.length > 0 && (
                   <button
                     type="button"
                     onClick={() => {
@@ -779,7 +816,7 @@ export default function DesignEditor({
                       setThemePickerOpen(true);
                     }}
                     className={`flex flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-full px-1.5 py-2 font-medium ${
-                      designType === "theme"
+                      designType === "theme" || cardTheme
                         ? "bg-primary text-text-on-brand shadow-sm"
                         : "text-text-muted hover:text-text"
                     }`}
@@ -878,7 +915,7 @@ export default function DesignEditor({
                             setThemePickerOpen(false);
                           }}
                           className={`flex flex-col items-center gap-1.5 rounded-lg border p-2 text-center ${
-                            selectedTheme?.id === theme.id
+                            selectedTheme?.id === theme.id || cardTheme?.theme.id === theme.id
                               ? "border-primary"
                               : "border-border hover:border-border-strong"
                           }`}
@@ -959,6 +996,67 @@ export default function DesignEditor({
                   Changer de thème
                 </button>
               )}
+
+            {/* Thème en parties (carte pliée, ou thème avec un verso — voir
+                lib/themeParts.ts) : les parties de la face affichée, à
+                remplir ; chacune est rendue puis posée à sa place (la face,
+                ou la case de son volet). */}
+            {cardTheme && !themePickerOpen && (() => {
+              const theme = cardTheme.theme;
+              const labels = themePartChoices(template, theme.scope ?? "sheet");
+              const parts = themeParts(theme).filter((p) => partSide(p.key) === side);
+              return (
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between gap-2 text-xs">
+                    <span className="font-medium text-text">Thème : {theme.name}</span>
+                    {side === "front" && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setThemePage(0);
+                          setThemePickerOpen(true);
+                        }}
+                        className="font-medium text-primary underline"
+                      >
+                        Changer
+                      </button>
+                    )}
+                  </div>
+                  {parts.length === 0 ? (
+                    <p className="text-xs text-text-muted">
+                      Le thème ne couvre pas {side === "front" ? "le recto" : "le verso"} : ajoute une photo ou un fichier.
+                    </p>
+                  ) : (
+                    parts.map((part) => {
+                      const fill = cardTheme.fills[part.key] ?? emptyFill(part);
+                      const panelIndex = part.key.includes(":") ? Number(part.key.split(":")[1]) : null;
+                      const sideValue = side === "front" ? front : back;
+                      const target = panelIndex === null ? sideValue.file : sideValue.mosaicFiles?.[panelIndex] ?? null;
+                      return (
+                        <ThemePartFiller
+                          key={`${theme.id}-${part.key}`}
+                          label={labels.find((c) => c.key === part.key)?.label ?? part.key}
+                          part={part}
+                          fill={fill}
+                          // À rendre : réglages changés, ou place vide. Un
+                          // fichier mis là par le client n'est pas écrasé.
+                          needsRender={!fill.renderedFile || target === null}
+                          onFillChange={(next) =>
+                            setCardTheme((ct) =>
+                              ct && ct.theme.id === theme.id ? { ...ct, fills: { ...ct.fills, [part.key]: next } } : ct
+                            )
+                          }
+                          render={(f) =>
+                            renderThemePart({ templateId: template.id, grant, rotated, themeId: theme.id, partKey: part.key, fill: f })
+                          }
+                          onRendered={(f, file) => placeThemePart(theme.id, part.key, f, file)}
+                        />
+                      );
+                    })
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Fichier : carte dédiée (voir FileVisualCard) pour un fond
                 unique — reprend le Figma (vignette + nom + qualité +
@@ -1285,22 +1383,22 @@ export default function DesignEditor({
                 onChange={(fontId) => updateTextLayer({ fontId })}
                 className="w-44 rounded-lg border border-border bg-surface px-2 py-1.5 text-sm"
               />
-              <input
-                type="number"
-                min={3}
-                max={maxFontSizeMm}
-                step={0.5}
-                value={Math.round(selectedLayer.fontSizeMm)}
-                onChange={(e) => {
-                  const v = parseFloat(e.target.value);
-                  if (!Number.isNaN(v))
-                    updateTextLayer({
-                      fontSizeMm: Math.min(maxFontSizeMm, Math.max(3, v)),
-                    });
-                }}
-                aria-label="Taille du texte (mm)"
+              <FontSizeInput
+                valueMm={selectedLayer.fontSizeMm}
+                minMm={3}
+                maxMm={maxFontSizeMm}
+                onChange={(fontSizeMm) => updateTextLayer({ fontSizeMm })}
+                ariaLabel={`Taille du texte (${fontUnit})`}
                 className="w-16 rounded-lg border border-border bg-surface px-2 py-1.5 text-sm"
               />
+              <button
+                type="button"
+                onClick={() => setFontUnit(fontUnit === "pt" ? "mm" : "pt")}
+                title="Changer l'unité de la taille (pt ou mm)"
+                className="rounded-lg px-1.5 py-1.5 text-xs text-text-muted hover:bg-surface-muted"
+              >
+                {fontUnit}
+              </button>
               <span className="mx-0.5 h-5 w-px bg-border" aria-hidden="true" />
               <button
                 type="button"
@@ -1396,6 +1494,7 @@ export default function DesignEditor({
                 themeBackgroundUrl={
                   side === "front" ? (selectedTheme?.backgroundUrl ?? null) : null
                 }
+                themeFit={selectedTheme?.overlay_fit ?? "fill"}
                 // Case sélectionnée : emplacement de thème (recto) ou case de
                 // mosaïque (les deux côtés).
                 selectedThemeSlot={

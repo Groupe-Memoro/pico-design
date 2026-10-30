@@ -26,7 +26,7 @@ import { readDocumentInfo, type DocumentInfo } from "@/lib/imposition/documentIn
 import { regMarkRects, type MmRect } from "@/lib/imposition/regmark";
 import { formatInches, sheetLabel } from "@/lib/imposition/presets";
 import { IMAGE_TYPES, imageToPdf, isImageFile } from "@/lib/imposition/imageToPdf";
-import { MM_TO_PT, formatIn } from "@/lib/pdf/units";
+import { MM_TO_PT, formatIn, formatInMm, formatSizeInMm } from "@/lib/pdf/units";
 import { MACHINES, MACHINE_LABELS, type CutterMachine } from "@/lib/imposition/machines";
 import type { SavedImposition } from "@/lib/imposition/saved";
 import type { ImpositionCutter, ImpositionDuploJob, ImpositionSheet, ImpositionProfile } from "@/lib/types";
@@ -247,7 +247,7 @@ export default function ImpositionTool({
   const [docCutting, setDocCutting] = useState<"guillotine" | "machine">(cfg?.document?.cutting ?? "guillotine");
   const docOnMachine = isDocument && docCutting === "machine";
   const [docCropMarks, setDocCropMarks] = useState(cfg?.document?.cropMarks ?? true);
-  const [docUnit, setDocUnit] = useState<Unit>("mm");
+  const [docUnit, setDocUnit] = useState<Unit>("in");
   const [docSheetIndex, setDocSheetIndex] = useState(0);
   const docInput = useRef<HTMLInputElement>(null);
 
@@ -1444,7 +1444,7 @@ export default function ImpositionTool({
                     {selectedJob1 && selectedJob2 && !twoPassResult && (
                       <p className="mt-1 text-xs text-warning-strong">
                         Ces deux jobs ne vont pas ensemble : la passe 1 doit couper la feuille en morceaux de{" "}
-                        {Math.round(selectedJob2.width_mm * 10) / 10} × {Math.round(selectedJob2.length_mm * 10) / 10} mm (la
+                        {formatSizeInMm(selectedJob2.width_mm, selectedJob2.length_mm)} (la
                         feuille du job n° {selectedJob2.job_no}), et ce job doit couper ce format dans chaque morceau.
                       </p>
                     )}
@@ -1482,7 +1482,7 @@ export default function ImpositionTool({
                       ? " Le code-barres du job est posé au recto, à la position lue par la Duplo."
                       : ""}
                     {activeDuplo.job.reg_mark
-                      ? ` Repère REG à ${Math.round(activeDuplo.job.side_mark_mm * 10) / 10} mm du bord latéral et ${Math.round(activeDuplo.job.lead_mark_mm * 10) / 10} mm du bord d'attaque, dans le même coin.`
+                      ? ` Repère REG à ${formatInMm(activeDuplo.job.side_mark_mm)} du bord latéral et ${formatInMm(activeDuplo.job.lead_mark_mm)} du bord d'attaque, dans le même coin.`
                       : ""}
                   </p>
                 )}

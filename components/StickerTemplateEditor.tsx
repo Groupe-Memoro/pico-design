@@ -22,8 +22,11 @@ import {
   type ZoneRotation,
 } from "@/lib/stickers/types";
 import FontPicker from "@/components/FontPicker";
+import ColorPickerButton from "@/components/ColorPickerButton";
+import { FontSizeInput, LengthInput, UnitsBar, unitLabel, useFontUnit, useLengthUnit } from "@/components/UnitInputs";
 import { loadFont } from "@/lib/design/fontLoader";
 import { measureInk } from "@/lib/design/inkMeasure";
+import { formatInMm } from "@/lib/pdf/units";
 
 const ASSET_HELP: Record<StickerAsset, string> = {
   artwork: "La planche du graphiste, sans le nom. Imprimée sous le texte.",
@@ -88,6 +91,8 @@ export default function StickerTemplateEditor({
   const H = layout.area.height;
   const [name, setName] = useState(template.name);
   const [zones, setZones] = useState<StickerZone[]>(template.zones ?? []);
+  const [lengthUnit] = useLengthUnit();
+  const [fontUnit] = useFontUnit();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -382,9 +387,10 @@ export default function StickerTemplateEditor({
           </label>
           {cutter && (
             <p className="px-1 text-xs text-neutral-500">
-              Marges du profil (haut / droite / bas / gauche) : {cutter.margin_top_mm} / {cutter.margin_right_mm} /{" "}
-              {cutter.margin_bottom_mm} / {cutter.margin_left_mm} mm · calibration {cutter.offset_x_mm} /{" "}
-              {cutter.offset_y_mm} mm. Le visuel se pose dans ces marges ; les codes Graphtec viennent du profil.
+              Marges du profil (haut / droite / bas / gauche) :{" "}
+              {[cutter.margin_top_mm, cutter.margin_right_mm, cutter.margin_bottom_mm, cutter.margin_left_mm].map(formatInMm).join(" / ")}{" "}
+              · calibration {formatInMm(cutter.offset_x_mm)} / {formatInMm(cutter.offset_y_mm)}. Le visuel se pose dans ces
+              marges ; les codes Graphtec viennent du profil.
             </p>
           )}
         </div>
@@ -655,14 +661,13 @@ export default function StickerTemplateEditor({
               </p>
             ) : (
               <div className="space-y-3">
+                <UnitsBar font />
                 <div className="grid grid-cols-4 gap-2">
                   {(["x", "y", "width", "height"] as const).map((key) => (
-                    <Field key={key} label={{ x: "X (mm)", y: "Y (mm)", width: "Largeur", height: "Hauteur" }[key]}>
-                      <input
-                        type="number"
-                        step={0.1}
-                        value={selected[key]}
-                        onChange={(e) => updateZone(selected.id, { [key]: Number(e.target.value) || 0 })}
+                    <Field key={key} label={`${{ x: "X", y: "Y", width: "Largeur", height: "Hauteur" }[key]} (${unitLabel(lengthUnit)})`}>
+                      <LengthInput
+                        valueMm={selected[key]}
+                        onChange={(mm) => updateZone(selected.id, { [key]: mm })}
                         className={inputClass}
                       />
                     </Field>
@@ -677,20 +682,19 @@ export default function StickerTemplateEditor({
                 </Field>
                 <div className="grid grid-cols-3 gap-2">
                   <Field label="Couleur">
-                    <input
-                      type="color"
-                      value={selected.color}
-                      onChange={(e) => updateZone(selected.id, { color: e.target.value })}
-                      className="mt-1 h-9 w-full cursor-pointer rounded border border-neutral-300"
-                    />
+                    <div className="mt-1 flex h-9 items-center">
+                      <ColorPickerButton
+                        value={selected.color}
+                        onChange={(color) => updateZone(selected.id, { color })}
+                        label="Couleur du texte"
+                      />
+                    </div>
                   </Field>
-                  <Field label="Taille max. (mm)">
-                    <input
-                      type="number"
-                      min={1.5}
-                      step={0.5}
-                      value={selected.maxFontMm}
-                      onChange={(e) => updateZone(selected.id, { maxFontMm: Math.max(1.5, Number(e.target.value) || 1.5) })}
+                  <Field label={`Taille max. (${fontUnit})`}>
+                    <FontSizeInput
+                      valueMm={selected.maxFontMm}
+                      minMm={1.5}
+                      onChange={(maxFontMm) => updateZone(selected.id, { maxFontMm })}
                       className={inputClass}
                     />
                   </Field>

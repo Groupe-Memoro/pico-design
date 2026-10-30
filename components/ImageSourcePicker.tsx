@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useRef, useState } from "react";
-import type { LogoShape, Template, ThemeSlot, ThemeSlotAdjust, VisualMode, ThemeTextZone } from "@/lib/types";
+import type { LogoShape, Template, ThemeFit, ThemeSlot, ThemeSlotAdjust, VisualMode, ThemeTextZone } from "@/lib/types";
 import ThemeTextOverlay from "@/components/ThemeTextOverlay";
 import type { LogoShadowSettings } from "@/lib/logoShadowSettings";
 import type { VisualWithUrl } from "@/components/VisualsGrid";
@@ -109,6 +109,7 @@ export interface ImageSourceValue {
   // une photo d'ici la retire aussi de tout emplacement qui l'utilisait.
   themePhotoBank?: File[];
 }
+
 
 // Coins de redimensionnement. Le nom dit quel coin on saisit ; le coin
 // DIAGONALEMENT opposé est celui qui reste fixe.
@@ -320,7 +321,7 @@ function LayerHandles({
 // Une case de la grille mosaïque (sourceMode "mosaic") : une miniature très
 // compacte (carrée), pas le grand FileDropZone habituel — il y en a
 // plusieurs à la fois, côte à côte, pas la place pour son texte d'aide.
-function MosaicCellDropZone({
+export function MosaicCellDropZone({
   file,
   onFileChange,
   label,
@@ -570,6 +571,7 @@ export default function ImageSourcePicker({
   themeOverlayUrl = null,
   themeTextZones = [],
   themeBackgroundUrl = null,
+  themeFit = "fill",
   selectedThemeSlot = null,
   onSelectThemeSlot,
 }: {
@@ -655,6 +657,9 @@ export default function ImageSourcePicker({
   themeTextZones?: ThemeTextZone[];
   // Image de fond du thème (facultative) — sous les photos, fixe.
   themeBackgroundUrl?: string | null;
+  // Cadrage du graphisme et du fond sur la page, comme au rendu (voir
+  // composeThemeImage) : étirés ('fill') ou recadrés sans déformation ('cover').
+  themeFit?: ThemeFit;
   // Emplacement actuellement sélectionné (glisser/zoomer l'affecte, lui et
   // pas les autres) — possédé par DesignPreview, comme selectedLayerId.
   selectedThemeSlot?: number | null;
@@ -1450,7 +1455,7 @@ export default function ImageSourcePicker({
         <div className="space-y-3">
           <div>
             <label className="block text-sm font-medium">Visuel</label>
-            <VisualPicker visuals={visuals} value={visualId} onChange={handleVisualChange} />
+            <VisualPicker visuals={visuals} value={visualId} onChange={handleVisualChange} preferPatterns={sourceMode === "tile"} />
           </div>
 
           {sourceMode === "tile" && (
@@ -1652,7 +1657,7 @@ export default function ImageSourcePicker({
                   src={themeBackgroundUrl}
                   alt=""
                   draggable={false}
-                  className="pointer-events-none absolute inset-0 h-full w-full"
+                  className={`pointer-events-none absolute inset-0 h-full w-full ${themeFit === "cover" ? "object-cover" : "object-fill"}`}
                 />
               )}
               {(isTheme || isMosaic) &&
@@ -1772,7 +1777,7 @@ export default function ImageSourcePicker({
                   src={themeOverlayUrl}
                   alt=""
                   draggable={false}
-                  className="pointer-events-none absolute inset-0 h-full w-full"
+                  className={`pointer-events-none absolute inset-0 h-full w-full ${themeFit === "cover" ? "object-cover" : "object-fill"}`}
                 />
               )}
               {isTheme && template && (
@@ -2056,3 +2061,4 @@ export default function ImageSourcePicker({
     </div>
   );
 }
+

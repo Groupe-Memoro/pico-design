@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import ColorPickerButton from "@/components/ColorPickerButton";
+import { formatFontSize, useFontUnit } from "@/components/UnitInputs";
 import IllustrationPicker from "@/components/IllustrationPicker";
 import {
   ChevronDownIcon,
@@ -66,6 +67,7 @@ export default function LayersPanel({
   // Banque d'illustrations (module Illustrations) : vide = pas de bouton.
   illustrations?: IllustrationWithUrl[];
 }) {
+  const [fontUnit, setFontUnit] = useFontUnit();
   const effectiveMaxFontSizeMm = maxFontSizeMm ?? 40;
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Fichier du calque Image SÉLECTIONNÉ (Remplacer) — input séparé de celui
@@ -354,9 +356,14 @@ export default function LayersPanel({
               style={rangeFillStyle(selectedLayer.fontSizeMm, 3, effectiveMaxFontSizeMm)}
               aria-label="Taille du texte"
             />
-            <span className="w-12 shrink-0 text-right text-xs text-text-subtle">
-              {Math.round(selectedLayer.fontSizeMm)} mm
-            </span>
+            <button
+              type="button"
+              onClick={() => setFontUnit(fontUnit === "pt" ? "mm" : "pt")}
+              title="Changer l'unité de la taille (pt ou mm)"
+              className="w-14 shrink-0 text-right text-xs text-text-subtle hover:text-text"
+            >
+              {formatFontSize(selectedLayer.fontSizeMm, fontUnit, 1)}
+            </button>
           </div>
 
           <div className="flex items-center gap-2">

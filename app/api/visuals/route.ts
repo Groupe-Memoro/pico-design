@@ -4,6 +4,7 @@ import { randomUUID } from "crypto";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { ALLOWED_VISUAL_TYPES, prepareUploadedFile } from "@/lib/visualUpload";
 import { storageFileName } from "@/lib/storageName";
+import { detectPattern } from "@/lib/visualPattern";
 
 export const runtime = "nodejs"; // la rasterisation PDF a besoin du runtime Node, pas Edge.
 
@@ -27,6 +28,8 @@ export async function POST(request: Request) {
   const name = formData.get("name");
   const file = formData.get("file");
   const collectionId = formData.get("collectionId");
+  // "true" / "false" : choisi à la main ; sinon, deviné d'après l'image.
+  const isPattern = formData.get("isPattern");
 
   if (typeof name !== "string" || !(file instanceof File)) {
     return NextResponse.json({ error: "Paramètres manquants (name, file)." }, { status: 400 });
@@ -63,6 +66,10 @@ export async function POST(request: Request) {
       file_path: filePath,
       mime_type: prepared.contentType,
       collection_id: typeof collectionId === "string" && collectionId ? collectionId : null,
+      is_pattern:
+        isPattern === "true" || isPattern === "false"
+          ? isPattern === "true"
+          : await detectPattern(prepared.buffer, prepared.contentType),
       created_by: user.id,
     })
     .select()

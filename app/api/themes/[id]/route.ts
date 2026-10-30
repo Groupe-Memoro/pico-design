@@ -1,10 +1,8 @@
 import { requireApiUser, serverError } from "@/lib/api";
 import { NextResponse } from "next/server";
-import { parseThemeSlotsField } from "@/lib/pdf/theme";
-import { MAX_THEME_SLOTS } from "@/lib/themeShapes";
-import { storageFileName } from "@/lib/storageName";
-import { parseTextZonesField } from "@/lib/themeText";
-import { parseThemeGuidesField } from "@/lib/variableData/snap";
+import { themePartsColumns, themePartsFromForm } from "@/lib/themePartsForm";
+import { themeParts } from "@/lib/themeParts";
+import type { Theme, ThemeScope } from "@/lib/types";
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   const session = await requireApiUser();
@@ -20,56 +18,20 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   const name = formData.get("name");
   if (typeof name === "string" && name.trim()) update.name = name.trim();
 
-  if (formData.has("slots")) {
-    const slots = parseThemeSlotsField(formData.get("slots"));
-    if (!slots) {
-      return NextResponse.json({ error: `Emplacements invalides (1 à ${MAX_THEME_SLOTS} attendus).` }, { status: 400 });
+  // Parties du thème (voir lib/themeParts.ts) : celles envoyées remplacent les
+  // anciennes ; une partie sans nouveau fichier garde le sien.
+  if (formData.has("parts")) {
+    const { data: current, error: currentError } = await supabase.from("themes").select("*").eq("id", params.id).single<Theme>();
+    if (currentError || !current) return NextResponse.json({ error: "Thème introuvable." }, { status: 404 });
+    const scope: ThemeScope = formData.get("scope") === "panel" ? "panel" : "sheet";
+    let parts;
+    try {
+      parts = await themePartsFromForm(supabase, params.id, formData, scope, themeParts(current));
+    } catch (err) {
+      return serverError(err, "Impossible d'enregistrer l'image du thème.");
     }
-    update.slots = slots;
-  }
-
-  if (formData.has("textZones")) {
-    const textZones = parseTextZonesField(formData.get("textZones"));
-    if (!textZones) return NextResponse.json({ error: "Zones de texte invalides." }, { status: 400 });
-    update.text_zones = textZones;
-  }
-
-  if (formData.has("guides")) {
-    const guides = parseThemeGuidesField(formData.get("guides"));
-    if (!guides) return NextResponse.json({ error: "Repères invalides." }, { status: 400 });
-    update.guides = guides;
-  }
-
-  const overlayFile = formData.get("overlay");
-  if (overlayFile instanceof File && overlayFile.size > 0) {
-    const overlayPath = `themes/${params.id}/overlay-${storageFileName(overlayFile.name)}`;
-    const buffer = Buffer.from(await overlayFile.arrayBuffer());
-    const { error: uploadError } = await supabase.storage
-      .from("overlays")
-      .upload(overlayPath, buffer, { contentType: overlayFile.type || "image/png", upsert: true });
-    if (uploadError) {
-      return serverError(uploadError, "Impossible d'enregistrer l'image du thème.");
-    }
-    update.overlay_path = overlayPath;
-  }
-
-  // Fond facultatif (voir 0068_theme_background.sql) : un nouveau fichier le
-  // remplace, `removeBackground` le retire.
-  const backgroundFile = formData.get("background");
-  if (backgroundFile instanceof File && backgroundFile.size > 0) {
-    const backgroundPath = `themes/${params.id}/background-${storageFileName(backgroundFile.name)}`;
-    const { error: uploadError } = await supabase.storage
-      .from("overlays")
-      .upload(backgroundPath, Buffer.from(await backgroundFile.arrayBuffer()), {
-        contentType: backgroundFile.type || "image/png",
-        upsert: true,
-      });
-    if (uploadError) {
-      return serverError(uploadError, "Impossible d'enregistrer l'image du thème.");
-    }
-    update.background_path = backgroundPath;
-  } else if (formData.get("removeBackground") === "true") {
-    update.background_path = null;
+    if (typeof parts === "string") return NextResponse.json({ error: parts }, { status: 400 });
+    Object.assign(update, themePartsColumns(parts, scope));
   }
 
   const { data, error } = await supabase

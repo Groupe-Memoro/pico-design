@@ -6,6 +6,7 @@ import { jobNoFromFileName } from "@/lib/imposition/barcodes";
 import { parseAllJobs, type ParsedDuploJob } from "@/lib/imposition/duplo";
 import { sheetLabel } from "@/lib/imposition/presets";
 import type { ImpositionDuploJob } from "@/lib/types";
+import { formatInMm } from "@/lib/pdf/units";
 
 // Catalogue des jobs de la Duplo : import (ou mise à jour) depuis le fichier
 // AllJobs exporté par la machine, et liste des jobs enregistrés.
@@ -226,7 +227,7 @@ export default function DuploJobsManager({
                 </span>
                 <span className="shrink-0 text-xs text-neutral-500">
                   {sheetLabel(job.width_mm, job.length_mm)} · {job.slits.length} refentes · {job.cuts.length} coupes
-                  {job.reg_mark ? ` · REG ${Math.round(job.side_mark_mm * 10) / 10}/${Math.round(job.lead_mark_mm * 10) / 10} mm` : ""}
+                  {job.reg_mark ? ` · REG ${formatInMm(job.side_mark_mm)} / ${formatInMm(job.lead_mark_mm)}` : ""}
                 </span>
               </li>
             ))}

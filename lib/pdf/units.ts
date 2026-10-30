@@ -25,3 +25,18 @@ export function inToMm(inches: number): number {
 export function formatIn(mm: number): string {
   return `${Math.round(mmToIn(mm) * 1000) / 1000}"`;
 }
+
+// Affichage d'une dimension : pouces d'abord, mm en complément, à la
+// française (virgule), trois décimales au plus en po, une en mm.
+// Ex. « 2,125 po (54 mm) ».
+const frIn = (mm: number) => String(Math.round(mmToIn(mm) * 1000) / 1000).replace(".", ",");
+const frMm = (mm: number) => String(Math.round(mm * 10) / 10).replace(".", ",");
+
+export function formatInMm(mm: number): string {
+  return `${frIn(mm)} po (${frMm(mm)} mm)`;
+}
+
+// Ex. « 2,125 × 3,375 po (54 × 85,7 mm) ».
+export function formatSizeInMm(widthMm: number, heightMm: number): string {
+  return `${frIn(widthMm)} × ${frIn(heightMm)} po (${frMm(widthMm)} × ${frMm(heightMm)} mm)`;
+}

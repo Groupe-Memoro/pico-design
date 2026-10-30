@@ -4,29 +4,29 @@ import { useState } from "react";
 import { SpinnerIcon } from "@/components/icons";
 import { ALBUM_FORMATS, type Album, type AlbumSettings } from "@/lib/albums/types";
 import FontPicker from "@/components/FontPicker";
+import ColorPickerButton from "@/components/ColorPickerButton";
+import { LengthInput, LengthUnitToggle } from "@/components/UnitInputs";
 
 const inputClass = "mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm";
 const labelClass = "block text-sm font-medium";
 const MM_PER_IN = 25.4;
-// Trois décimales : 1/8 po (0,125) ne doit pas devenir 0,13.
-const round3 = (n: number) => Math.round(n * 1000) / 1000;
 
 // Réglages de l'album : identité, format et style de toutes ses pages.
 export default function AlbumSettingsForm({ album, onSaved }: { album: Album; onSaved: () => void }) {
   const [name, setName] = useState(album.name);
   const [school, setSchool] = useState(album.school);
   const [year, setYear] = useState(album.year);
-  // Dimensions saisies en pouces (l'usage à l'atelier), enregistrées en mm.
-  const [widthIn, setWidthIn] = useState(round3(Number(album.width_mm) / MM_PER_IN));
-  const [heightIn, setHeightIn] = useState(round3(Number(album.height_mm) / MM_PER_IN));
-  const [bleedIn, setBleedIn] = useState(round3(Number(album.bleed_mm) / MM_PER_IN));
+  // Dimensions enregistrées en mm, saisies en po ou en mm (voir UnitInputs).
+  const [widthMm, setWidthMm] = useState(Number(album.width_mm));
+  const [heightMm, setHeightMm] = useState(Number(album.height_mm));
+  const [bleedMm, setBleedMm] = useState(Number(album.bleed_mm));
   const [s, setS] = useState<AlbumSettings>(album.settings);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const set = (patch: Partial<AlbumSettings>) => setS((cur) => ({ ...cur, ...patch }));
   const preset = ALBUM_FORMATS.find(
-    (f) => Math.abs(f.widthMm - widthIn * MM_PER_IN) < 0.5 && Math.abs(f.heightMm - heightIn * MM_PER_IN) < 0.5
+    (f) => Math.abs(f.widthMm - widthMm) < 0.5 && Math.abs(f.heightMm - heightMm) < 0.5
   );
 
   async function submit(e: React.FormEvent) {
@@ -40,9 +40,9 @@ export default function AlbumSettingsForm({ album, onSaved }: { album: Album; on
         name,
         school,
         year,
-        width_mm: widthIn * MM_PER_IN,
-        height_mm: heightIn * MM_PER_IN,
-        bleed_mm: bleedIn * MM_PER_IN,
+        width_mm: widthMm,
+        height_mm: heightMm,
+        bleed_mm: bleedMm,
         settings: s,
       }),
     });
@@ -61,8 +61,8 @@ export default function AlbumSettingsForm({ album, onSaved }: { album: Album; on
     <div>
       <label className={labelClass}>{label}</label>
       <div className="mt-1 flex items-center gap-2">
-        <input type="color" value={value} onChange={(e) => onChange(e.target.value)} className="h-9 w-12 cursor-pointer rounded border border-neutral-300" />
-        <span className="font-mono text-xs text-neutral-500">{value}</span>
+        <ColorPickerButton value={value} onChange={onChange} label={label} />
+        <span className="font-mono text-xs uppercase text-neutral-500">{value}</span>
       </div>
     </div>
   );
@@ -88,7 +88,10 @@ export default function AlbumSettingsForm({ album, onSaved }: { album: Album; on
       </section>
 
       <section className="space-y-3">
-        <h3 className="text-sm font-semibold text-text">Format (pouces)</h3>
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-sm font-semibold text-text">Format</h3>
+          <LengthUnitToggle />
+        </div>
         <div className="grid gap-3 sm:grid-cols-4">
           <div>
             <label className={labelClass}>Format</label>
@@ -97,8 +100,8 @@ export default function AlbumSettingsForm({ album, onSaved }: { album: Album; on
               onChange={(e) => {
                 const f = ALBUM_FORMATS.find((x) => x.id === e.target.value);
                 if (f) {
-                  setWidthIn(round3(f.widthMm / MM_PER_IN));
-                  setHeightIn(round3(f.heightMm / MM_PER_IN));
+                  setWidthMm(f.widthMm);
+                  setHeightMm(f.heightMm);
                 }
               }}
               className={inputClass}
@@ -113,15 +116,15 @@ export default function AlbumSettingsForm({ album, onSaved }: { album: Album; on
           </div>
           <div>
             <label className={labelClass}>Largeur</label>
-            <input type="number" step="any" min={2} value={widthIn} onChange={(e) => setWidthIn(Number(e.target.value))} className={inputClass} />
+            <LengthInput valueMm={widthMm} minMm={2 * MM_PER_IN} onChange={setWidthMm} className={inputClass} />
           </div>
           <div>
             <label className={labelClass}>Hauteur</label>
-            <input type="number" step="any" min={2} value={heightIn} onChange={(e) => setHeightIn(Number(e.target.value))} className={inputClass} />
+            <LengthInput valueMm={heightMm} minMm={2 * MM_PER_IN} onChange={setHeightMm} className={inputClass} />
           </div>
           <div>
             <label className={labelClass}>Fond perdu</label>
-            <input type="number" step="any" min={0} max={0.75} value={bleedIn} onChange={(e) => setBleedIn(Number(e.target.value))} className={inputClass} />
+            <LengthInput valueMm={bleedMm} minMm={0} maxMm={0.75 * MM_PER_IN} onChange={setBleedMm} className={inputClass} />
           </div>
         </div>
       </section>
@@ -162,14 +165,12 @@ export default function AlbumSettingsForm({ album, onSaved }: { album: Album; on
             {fontSelect(s.bodyFont, (v) => set({ bodyFont: v }))}
           </div>
           <div>
-            <label className={labelClass}>Marge (po)</label>
-            <input
-              type="number"
-              step="any"
-              min={0}
-              max={2}
-              value={round3(s.marginMm / MM_PER_IN)}
-              onChange={(e) => set({ marginMm: Number(e.target.value) * MM_PER_IN })}
+            <label className={labelClass}>Marge</label>
+            <LengthInput
+              valueMm={s.marginMm}
+              minMm={0}
+              maxMm={2 * MM_PER_IN}
+              onChange={(marginMm) => set({ marginMm })}
               className={inputClass}
             />
           </div>

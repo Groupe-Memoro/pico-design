@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Modal from "@/components/Modal";
-import type { VisualWithUrl } from "@/components/VisualsGrid";
+import { PatternBadge, type VisualWithUrl } from "@/components/VisualsGrid";
 
 /**
  * Sélecteur de visuel avec miniatures — un <select> HTML ne peut pas
@@ -13,16 +13,25 @@ export default function VisualPicker({
   visuals,
   value,
   onChange,
+  preferPatterns = false,
 }: {
   visuals: VisualWithUrl[];
   value: string;
   onChange: (id: string) => void;
+  // Mode mosaïque : les motifs répétables passent en premier.
+  preferPatterns?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [patternsOnly, setPatternsOnly] = useState(false);
 
   const selected = visuals.find((v) => v.id === value) ?? null;
-  const filtered = visuals.filter((v) => v.name.toLowerCase().includes(search.trim().toLowerCase()));
+  const hasPatterns = visuals.some((v) => v.is_pattern);
+  const filtered = visuals
+    .filter((v) => v.name.toLowerCase().includes(search.trim().toLowerCase()))
+    .filter((v) => !patternsOnly || v.is_pattern);
+  // Tri stable : l'ordre par nom est gardé à l'intérieur de chaque groupe.
+  if (preferPatterns) filtered.sort((a, b) => Number(b.is_pattern) - Number(a.is_pattern));
 
   return (
     <>
@@ -40,6 +49,7 @@ export default function VisualPicker({
         <span className="flex-1 truncate text-sm text-text">
           {selected?.name ?? "Choisir un visuel..."}
         </span>
+        {selected?.is_pattern && <PatternBadge />}
         <svg
           viewBox="0 0 24 24"
           fill="none"
@@ -60,6 +70,12 @@ export default function VisualPicker({
               placeholder="Rechercher (nom)..."
               className="w-full input"
             />
+            {hasPatterns && (
+              <label className="flex items-center gap-2 text-sm text-neutral-600">
+                <input type="checkbox" checked={patternsOnly} onChange={(e) => setPatternsOnly(e.target.checked)} />
+                Motifs répétables seulement
+              </label>
+            )}
             {filtered.length === 0 ? (
               <p className="text-sm text-neutral-500">Aucun visuel ne correspond.</p>
             ) : (
@@ -78,7 +94,8 @@ export default function VisualPicker({
                         : "border-neutral-200 hover:border-neutral-400"
                     }`}
                   >
-                    <div className="flex h-28 items-center justify-center bg-neutral-50 p-2">
+                    <div className="relative flex h-28 items-center justify-center bg-neutral-50 p-2">
+                      {v.is_pattern && <PatternBadge className="absolute right-1.5 top-1.5" />}
                       {v.fileUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={`/api/visuals/${v.id}/thumbnail?v=${encodeURIComponent(v.file_path)}`} alt={v.name} loading="lazy" decoding="async" className="max-h-full max-w-full object-contain" />

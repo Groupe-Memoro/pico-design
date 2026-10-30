@@ -2,6 +2,7 @@
 
 import VariableDataEditor from "@/components/variableData/VariableDataEditor";
 import { STUDENT_VOCAB, type StudentCardTemplate } from "@/lib/studentCards/types";
+import { formatSizeInMm } from "@/lib/pdf/units";
 
 // Éditeur d'un modèle de carte étudiante : l'éditeur commun des documents à
 // données variables, au format de la carte, avec l'école du modèle.
@@ -15,7 +16,7 @@ export default function StudentCardEditor({ template, schools }: { template: Stu
       pageHeight={H}
       apiBase="/api/student-cards"
       backHref="/cartes-etudiantes"
-      subtitle={`${String(W).replace(".", ",")} × ${String(H).replace(".", ",")} mm`}
+      subtitle={formatSizeInMm(W, H)}
       extraField={{ key: "school", label: "École", value: template.school, suggestions: schools }}
       rounded
       // Carte PVC : imprimée bord à bord, sans fond perdu ; textes à 3 mm du bord.

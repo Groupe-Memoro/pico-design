@@ -5,6 +5,7 @@ import { composeMosaicImage } from "./mosaic";
 import { composeThemeImage } from "./theme";
 import { applyOrientation } from "./orientation";
 import { panelCells } from "../folds";
+import { themeParts } from "../themeParts";
 import { prepareUploadedFile } from "../visualUpload";
 import { isPdfBuffer } from "./rasterizePdf";
 import { pdfPageCount, planPdfPages, type PdfPagePlan } from "./pdfPages";
@@ -84,28 +85,6 @@ export async function resolveProductImage(
   input: ResolveProductImageInput
 ): Promise<ResolvedProductImage> {
   if (input.themeId) {
-    const { data: theme, error: themeError } = await supabase
-      .from("themes")
-      .select("*")
-      .eq("id", input.themeId)
-      .single<Theme>();
-    if (themeError || !theme) {
-      throw new Error("Thème introuvable.");
-    }
-    const { data: overlayData, error: overlayError } = await supabase.storage
-      .from("overlays")
-      .download(theme.overlay_path);
-    if (overlayError || !overlayData) {
-      throw new Error("Impossible de télécharger le graphisme du thème.");
-    }
-    const overlayBuffer = Buffer.from(await overlayData.arrayBuffer());
-    // Fond facultatif : introuvable, le thème se rend quand même sur blanc.
-    let backgroundBuffer: Buffer | null = null;
-    if (theme.background_path) {
-      const { data: backgroundData } = await supabase.storage.from("overlays").download(theme.background_path);
-      if (backgroundData) backgroundBuffer = Buffer.from(await backgroundData.arrayBuffer());
-    }
-
     const { data: rawTemplate, error: templateError } = await supabase
       .from("templates")
       .select("*")
@@ -117,22 +96,14 @@ export async function resolveProductImage(
     const template = applyOrientation(rawTemplate, input.rotated ?? false);
     const pageWidthMm = template.width_mm + template.bleed_mm * 2;
     const pageHeightMm = template.height_mm + template.bleed_mm * 2;
-    const targetWidthPx = mmToPx(pageWidthMm, template.dpi);
-    const targetHeightPx = mmToPx(pageHeightMm, template.dpi);
-
-    const slotBuffers = await Promise.all(
-      (input.themeSlotFiles ?? []).map(async (f) => (f ? Buffer.from(await f.arrayBuffer()) : null))
-    );
-    const buffer = await composeThemeImage(
-      slotBuffers,
-      theme.slots,
-      overlayBuffer,
-      targetWidthPx,
-      targetHeightPx,
-      input.themeSlotAdjust ?? [],
-      backgroundBuffer,
-      { zones: theme.text_zones ?? [], texts: input.themeTexts ?? [], dpi: template.dpi }
-    );
+    const { buffer } = await renderTheme(supabase, input.themeId, {
+      widthPx: mmToPx(pageWidthMm, template.dpi),
+      heightPx: mmToPx(pageHeightMm, template.dpi),
+      dpi: template.dpi,
+      slotFiles: input.themeSlotFiles ?? [],
+      slotAdjust: input.themeSlotAdjust ?? [],
+      texts: input.themeTexts ?? [],
+    });
     return { buffer, contentType: "image/jpeg", filename: "theme.jpg" };
   }
 
@@ -242,4 +213,56 @@ export async function resolveProductImage(
     input.positionY
   );
   return { buffer, contentType: "image/jpeg", filename: "visual-full.jpg" };
+}
+
+/**
+ * Rendu d'une partie d'un thème à une taille donnée (la page du modèle, ou un
+ * volet) : graphisme, fond, photos du client et ses textes. `partKey` absent =
+ * la première partie (le recto d'un thème d'avant).
+ */
+export async function renderTheme(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: SupabaseClient<any>,
+  themeId: string,
+  opts: {
+    widthPx: number;
+    heightPx: number;
+    dpi: number;
+    slotFiles: (File | null)[];
+    slotAdjust: ThemeSlotAdjust[];
+    texts: (string | null | undefined)[];
+    partKey?: string;
+  }
+): Promise<{ buffer: Buffer; theme: Theme }> {
+  const { data: theme, error: themeError } = await supabase.from("themes").select("*").eq("id", themeId).single<Theme>();
+  if (themeError || !theme) {
+    throw new Error("Thème introuvable.");
+  }
+  const parts = themeParts(theme);
+  const part = opts.partKey ? parts.find((p) => p.key === opts.partKey) : parts[0];
+  if (!part) throw new Error("Cette partie du thème n'existe pas.");
+  const { data: overlayData, error: overlayError } = await supabase.storage.from("overlays").download(part.overlay_path);
+  if (overlayError || !overlayData) {
+    throw new Error("Impossible de télécharger le graphisme du thème.");
+  }
+  const overlayBuffer = Buffer.from(await overlayData.arrayBuffer());
+  // Fond facultatif : introuvable, le thème se rend quand même sur blanc.
+  let backgroundBuffer: Buffer | null = null;
+  if (part.background_path) {
+    const { data: backgroundData } = await supabase.storage.from("overlays").download(part.background_path);
+    if (backgroundData) backgroundBuffer = Buffer.from(await backgroundData.arrayBuffer());
+  }
+  const slotBuffers = await Promise.all(opts.slotFiles.map(async (f) => (f ? Buffer.from(await f.arrayBuffer()) : null)));
+  const buffer = await composeThemeImage(
+    slotBuffers,
+    part.slots,
+    overlayBuffer,
+    opts.widthPx,
+    opts.heightPx,
+    opts.slotAdjust,
+    backgroundBuffer,
+    { zones: part.text_zones ?? [], texts: opts.texts, dpi: opts.dpi },
+    part.overlay_fit ?? "fill"
+  );
+  return { buffer, theme };
 }

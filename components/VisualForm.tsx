@@ -24,6 +24,8 @@ export default function VisualForm({
   const [name, setName] = useState(visual?.name ?? "");
   const [nameTouched, setNameTouched] = useState(isEditing);
   const [collectionId, setCollectionId] = useState(visual?.collection_id ?? "");
+  // "auto" : deviné d'après l'image à l'enregistrement (voir lib/visualPattern.ts).
+  const [isPattern, setIsPattern] = useState<"auto" | "true" | "false">(visual ? String(visual.is_pattern) as "true" | "false" : "auto");
   const [files, setFiles] = useState<File[]>([]);
   const [preview, setPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -61,6 +63,7 @@ export default function VisualForm({
       const formData = new FormData();
       formData.append("name", name);
       formData.append("collectionId", collectionId);
+      formData.append("isPattern", isPattern);
       if (files[0]) formData.append("file", files[0]);
 
       const res = await fetch(isEditing ? `/api/visuals/${visual!.id}` : "/api/visuals", {
@@ -86,6 +89,7 @@ export default function VisualForm({
       const formData = new FormData();
       formData.append("name", stripExtension(f.name));
       formData.append("collectionId", collectionId);
+      formData.append("isPattern", isPattern);
       formData.append("file", f);
       const res = await fetch("/api/visuals", { method: "POST", body: formData });
       if (!res.ok) failed.push(f.name);
@@ -160,6 +164,23 @@ export default function VisualForm({
             </option>
           ))}
         </select>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium">Motif répétable</label>
+        <select
+          value={isPattern}
+          onChange={(e) => setIsPattern(e.target.value as typeof isPattern)}
+          className="mt-1 w-full input"
+        >
+          <option value="auto">Détecter automatiquement</option>
+          <option value="true">Oui, motif répétable</option>
+          <option value="false">Non, visuel simple</option>
+        </select>
+        <p className="mt-1 text-xs text-neutral-500">
+          Un motif se répète sans raccord visible (mosaïque). La détection compare les bords opposés de
+          l&apos;image{files.length > 1 ? ", fichier par fichier" : ""}.
+        </p>
       </div>
 
       {progress && (

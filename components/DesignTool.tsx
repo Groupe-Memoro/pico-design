@@ -11,7 +11,9 @@ import type { VisualWithUrl } from "@/components/VisualsGrid";
 import type { ThemeWithOverlayUrl } from "@/components/ThemesTable";
 import type { Category, Sku, Template, TemplateMockup, IllustrationWithUrl } from "@/lib/types";
 import { pdfPageCount, planPdfPages } from "@/lib/pdf/pdfPages";
-import { parseFold } from "@/lib/folds";
+import { allowsPanels, allowsSheet, parseFold } from "@/lib/folds";
+import { emptyFill, type CardTheme } from "@/components/ThemePartFiller";
+import { partSide, themeParts } from "@/lib/themeParts";
 import { applyOrientation } from "@/lib/pdf/orientation";
 import type { DesignLayer } from "@/lib/design/layers";
 import { prestageFiles } from "@/lib/design/stageUpload";
@@ -115,6 +117,9 @@ export default function DesignTool({
   const [designType, setDesignType] = useState<"single" | "mosaic" | "theme" | "panels">("single");
   const [mosaicGrid, setMosaicGrid] = useState(DEFAULT_MOSAIC_GRID);
   const [selectedTheme, setSelectedTheme] = useState<ThemeWithOverlayUrl | null>(null);
+  // Thème en parties (carte pliée, ou thème avec un verso — voir
+  // lib/themeParts.ts) : choisi une fois, ses parties rendues à leur place.
+  const [cardTheme, setCardTheme] = useState<CardTheme | null>(null);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [frontLayers, setFrontLayers] = useState<DesignLayer[]>([]);
   const [backLayers, setBackLayers] = useState<DesignLayer[]>([]);
@@ -130,7 +135,12 @@ export default function DesignTool({
         ? { cols: effectiveFold.panels, rows: 1 }
         : { cols: 1, rows: effectiveFold.panels }
       : mosaicGrid;
-  const themesForTemplate = themes.filter((t) => t.template_id === template?.id);
+  // Thèmes du modèle : par planche, ou par volet si le modèle se compose par
+  // volet (voir la migration 0086).
+  const templateFold = template ? parseFold(template.fold) : null;
+  const themesForTemplate = themes.filter(
+    (t) => t.template_id === template?.id && (t.scope === "panel" ? allowsPanels(templateFold) : allowsSheet(templateFold))
+  );
   const mockupsForTemplate = mockups.filter((m) => m.template_id === template?.id);
 
   // Un modèle plié conçu seulement « par volet » s'ouvre directement ainsi.
@@ -177,6 +187,13 @@ export default function DesignTool({
     type: "single" | "mosaic" | "theme" | "panels",
     extra?: { grid?: { cols: number; rows: number }; theme?: ThemeWithOverlayUrl }
   ) {
+    // Thème en parties (carte pliée, ou avec un verso) : rendu partie par
+    // partie, à sa place — voir selectCardTheme.
+    if (type === "theme" && extra?.theme && template && isCardTheme(extra.theme, template)) {
+      selectCardTheme(extra.theme);
+      return;
+    }
+    setCardTheme(null);
     if (type === "panels") {
       // Une case par volet, au recto comme au verso ; les cases déjà remplies
       // restent si le nombre de volets n'a pas changé.
@@ -242,6 +259,48 @@ export default function DesignTool({
     }));
   }
 
+  // Un thème se remplit partie par partie (lib/themeParts.ts) pour un modèle
+  // plié, ou s'il a autre chose que le recto. Sinon, le mode Thème d'avant
+  // (photos cadrées à la main dans le recto).
+  function isCardTheme(theme: ThemeWithOverlayUrl, t: Template) {
+    return Boolean(parseFold(t.fold)) || themeParts(theme).some((p) => p.key !== "front");
+  }
+
+  function selectCardTheme(theme: ThemeWithOverlayUrl) {
+    const same = cardTheme?.theme.id === theme.id;
+    const parts = themeParts(theme);
+    // Toutes les parties dès le choix : chacune garde la même identité d'un
+    // affichage à l'autre (voir ThemePartFiller).
+    setCardTheme(same ? cardTheme : { theme, fills: Object.fromEntries(parts.map((p) => [p.key, emptyFill(p)])) });
+    setSelectedTheme(null);
+    if (same) return;
+    if (theme.scope === "panel") {
+      // Une case par volet, recto et verso ; les volets du thème se rendent,
+      // les autres restent libres pour une photo ou un fichier.
+      const count = parseFold(template?.fold)?.panels ?? 0;
+      setDesignType("panels");
+      const toPanels = (v: ImageSourceValue): ImageSourceValue => ({
+        ...v,
+        sourceMode: "mosaic",
+        mosaicFiles: Array.from({ length: count }, () => null),
+        mosaicCellAdjust: [],
+      });
+      setFront(toPanels);
+      setBack(toPanels);
+      return;
+    }
+    // Par planche : chaque face du thème devient le fichier de cette face.
+    setDesignType("single");
+    const covers = (side: "front" | "back") => parts.some((p) => partSide(p.key) === side);
+    const toSheet = (side: "front" | "back") => (v: ImageSourceValue): ImageSourceValue => ({
+      ...v,
+      sourceMode: "upload",
+      file: covers(side) ? null : v.sourceMode === "upload" ? v.file : null,
+    });
+    setFront(toSheet("front"));
+    setBack(toSheet("back"));
+  }
+
   function handleRestart() {
     setCategory(null);
     setTemplate(null);
@@ -253,6 +312,7 @@ export default function DesignTool({
     setDesignType("single");
     setMosaicGrid(DEFAULT_MOSAIC_GRID);
     setSelectedTheme(null);
+    setCardTheme(null);
     setReviewOpen(false);
     setPhase("pick");
   }
@@ -350,6 +410,8 @@ export default function DesignTool({
           onRotatedChange={setRotated}
           visuals={visuals}
           themesForTemplate={themesForTemplate}
+          cardTheme={cardTheme}
+          setCardTheme={setCardTheme}
           illustrations={illustrations}
           front={front}
           back={back}

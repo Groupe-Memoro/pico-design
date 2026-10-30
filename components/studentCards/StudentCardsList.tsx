@@ -7,9 +7,9 @@ import Modal from "@/components/Modal";
 import UpdatingBadge from "@/components/UpdatingBadge";
 import { FilePenIcon, SpinnerIcon, TrashIcon } from "@/components/icons";
 import { CARD_FORMATS, type StudentCardTemplate } from "@/lib/studentCards/types";
+import { formatSizeInMm } from "@/lib/pdf/units";
 
-const formatLabel = (w: number, h: number) =>
-  `${String(Number(w)).replace(".", ",")} × ${String(Number(h)).replace(".", ",")} mm`;
+const formatLabel = (w: number, h: number) => formatSizeInMm(Number(w), Number(h));
 
 // Vignette du recto, rendue comme à la production avec l'élève d'exemple
 // (voir thumbnailVariableData). L'URL change à chaque enregistrement.

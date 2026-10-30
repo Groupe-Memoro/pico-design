@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CopyIcon, SpinnerIcon, TrashIcon } from "@/components/icons";
 import FontPicker from "@/components/FontPicker";
+import ColorPickerButton from "@/components/ColorPickerButton";
+import { FontSizeInput, LengthInput, UnitsBar, formatLength, unitLabel, useFontUnit, useLengthUnit } from "@/components/UnitInputs";
 import { fontOptionById } from "@/lib/design/fonts";
 import { loadFont } from "@/lib/design/fontLoader";
 import {
@@ -228,6 +230,8 @@ export default function VariableDataEditor({
   const [extraValue, setExtraValue] = useState(extraField?.value ?? "");
   const [twoSided, setTwoSided] = useState(template.two_sided);
   const [zones, setZones] = useState<CardZone[]>(template.zones ?? []);
+  const [lengthUnit] = useLengthUnit();
+  const [fontUnit] = useFontUnit();
   const [sample, setSample] = useState<CardSample | null>(template.sample);
   const [photoColumn, setPhotoColumn] = useState<string>(template.photo_column ?? "");
   const [side, setSide] = useState<CardSide>("front");
@@ -1123,7 +1127,7 @@ export default function VariableDataEditor({
               {guides.bleed > 0 && (
                 <span className="flex items-center gap-1.5">
                   <span className="inline-block h-3 w-5 border border-rose-300 bg-rose-100" /> Fond perdu (
-                  {String(Math.round(guides.bleed * 100) / 100).replace(".", ",")} mm)
+                  {formatLength(guides.bleed, lengthUnit)})
                 </span>
               )}
               {(guides.safetyX > 0 || guides.safetyY > 0) && (
@@ -1282,14 +1286,13 @@ export default function VariableDataEditor({
             ) : (
               <div className="space-y-3">
                 <AlignBar count={1} onAlign={align} />
+                <UnitsBar font={selected.kind === "text"} />
                 <div className="grid grid-cols-4 gap-2">
                   {(["x", "y", "width", "height"] as const).map((key) => (
-                    <Field key={key} label={{ x: "X (mm)", y: "Y (mm)", width: "Largeur", height: "Hauteur" }[key]}>
-                      <input
-                        type="number"
-                        step={0.1}
-                        value={selected[key]}
-                        onChange={(e) => updateZone(selected.id, { [key]: Number(e.target.value) || 0 })}
+                    <Field key={key} label={`${{ x: "X", y: "Y", width: "Largeur", height: "Hauteur" }[key]} (${unitLabel(lengthUnit)})`}>
+                      <LengthInput
+                        valueMm={selected[key]}
+                        onChange={(mm) => updateZone(selected.id, { [key]: mm })}
                         className={inputClass}
                       />
                     </Field>
@@ -1398,22 +1401,20 @@ export default function VariableDataEditor({
                     </Field>
                     <div className="grid grid-cols-2 gap-2">
                       <Field label="Couleur">
-                        <input
-                          type="color"
-                          value={selected.color}
-                          onChange={(e) => updateZone(selected.id, { color: e.target.value })}
-                          className="mt-1 h-9 w-full cursor-pointer rounded border border-neutral-300"
-                        />
+                        <div className="mt-1 flex h-9 items-center gap-2">
+                          <ColorPickerButton
+                            value={selected.color}
+                            onChange={(color) => updateZone(selected.id, { color })}
+                            label="Couleur du texte"
+                          />
+                          <span className="font-mono text-xs uppercase text-neutral-500">{selected.color}</span>
+                        </div>
                       </Field>
-                      <Field label="Taille max. (mm)">
-                        <input
-                          type="number"
-                          min={1.2}
-                          step={0.1}
-                          value={selected.maxFontMm}
-                          onChange={(e) =>
-                            updateZone(selected.id, { maxFontMm: Math.max(1.2, Number(e.target.value) || 1.2) })
-                          }
+                      <Field label={`Taille max. (${fontUnit})`}>
+                        <FontSizeInput
+                          valueMm={selected.maxFontMm}
+                          minMm={1.2}
+                          onChange={(maxFontMm) => updateZone(selected.id, { maxFontMm })}
                           className={inputClass}
                         />
                       </Field>
@@ -1592,14 +1593,12 @@ export default function VariableDataEditor({
                 {userGuides.map((g) => (
                   <li key={g.id} className="flex items-center gap-2 text-xs text-neutral-600">
                     <span className="w-20">{g.axis === "v" ? "Vertical, X" : "Horizontal, Y"}</span>
-                    <input
-                      type="number"
-                      step={0.1}
-                      value={g.pos}
-                      onChange={(e) => updateGuide(g.id, Number(e.target.value) || 0)}
+                    <LengthInput
+                      valueMm={g.pos}
+                      onChange={(mm) => updateGuide(g.id, mm)}
                       className="w-20 rounded border border-neutral-300 px-2 py-1 text-sm"
                     />
-                    <span>mm</span>
+                    <span>{unitLabel(lengthUnit)}</span>
                     <button
                       type="button"
                       onClick={() => removeGuide(g.id)}

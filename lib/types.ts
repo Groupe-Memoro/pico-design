@@ -73,6 +73,21 @@ export interface Template {
 }
 
 export type VisualMode = "full" | "tile";
+export type ThemeFit = "fill" | "cover";
+export type ThemeScope = "sheet" | "panel";
+
+// Une partie d'un thème : une face entière (« front », « back ») ou un volet
+// (« front:1 », voir panelKey dans lib/folds.ts).
+export interface ThemePart {
+  key: string;
+  overlay_path: string;
+  background_path?: string | null;
+  overlay_fit?: ThemeFit;
+  slots: ThemeSlot[];
+  text_zones?: ThemeTextZone[];
+  guides?: { id: string; axis: "v" | "h"; pos: number }[];
+}
+
 export type LogoShape = "logo" | "pastille";
 
 // Un emplacement de photo dans un Thème : position (centre) + taille,
@@ -163,6 +178,17 @@ export interface Theme {
   // supabase/migrations/0068_theme_background.sql) : visible là où il n'y a
   // pas de photo. Sans fond, la page est blanche sous les photos.
   background_path?: string | null;
+  // Cadrage du graphisme et du fond sur la page (voir la migration 0085) :
+  // 'fill' = étirés (thèmes d'avant), 'cover' = recadrés sans déformation.
+  // Absent avant la migration = 'fill'.
+  overlay_fit?: ThemeFit;
+  // Par planche (la feuille entière) ou par volet d'un produit plié (voir la
+  // migration 0086). Absent avant la migration = par planche.
+  scope?: ThemeScope;
+  // Parties du thème (voir lib/themeParts.ts et la migration 0087) : recto
+  // et/ou verso par planche, ou des volets. Vide/absent = une seule partie, le
+  // recto, décrite par les colonnes ci-dessous (thèmes d'avant).
+  parts?: ThemePart[];
   slots: ThemeSlot[];
   // Zones de texte libres (voir lib/themeText.ts et la migration 0076) : le
   // client y écrit ce qu'il veut, dans la police et la couleur fixées ici.
@@ -221,6 +247,8 @@ export interface Visual {
   file_path: string;
   mime_type: string;
   collection_id: string | null;
+  // Motif répétable (mosaïque sans raccord visible), voir 0084.
+  is_pattern: boolean;
   created_at: string;
   created_by: string | null;
 }

@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { Template, ThemeSlot, ThemeSlotShape, ThemeTextZone } from "@/lib/types";
+import type { Template, ThemePart, ThemeScope, ThemeSlot, ThemeSlotShape, ThemeTextZone } from "@/lib/types";
+import { themePartChoices, themeParts } from "@/lib/themeParts";
 import ThemeTextOverlay from "@/components/ThemeTextOverlay";
 import { MAX_THEME_TEXT_ZONES, THEME_TEXT_ALIGNS, THEME_TEXT_VERTICAL_ALIGNS, newThemeTextZone } from "@/lib/themeText";
 import type { ThemeWithOverlayUrl } from "@/components/ThemesTable";
@@ -24,6 +25,11 @@ import {
 } from "@/lib/themeShapes";
 import { templateOptionLabel } from "@/lib/templateLabel";
 import FontPicker from "@/components/FontPicker";
+import ColorPickerButton from "@/components/ColorPickerButton";
+import { FontSizeInput, FontUnitToggle, LengthInput, LengthUnitToggle, formatLength, unitLabel, useLengthUnit } from "@/components/UnitInputs";
+import { allowsPanels, foldLines, panelThemeFormat, panelThemePlacement, parseFold, parsePanelKey } from "@/lib/folds";
+import { checkThemeFile, fillToCover, themePagePx, type ThemePage } from "@/lib/themeFit";
+import { formatInMm, formatSizeInMm } from "@/lib/pdf/units";
 
 const MIN_RATIO = 0.05;
 // Distance (px à l'écran) sous laquelle un cadre s'aimante à un repère.
@@ -84,10 +90,44 @@ const DEFAULT_POLYGON_SIDES = 6;
  * rendu final, voir lib/pdf/theme.ts) : permet de voir à la fois ses zones
  * découpées ET les rectangles des emplacements, pour les aligner précisément.
  */
+// Une partie du thème en cours d'édition (voir lib/themeParts.ts) : ce qui
+// est enregistré, plus les fichiers choisis et les retraits pas encore envoyés.
+interface PartDraft {
+  slots: ThemeSlot[];
+  textZones: ThemeTextZone[];
+  guides: UserGuide[];
+  overlayFile: File | null;
+  overlayPreview: string | null;
+  backgroundFile: File | null;
+  backgroundPreview: string | null;
+  removeBackground: boolean;
+  // Thème d'avant à l'image étirée, corrigé sans nouveau fichier (voir fixStretch).
+  fixedStretch: boolean;
+  // Partie retirée du thème (enregistrée avant, à supprimer).
+  removed: boolean;
+}
+
+const EMPTY_DRAFT: PartDraft = {
+  slots: [],
+  textZones: [],
+  guides: [],
+  overlayFile: null,
+  overlayPreview: null,
+  backgroundFile: null,
+  backgroundPreview: null,
+  removeBackground: false,
+  fixedStretch: false,
+  removed: false,
+};
+
+function draftFromPart(p: ThemePart): PartDraft {
+  return { ...EMPTY_DRAFT, slots: p.slots, textZones: p.text_zones ?? [], guides: p.guides ?? [] };
+}
+
 export default function ThemeForm({
   theme,
   templates,
-  currentOverlayUrl,
+  currentOverlayUrl: currentOverlayUrlProp,
   onSuccess,
   onBusyChange,
 }: {
@@ -98,21 +138,66 @@ export default function ThemeForm({
   onBusyChange?: (busy: boolean) => void;
 }) {
   const isEditing = Boolean(theme);
+  const [lengthUnit] = useLengthUnit();
   const [templateId, setTemplateId] = useState(theme?.template_id ?? templates[0]?.id ?? "");
   const [name, setName] = useState(theme?.name ?? "");
-  // Calculés avant l'état `slots` (juste en dessous) : son initialisation
-  // (defaultSlot) en a besoin pour un premier emplacement carré dès le
-  // départ — sans template (aucun modèle disponible), 1 = carré par défaut.
-  const template = templates.find((t) => t.id === templateId) ?? null;
+  const baseTemplate = templates.find((t) => t.id === templateId) ?? null;
+  // Par planche ou par volet (voir la migration 0086) : par volet seulement
+  // pour un modèle plié qui se compose par volet.
+  const [scope, setScope] = useState<ThemeScope>(theme?.scope ?? "sheet");
+  const panelFold = baseTemplate && allowsPanels(parseFold(baseTemplate.fold)) ? parseFold(baseTemplate.fold) : null;
+  const effectiveScope: ThemeScope = panelFold ? scope : "sheet";
+
+  // Parties du thème (voir lib/themeParts.ts) : recto et/ou verso par planche,
+  // ou n'importe quels volets par volet. Chacune a son graphisme, son fond, ses
+  // emplacements, ses textes et ses repères ; l'onglet ouvert est la partie
+  // éditée, et tout l'éditeur ci-dessous travaille sur elle.
+  const savedParts = theme ? themeParts(theme) : [];
+  const partChoices = baseTemplate ? themePartChoices(baseTemplate, effectiveScope) : [{ key: "front", label: "Recto" }];
+  const [drafts, setDrafts] = useState<Record<string, PartDraft>>(() =>
+    Object.fromEntries(savedParts.map((p) => [p.key, draftFromPart(p)]))
+  );
+  const [activeKeyState, setActiveKey] = useState(() => savedParts[0]?.key ?? "front");
+  const activeKey = partChoices.some((c) => c.key === activeKeyState) ? activeKeyState : partChoices[0].key;
+  const activeLabel = partChoices.find((c) => c.key === activeKey)?.label ?? "";
+  const savedPart = savedParts.find((p) => p.key === activeKey) ?? null;
+  const draft = drafts[activeKey] ?? EMPTY_DRAFT;
+  function draftSetter<K extends keyof PartDraft>(k: K) {
+    return (u: React.SetStateAction<PartDraft[K]>) =>
+      setDrafts((all) => {
+        const d = all[activeKey] ?? EMPTY_DRAFT;
+        const v = typeof u === "function" ? (u as (prev: PartDraft[K]) => PartDraft[K])(d[k]) : u;
+        return { ...all, [activeKey]: { ...d, [k]: v } };
+      });
+  }
+  // Une partie fait partie du thème si elle a un graphisme (nouveau ou enregistré).
+  const partIncluded = (key: string) => {
+    const d = drafts[key];
+    return !d?.removed && Boolean(d?.overlayFile || savedParts.some((p) => p.key === key));
+  };
+
+  const panelAt = effectiveScope === "panel" ? parsePanelKey(activeKey) : null;
+  // Format de la partie : la page entière, ou le volet (fond perdu des 4 côtés).
+  const panelFormat = panelFold && baseTemplate && panelAt ? panelThemeFormat(baseTemplate, activeKey) : null;
+  const template: Template | null =
+    panelFormat ? { ...panelFormat, fold_marks_vertical_mm: [], fold_marks_horizontal_mm: [] } : baseTemplate;
+  // Volet : côtés qui tombent sur un pli, où le fond perdu est retiré au rendu.
+  const placement = panelAt && baseTemplate ? panelThemePlacement(baseTemplate, panelAt.side, panelAt.index) : null;
+  const panelFoldSafety =
+    panelFold && placement
+      ? { direction: panelFold.direction, safetyMm: panelFold.safetyMm, start: placement.cutStart, end: placement.cutEnd, label: activeLabel }
+      : null;
   const pageAspectRatio = template ? (template.width_mm + template.bleed_mm * 2) / (template.height_mm + template.bleed_mm * 2) : 1;
-  const [slots, setSlots] = useState<ThemeSlot[]>(() => theme?.slots ?? [defaultSlot(0, pageAspectRatio)]);
+  const slots = draft.slots;
+  const setSlots = draftSetter("slots");
   // Page du modèle en mm, fond perdu compris : les repères s'y mesurent.
   const pageW = template ? template.width_mm + template.bleed_mm * 2 : 1;
   const pageH = template ? template.height_mm + template.bleed_mm * 2 : 1;
   // Repères (voir lib/variableData/snap.ts) : lignes posées par l'utilisateur,
   // en mm ; avec le magnétisme, les cadres s'y collent, comme à la coupe, à
   // la marge de sécurité, aux plis, au centre et aux autres cadres.
-  const [userGuides, setUserGuides] = useState<UserGuide[]>(() => theme?.guides ?? []);
+  const userGuides = draft.guides;
+  const setUserGuides = draftSetter("guides");
   const [snapOn, setSnapOn] = useState(true);
   const [showGuides, setShowGuides] = useState(true);
   // Ligne où un cadre s'aimante pendant le glisser (ratios de la page).
@@ -120,15 +205,21 @@ export default function ThemeForm({
   const guideDragRef = useRef<string | null>(null);
   // Zones de texte libres (voir lib/themeText.ts) : le client y écrit ce
   // qu'il veut ; la zone ouverte dans le panneau est encadrée sur l'aperçu.
-  const [textZones, setTextZones] = useState<ThemeTextZone[]>(() => theme?.text_zones ?? []);
+  const textZones = draft.textZones;
+  const setTextZones = draftSetter("textZones");
   const [selectedZone, setSelectedZone] = useState<number | null>(null);
-  const [overlayFile, setOverlayFile] = useState<File | null>(null);
-  const [overlayPreview, setOverlayPreview] = useState<string | null>(null);
+  const overlayFile = draft.overlayFile;
+  const setOverlayFile = draftSetter("overlayFile");
+  const overlayPreview = draft.overlayPreview;
+  const setOverlayPreview = draftSetter("overlayPreview");
   // Image de fond facultative (sous les photos) : un nouveau fichier, ou le
   // retrait de celle enregistrée.
-  const [backgroundFile, setBackgroundFile] = useState<File | null>(null);
-  const [backgroundPreview, setBackgroundPreview] = useState<string | null>(null);
-  const [removeBackground, setRemoveBackground] = useState(false);
+  const backgroundFile = draft.backgroundFile;
+  const setBackgroundFile = draftSetter("backgroundFile");
+  const backgroundPreview = draft.backgroundPreview;
+  const setBackgroundPreview = draftSetter("backgroundPreview");
+  const removeBackground = draft.removeBackground;
+  const setRemoveBackground = draftSetter("removeBackground");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Tracé d'un polygone au clic : l'emplacement visé (un existant, ou "new"
@@ -153,7 +244,31 @@ export default function ThemeForm({
     });
   }
 
+  // Fichiers enregistrés de la partie ouverte.
+  const currentOverlayUrl =
+    theme?.partUrls?.[activeKey]?.overlayUrl ?? (savedPart && savedPart.key === savedParts[0]?.key ? currentOverlayUrlProp ?? null : null);
   const overlayUrl = overlayPreview ?? currentOverlayUrl ?? null;
+
+  // Thème d'avant au graphisme étiré : passe au recadrage sans déformation en
+  // gardant le fichier, et recale emplacements, zones de texte et repères sur
+  // les mêmes parties du graphisme. Rien n'est enregistré avant « Enregistrer ».
+  function fixStretch(fileW: number, fileH: number) {
+    if (!template) return;
+    const m = fillToCover(fileW, fileH, template);
+    setSlots((list) => list.map((f) => m.frame(f)));
+    setTextZones((list) => list.map((f) => m.frame(f)));
+    setUserGuides((list) => list.map((g) => ({ ...g, pos: m.guide(g.axis, g.pos) })));
+    setFixedStretch(true);
+  }
+  // Cadrage du graphisme et du fond (voir 0085_theme_fit.sql) : un nouveau
+  // thème ou un nouveau graphisme est recadré sans déformation ; un thème
+  // d'avant reste étiré tant que son graphisme n'est pas remplacé.
+  const fixedStretch = draft.fixedStretch;
+  const setFixedStretch = draftSetter("fixedStretch");
+  const fit = !savedPart || overlayFile || fixedStretch ? "cover" : (savedPart.overlay_fit ?? "fill");
+  const fitClass = fit === "cover" ? "object-cover" : "object-fill";
+  // Au verso, les plis d'un pli roulé tombent ailleurs (volets inversés).
+  const folds = template ? foldLines(template, activeKey === "back" ? "back" : "front") : null;
 
   function handleBackgroundChange(f: File | null) {
     setBackgroundFile(f);
@@ -164,7 +279,9 @@ export default function ThemeForm({
     });
   }
 
-  const currentBackgroundUrl = removeBackground ? null : (theme?.backgroundUrl ?? null);
+  const currentBackgroundUrl = removeBackground
+    ? null
+    : (theme?.partUrls?.[activeKey]?.backgroundUrl ?? (savedPart && savedPart.key === savedParts[0]?.key ? theme?.backgroundUrl ?? null : null));
   const backgroundUrl = backgroundPreview ?? currentBackgroundUrl;
 
   const previewBoxRef = useRef<HTMLDivElement>(null);
@@ -224,6 +341,20 @@ export default function ThemeForm({
       h.push(b / pageH, 1 - b / pageH, (b + template.safety_margin_y_mm) / pageH, 1 - (b + template.safety_margin_y_mm) / pageH);
       for (const f of template.fold_marks_vertical_mm ?? []) v.push((b + f) / pageW);
       for (const f of template.fold_marks_horizontal_mm ?? []) h.push((b + f) / pageH);
+      if (panelFoldSafety) {
+        // Bords du volet qui peuvent tomber sur un pli, et leur zone de sécurité.
+        const sm = panelFoldSafety.safetyMm;
+        const axis = panelFoldSafety.direction === "vertical" ? v : h;
+        const len = panelFoldSafety.direction === "vertical" ? pageW : pageH;
+        if (panelFoldSafety.start) axis.push((b + sm) / len);
+        if (panelFoldSafety.end) axis.push(1 - (b + sm) / len);
+      }
+      for (const f of folds?.positionsMm ?? []) {
+        // Le pli et le bord de sa zone de sécurité, de chaque côté.
+        const at = [f - folds!.safetyMm, f, f + folds!.safetyMm];
+        if (folds!.direction === "vertical") v.push(...at.map((x) => (b + x) / pageW));
+        else h.push(...at.map((y) => (b + y) / pageH));
+      }
     }
     const frames = [
       ...slots.filter((_, i) => i !== except.slot),
@@ -586,8 +717,18 @@ export default function ThemeForm({
       setError("Choisis un modèle.");
       return;
     }
-    if (!isEditing && !overlayFile) {
-      setError("Choisis un graphisme.");
+    // Parties envoyées : celles qui ont un graphisme, dans l'ordre des onglets.
+    const included = partChoices.filter((c) => partIncluded(c.key));
+    const incomplete = partChoices.find((c) => {
+      const d = drafts[c.key];
+      return d && !d.removed && !partIncluded(c.key) && (d.slots.length > 0 || d.textZones.length > 0);
+    });
+    if (incomplete) {
+      setError(`Ajoute un graphisme pour « ${incomplete.label} », ou retire cette partie.`);
+      return;
+    }
+    if (included.length === 0) {
+      setError("Choisis un graphisme pour au moins une partie.");
       return;
     }
     setLoading(true);
@@ -595,15 +736,29 @@ export default function ThemeForm({
 
     const formData = new FormData();
     formData.append("templateId", templateId);
+    formData.append("scope", effectiveScope);
     formData.append("name", name);
-    formData.append("slots", JSON.stringify(slots));
-    formData.append("textZones", JSON.stringify(textZones));
-    // Envoyés seulement s'il y en a (ou s'il y en avait) : un thème reste
-    // enregistrable avant la migration 0083.
-    if (userGuides.length > 0 || (theme?.guides?.length ?? 0) > 0) formData.append("guides", JSON.stringify(userGuides));
-    if (overlayFile) formData.append("overlay", overlayFile);
-    if (backgroundFile) formData.append("background", backgroundFile);
-    else if (removeBackground) formData.append("removeBackground", "true");
+    formData.append(
+      "parts",
+      JSON.stringify(
+        included.map((c) => {
+          const d = drafts[c.key] ?? EMPTY_DRAFT;
+          return {
+            key: c.key,
+            slots: d.slots,
+            textZones: d.textZones,
+            guides: d.guides,
+            fixFit: d.fixedStretch && !d.overlayFile,
+            removeBackground: d.removeBackground && !d.backgroundFile,
+          };
+        })
+      )
+    );
+    for (const c of included) {
+      const d = drafts[c.key];
+      if (d?.overlayFile) formData.append(`overlay@${c.key}`, d.overlayFile);
+      if (d?.backgroundFile) formData.append(`background@${c.key}`, d.backgroundFile);
+    }
 
     const res = await fetch(isEditing ? `/api/themes/${theme!.id}` : "/api/themes", {
       method: isEditing ? "PATCH" : "POST",
@@ -649,9 +804,90 @@ export default function ThemeForm({
           </select>
         </div>
 
+        {panelFold && baseTemplate && (
+          <div>
+            <label className="block text-sm font-medium">Type de thème</label>
+            <div className="mt-1 flex overflow-hidden rounded-lg border border-neutral-300 text-sm">
+              {(
+                [
+                  ["sheet", "Par planche"],
+                  ["panel", "Par volet"],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => {
+                    setScope(value);
+                    setSelectedZone(null);
+                    setDrawing(null);
+                  }}
+                  aria-pressed={effectiveScope === value}
+                  className={`flex-1 px-3 py-1.5 ${effectiveScope === value ? "bg-pico-maroon text-white" : "bg-surface text-neutral-700 hover:bg-neutral-50"}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1 text-xs text-neutral-500">
+              {effectiveScope === "panel"
+                ? "Un graphisme par volet, sur les volets de ton choix (ex. la couverture et l'intérieur gauche)."
+                : "Un graphisme par face, au recto et/ou au verso, sur toute la feuille ouverte."}
+            </p>
+          </div>
+        )}
+
+        {partChoices.length > 1 && (
+          <div>
+            <label className="block text-sm font-medium">{effectiveScope === "panel" ? "Volets" : "Faces"}</label>
+            <p className="text-xs text-neutral-500">
+              Remplis les {effectiveScope === "panel" ? "volets" : "faces"} de ton choix ; les autres restent libres pour le client.
+            </p>
+            <div className="mt-1 flex flex-wrap gap-1.5">
+              {partChoices.map((c) => (
+                <button
+                  key={c.key}
+                  type="button"
+                  onClick={() => {
+                    setActiveKey(c.key);
+                    setSelectedZone(null);
+                    setDrawing(null);
+                  }}
+                  aria-pressed={activeKey === c.key}
+                  className={`rounded-lg border px-2.5 py-1 text-xs ${
+                    activeKey === c.key
+                      ? "border-pico-maroon bg-pico-maroon text-white"
+                      : "border-neutral-300 bg-surface text-neutral-700 hover:bg-neutral-50"
+                  }`}
+                >
+                  {partIncluded(c.key) ? "✓ " : ""}
+                  {c.label}
+                </button>
+              ))}
+            </div>
+            {partIncluded(activeKey) && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (!confirm(`Retirer « ${activeLabel} » du thème ?`)) return;
+                  setDrafts((all) => ({ ...all, [activeKey]: { ...EMPTY_DRAFT, removed: savedParts.some((p) => p.key === activeKey) } }));
+                  setSelectedZone(null);
+                  setDrawing(null);
+                }}
+                className="mt-1 text-xs text-danger hover:underline"
+              >
+                Retirer « {activeLabel} » du thème
+              </button>
+            )}
+          </div>
+        )}
+
+        {template && <ThemePageInfo template={template} panelFold={panelFoldSafety} />}
+
         <div>
           <label className="block text-sm font-medium">
-            Graphisme (PNG avec transparence){currentOverlayUrl ? " — laisser vide pour garder l'actuel" : ""}
+            Graphisme{partChoices.length > 1 ? ` — ${activeLabel}` : ""} (PNG avec transparence)
+            {currentOverlayUrl ? " — laisser vide pour garder l'actuel" : ""}
           </label>
           <div className="mt-1">
             <FileDropZone
@@ -661,6 +897,9 @@ export default function ThemeForm({
               previewUrl={overlayPreview ?? currentOverlayUrl ?? null}
             />
           </div>
+          {template && overlayUrl && (
+            <ThemeFileNote url={overlayUrl} template={template} fit={fit} onFixStretch={fixStretch} fixed={fixedStretch} />
+          )}
           <p className="mt-1 text-xs text-neutral-500">
             Zones transparentes = là où les photos du client apparaîtront ; le reste (cadre, décor) reste
             visible par-dessus.
@@ -679,9 +918,10 @@ export default function ThemeForm({
               previewUrl={backgroundUrl}
             />
           </div>
+          {template && backgroundUrl && <ThemeFileNote url={backgroundUrl} template={template} fit={fit} />}
           <div className="mt-1 flex items-center justify-between gap-3">
             <p className="text-xs text-neutral-500">
-              Posée sous les photos, étirée à la page : visible là où il n&apos;y a pas de photo.
+              Posée sous les photos, aux mêmes dimensions que le graphisme : visible là où il n&apos;y a pas de photo.
             </p>
             {currentBackgroundUrl && !backgroundFile && (
               <button
@@ -866,17 +1106,18 @@ export default function ThemeForm({
                             className="mt-1 w-full rounded border border-neutral-300 bg-surface px-2 py-1"
                           />
                         </label>
-                        <label className="block">
-                          <span className="text-neutral-600">Taille max. (mm)</span>
-                          <input
-                            type="number"
-                            step="any"
-                            min={1}
-                            value={zone.fontSizeMm}
-                            onChange={(e) => updateZone(i, { fontSizeMm: Math.max(1, Number(e.target.value) || 1) })}
+                        <div>
+                          <span className="flex items-center justify-between gap-1 text-neutral-600">
+                            Taille max. <FontUnitToggle />
+                          </span>
+                          <FontSizeInput
+                            valueMm={zone.fontSizeMm}
+                            minMm={1}
+                            onChange={(fontSizeMm) => updateZone(i, { fontSizeMm })}
+                            ariaLabel="Taille max. du texte"
                             className="mt-1 w-full rounded border border-neutral-300 px-2 py-1"
                           />
-                        </label>
+                        </div>
                       </div>
                       <label className="flex items-center gap-1.5 text-neutral-600">
                         Rotation
@@ -890,13 +1131,7 @@ export default function ThemeForm({
                         °
                       </label>
                       <div className="flex flex-wrap items-center gap-2">
-                        <input
-                          type="color"
-                          value={zone.color}
-                          onChange={(e) => updateZone(i, { color: e.target.value })}
-                          className="h-7 w-10 cursor-pointer rounded border border-neutral-300"
-                          aria-label="Couleur"
-                        />
+                        <ColorPickerButton value={zone.color} onChange={(color) => updateZone(i, { color })} label="Couleur" />
                         <div className="flex overflow-hidden rounded-lg border border-neutral-300" title="Alignement vertical dans la zone">
                           {THEME_TEXT_VERTICAL_ALIGNS.map((a) => (
                             <button
@@ -989,6 +1224,7 @@ export default function ThemeForm({
                 <input type="checkbox" checked={snapOn} onChange={(e) => setSnapOn(e.target.checked)} />
                 Magnétisme
               </label>
+              <LengthUnitToggle />
             </span>
           </div>
           <div className="flex gap-2">
@@ -1012,14 +1248,12 @@ export default function ThemeForm({
               {userGuides.map((g) => (
                 <li key={g.id} className="flex items-center gap-2 text-xs text-neutral-600">
                   <span className="w-20">{g.axis === "v" ? "Vertical, X" : "Horizontal, Y"}</span>
-                  <input
-                    type="number"
-                    step={0.1}
-                    value={g.pos}
-                    onChange={(e) => updateGuide(g.id, Number(e.target.value) || 0)}
+                  <LengthInput
+                    valueMm={g.pos}
+                    onChange={(mm) => updateGuide(g.id, mm)}
                     className="w-20 rounded border border-neutral-300 px-2 py-1 text-sm"
                   />
-                  <span>mm</span>
+                  <span>{unitLabel(lengthUnit)}</span>
                   <button
                     type="button"
                     onClick={() => removeGuide(g.id)}
@@ -1101,7 +1335,7 @@ export default function ThemeForm({
                 src={backgroundUrl}
                 alt=""
                 draggable={false}
-                className="pointer-events-none absolute inset-0 h-full w-full object-fill"
+                className={`pointer-events-none absolute inset-0 h-full w-full ${fitClass}`}
               />
             )}
             {/* Graphisme SOUS les emplacements, ici seulement : on voit et on attrape
@@ -1113,7 +1347,7 @@ export default function ThemeForm({
                 src={overlayUrl}
                 alt=""
                 draggable={false}
-                className="pointer-events-none absolute inset-0 h-full w-full object-fill"
+                className={`pointer-events-none absolute inset-0 h-full w-full ${fitClass}`}
               />
             )}
             {slots.map((slot, i) => (
@@ -1306,6 +1540,50 @@ export default function ThemeForm({
                       {(template.fold_marks_horizontal_mm ?? []).map((f) => (
                         <line key={`fh-${f}`} x1={0} x2={pageW} y1={b + f} y2={b + f} stroke="#2563eb" strokeWidth={1} strokeDasharray="4 3" vectorEffect="non-scaling-stroke" />
                       ))}
+                      {/* Thème par volet : zone de sécurité du pli sur les deux
+                          côtés qui peuvent y tomber, et le fond perdu retiré. */}
+                      {panelFoldSafety &&
+                        (() => {
+                          const sm = panelFoldSafety.safetyMm;
+                          const vertical = panelFoldSafety.direction === "vertical";
+                          const len = vertical ? pageW : pageH;
+                          // Côté pli : le fond perdu (retiré au rendu) hachuré
+                          // en gris, la ligne du pli, et la zone de sécurité.
+                          const edges = [
+                            panelFoldSafety.start ? { cut: 0, fold: b, safe: b } : null,
+                            panelFoldSafety.end ? { cut: len - b, fold: len - b, safe: len - b - sm } : null,
+                          ].filter((e): e is { cut: number; fold: number; safe: number } => e !== null);
+                          return edges.map((e) =>
+                            vertical ? (
+                              <g key={`pfs-${e.cut}`}>
+                                <rect x={e.cut} y={0} width={b} height={pageH} fill="#6b7280" fillOpacity={0.35} />
+                                <rect x={e.safe} y={0} width={sm} height={pageH} fill="#2563eb" fillOpacity={0.12} />
+                                <line x1={e.fold} x2={e.fold} y1={0} y2={pageH} stroke="#2563eb" strokeWidth={1.5} strokeDasharray="6 3" vectorEffect="non-scaling-stroke" />
+                              </g>
+                            ) : (
+                              <g key={`pfs-${e.cut}`}>
+                                <rect x={0} y={e.cut} width={pageW} height={b} fill="#6b7280" fillOpacity={0.35} />
+                                <rect x={0} y={e.safe} width={pageW} height={sm} fill="#2563eb" fillOpacity={0.12} />
+                                <line x1={0} x2={pageW} y1={e.fold} y2={e.fold} stroke="#2563eb" strokeWidth={1.5} strokeDasharray="6 3" vectorEffect="non-scaling-stroke" />
+                              </g>
+                            )
+                          );
+                        })()}
+                      {/* Plis du modèle : la ligne, et la zone de sécurité de
+                          chaque côté (à garder libre de texte et de visages). */}
+                      {folds?.positionsMm.map((f) =>
+                        folds.direction === "vertical" ? (
+                          <g key={`pv-${f}`}>
+                            <rect x={b + f - folds.safetyMm} y={0} width={2 * folds.safetyMm} height={pageH} fill="#2563eb" fillOpacity={0.12} />
+                            <line x1={b + f} x2={b + f} y1={0} y2={pageH} stroke="#2563eb" strokeWidth={1.5} strokeDasharray="6 3" vectorEffect="non-scaling-stroke" />
+                          </g>
+                        ) : (
+                          <g key={`ph-${f}`}>
+                            <rect x={0} y={b + f - folds.safetyMm} width={pageW} height={2 * folds.safetyMm} fill="#2563eb" fillOpacity={0.12} />
+                            <line x1={0} x2={pageW} y1={b + f} y2={b + f} stroke="#2563eb" strokeWidth={1.5} strokeDasharray="6 3" vectorEffect="non-scaling-stroke" />
+                          </g>
+                        )
+                      )}
                     </>
                   );
                 })()}
@@ -1328,7 +1606,7 @@ export default function ThemeForm({
                     onPointerDown={(e) => beginGuideDrag(e, g.id)}
                     onPointerMove={handleGuideDragMove}
                     onPointerUp={() => (guideDragRef.current = null)}
-                    title={`${g.axis === "v" ? "X" : "Y"} = ${String(g.pos).replace(".", ",")} mm`}
+                    title={`${g.axis === "v" ? "X" : "Y"} = ${formatLength(g.pos, lengthUnit)}`}
                     className={`absolute flex justify-center ${
                       g.axis === "v" ? "inset-y-0 w-2 -translate-x-1/2 cursor-ew-resize" : "inset-x-0 h-2 -translate-y-1/2 cursor-ns-resize flex-col"
                     }`}
@@ -1442,5 +1720,134 @@ function RotateHandle({
         style={{ transform: "translate(-50%, calc(-100% - 14px))" }}
       />
     </>
+  );
+}
+
+// Format attendu des fichiers du thème : la page entière, fond perdu compris,
+// et les plis du modèle.
+function ThemePageInfo({
+  template,
+  panelFold = null,
+}: {
+  template: Template;
+  // Thème par volet : le pli tombe sur l'un des bords, selon le volet.
+  panelFold?: { direction: "vertical" | "horizontal"; safetyMm: number; start: boolean; end: boolean; label: string | null } | null;
+}) {
+  const px = themePagePx(template);
+  const folds = foldLines(template);
+  const pageW = template.width_mm + 2 * template.bleed_mm;
+  const pageH = template.height_mm + 2 * template.bleed_mm;
+  return (
+    <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-xs text-neutral-600">
+      <p>
+        <span className="font-medium text-text">Fichiers attendus : </span>
+        {formatSizeInMm(pageW, pageH)}
+        {template.bleed_mm > 0 ? `, fond perdu de ${formatInMm(template.bleed_mm)} compris de chaque côté` : ", sans fond perdu"}
+        {" "}· {px.width} × {px.height} px à {template.dpi} dpi.
+      </p>
+      {panelFold && (() => {
+        const v = panelFold.direction === "vertical";
+        const sides = [panelFold.start ? (v ? "gauche" : "du haut") : null, panelFold.end ? (v ? "droit" : "du bas") : null].filter(Boolean);
+        return (
+          <p className="mt-1">
+            {panelFold.label ? `Volet ${panelFold.label}. ` : "Format d'un volet, pour n'importe lequel. "}
+            {panelFold.label
+              ? `Le pli est sur le bord ${sides.join(" et le bord ")} (ligne bleue)`
+              : `Le pli tombe sur le bord ${v ? "gauche ou droit" : "du haut ou du bas"} selon le volet`}
+            {" "}: de ce côté, le fond perdu (gris) est retiré au rendu ; garder {formatInMm(panelFold.safetyMm)} libres le long
+            du pli (bande bleue).
+          </p>
+        );
+      })()}
+      {folds && folds.positionsMm.length > 0 && (
+        <p className="mt-1">
+          {folds.positionsMm.length > 1 ? "Plis" : "Pli"} à{" "}
+          {folds.positionsMm.map((f) => formatInMm(f + template.bleed_mm)).join(", ")} du bord
+          {folds.direction === "vertical" ? " gauche" : " du haut"} du fichier ; garder{" "}
+          {formatInMm(folds.safetyMm)} libres de chaque côté (bande bleue).
+        </p>
+      )}
+    </div>
+  );
+}
+
+// Dimensions naturelles d'une image (adresse locale ou signée).
+function useImageSize(url: string): { width: number; height: number } | null {
+  const [size, setSize] = useState<{ url: string; width: number; height: number } | null>(null);
+  useEffect(() => {
+    const img = new Image();
+    img.onload = () => setSize({ url, width: img.naturalWidth, height: img.naturalHeight });
+    img.src = url;
+    return () => {
+      img.onload = null;
+    };
+  }, [url]);
+  return size && size.url === url && size.width > 0 ? size : null;
+}
+
+// Ce que deviendra le fichier sur la page : bon format, recadré, ou étiré
+// (thèmes d'avant la migration 0085, tant que le graphisme n'est pas remplacé).
+function ThemeFileNote({
+  url,
+  template,
+  fit,
+  onFixStretch,
+  fixed = false,
+}: {
+  url: string;
+  template: ThemePage;
+  fit: "fill" | "cover";
+  // Graphisme seulement : corriger l'étirement sans renvoyer le fichier.
+  onFixStretch?: (fileW: number, fileH: number) => void;
+  fixed?: boolean;
+}) {
+  const size = useImageSize(url);
+  if (!size) return null;
+  const check = checkThemeFile(size.width, size.height, template);
+  const lowRes = check.dpi < template.dpi * 0.66;
+  const res = ` ${size.width} × ${size.height} px, ≈ ${check.dpi} dpi à l'impression.`;
+  if (check.kind === "ok") {
+    return (
+      <p className={`mt-1 text-xs ${lowRes ? "text-warning-strong" : "text-success"}`}>
+        ✓ Bonnes proportions.{res}
+        {lowRes ? " Résolution faible pour l'impression." : ""}
+      </p>
+    );
+  }
+  const pageW = template.width_mm + 2 * template.bleed_mm;
+  const pageH = template.height_mm + 2 * template.bleed_mm;
+  if (fit === "fill") {
+    const stretch = Math.round(Math.abs((size.width / size.height) / (pageW / pageH) - 1) * 100);
+    return (
+      <div className="mt-1 space-y-1 text-xs text-warning-strong">
+        <p>⚠ Ce fichier est étiré pour remplir la page (déformé d&apos;environ {stretch} %).</p>
+        {onFixStretch && (
+          <button
+            type="button"
+            onClick={() => onFixStretch(size.width, size.height)}
+            className="rounded-lg border border-neutral-300 bg-surface px-2.5 py-1 font-medium text-text hover:bg-neutral-50"
+          >
+            Corriger sans déformation
+          </button>
+        )}
+      </div>
+    );
+  }
+  const fixedNote = fixed ? " Déformation corrigée : vérifiez les emplacements sur l'aperçu, puis enregistrez." : "";
+  const cut = [
+    check.cropXMm > 0.05 ? `${formatInMm(check.cropXMm)} à gauche et à droite` : null,
+    check.cropYMm > 0.05 ? `${formatInMm(check.cropYMm)} en haut et en bas` : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
+  return (
+    <p className="mt-1 text-xs text-warning-strong">
+      ⚠{" "}
+      {check.kind === "no-bleed"
+        ? "Ce fichier semble fait sans fond perdu : il est agrandi pour le couvrir, et le bord du dessin tombe dans la coupe"
+        : "Proportions différentes de la page : le fichier est recadré au centre, sans déformation"}
+      {cut ? ` (coupé : ${cut})` : ""}.{res}
+      {fixedNote}
+    </p>
   );
 }

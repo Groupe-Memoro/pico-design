@@ -1,11 +1,8 @@
 import { requireApiUser, serverError } from "@/lib/api";
 import { NextResponse } from "next/server";
 import { randomUUID } from "crypto";
-import { parseThemeSlotsField } from "@/lib/pdf/theme";
-import { MAX_THEME_SLOTS } from "@/lib/themeShapes";
-import { storageFileName } from "@/lib/storageName";
-import { parseTextZonesField } from "@/lib/themeText";
-import { parseThemeGuidesField } from "@/lib/variableData/snap";
+import { themePartsColumns, themePartsFromForm } from "@/lib/themePartsForm";
+import type { ThemeScope } from "@/lib/types";
 
 /**
  * CRUD des Thèmes (voir supabase/migrations/0046_themes.sql et
@@ -36,51 +33,24 @@ export async function POST(request: Request) {
   const formData = await request.formData();
   const templateId = formData.get("templateId");
   const name = formData.get("name");
-  const overlayFile = formData.get("overlay");
-  const backgroundFile = formData.get("background");
-  const slots = parseThemeSlotsField(formData.get("slots"));
-  const textZones = parseTextZonesField(formData.get("textZones")) ?? [];
-  const guides = parseThemeGuidesField(formData.get("guides")) ?? [];
-
   if (typeof templateId !== "string" || !templateId) {
     return NextResponse.json({ error: "Modèle manquant." }, { status: 400 });
   }
   if (typeof name !== "string" || !name.trim()) {
     return NextResponse.json({ error: "Nom manquant." }, { status: 400 });
   }
-  if (!(overlayFile instanceof File) || overlayFile.size === 0) {
-    return NextResponse.json({ error: "Graphisme manquant." }, { status: 400 });
-  }
-  if (!slots) {
-    return NextResponse.json({ error: `Emplacements invalides (1 à ${MAX_THEME_SLOTS} attendus).` }, { status: 400 });
-  }
+  const scope: ThemeScope = formData.get("scope") === "panel" ? "panel" : "sheet";
 
+  // Parties du thème (recto/verso ou volets, voir lib/themeParts.ts), chacune
+  // avec son graphisme : nouveau thème, aucune partie existante.
   const themeId = randomUUID();
-  const overlayPath = `themes/${themeId}/overlay-${storageFileName(overlayFile.name)}`;
-  const buffer = Buffer.from(await overlayFile.arrayBuffer());
-  const { error: uploadError } = await supabase.storage
-    .from("overlays")
-    .upload(overlayPath, buffer, { contentType: overlayFile.type || "image/png", upsert: true });
-  if (uploadError) {
-    return serverError(uploadError, "Impossible d'enregistrer l'image du thème.");
+  let parts;
+  try {
+    parts = await themePartsFromForm(supabase, themeId, formData, scope, []);
+  } catch (err) {
+    return serverError(err, "Impossible d'enregistrer l'image du thème.");
   }
-
-  // Fond facultatif (voir 0068_theme_background.sql) : la colonne n'est
-  // écrite que s'il y en a un, pour qu'un thème sans fond reste créable
-  // avant la migration.
-  let backgroundPath: string | null = null;
-  if (backgroundFile instanceof File && backgroundFile.size > 0) {
-    backgroundPath = `themes/${themeId}/background-${storageFileName(backgroundFile.name)}`;
-    const { error: backgroundError } = await supabase.storage
-      .from("overlays")
-      .upload(backgroundPath, Buffer.from(await backgroundFile.arrayBuffer()), {
-        contentType: backgroundFile.type || "image/png",
-        upsert: true,
-      });
-    if (backgroundError) {
-      return serverError(backgroundError, "Impossible d'enregistrer l'arrière-plan du thème.");
-    }
-  }
+  if (typeof parts === "string") return NextResponse.json({ error: parts }, { status: 400 });
 
   const { data, error } = await supabase
     .from("themes")
@@ -88,13 +58,7 @@ export async function POST(request: Request) {
       id: themeId,
       template_id: templateId,
       name: name.trim(),
-      overlay_path: overlayPath,
-      ...(backgroundPath ? { background_path: backgroundPath } : {}),
-      slots,
-      // Écrite seulement s'il y en a (voir 0076_theme_text_zones.sql).
-      ...(textZones.length > 0 ? { text_zones: textZones } : {}),
-      // Idem pour les repères (voir 0083_theme_guides.sql).
-      ...(guides.length > 0 ? { guides } : {}),
+      ...themePartsColumns(parts, scope),
       created_by: user.id,
     })
     .select()

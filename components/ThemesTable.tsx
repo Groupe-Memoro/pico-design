@@ -10,7 +10,12 @@ import type { Template, Theme } from "@/lib/types";
 import { templateOptionLabel } from "@/lib/templateLabel";
 
 // URL signées du graphisme et du fond (null sans fond, voir Theme.background_path).
-export type ThemeWithOverlayUrl = Theme & { overlayUrl: string | null; backgroundUrl: string | null };
+export type ThemeWithOverlayUrl = Theme & {
+  overlayUrl: string | null;
+  backgroundUrl: string | null;
+  // Par partie du thème (voir lib/themeParts.ts), pour l'éditeur.
+  partUrls?: Record<string, { overlayUrl: string | null; backgroundUrl: string | null }>;
+};
 
 type ModalState = { mode: "create" } | { mode: "edit"; theme: ThemeWithOverlayUrl } | null;
 
@@ -191,6 +196,8 @@ export default function ThemesTable({
                 <p className="mt-0.5 truncate text-xs text-neutral-500">{templateName(t.template_id)}</p>
                 <p className="mt-0.5 text-xs text-neutral-400">
                   {t.slots.length} emplacement{t.slots.length > 1 ? "s" : ""}
+                  {t.scope === "panel" ? " · par volet" : ""}
+                  {(t.parts?.length ?? 0) > 1 ? ` · ${t.parts!.length} parties` : ""}
                 </p>
               </div>
             </div>

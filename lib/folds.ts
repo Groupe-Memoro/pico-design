@@ -168,3 +168,97 @@ export function finishedSize(t: { width_mm: number; height_mm: number; fold?: un
     open: { widthMm, heightMm },
   };
 }
+
+/**
+ * Plis d'un modèle, en mm depuis le bord de coupe le long de l'axe des plis
+ * (largeur pour des plis verticaux), avec la zone de sécurité de chaque côté.
+ * Au verso, l'ordre des volets s'inverse (plis verticaux) : un pli roulé y
+ * tombe ailleurs. null sans pli.
+ */
+export function foldLines(t: { width_mm: number; height_mm: number; fold?: unknown }, side: "front" | "back" = "front"): {
+  direction: FoldDirection;
+  positionsMm: number[];
+  safetyMm: number;
+} | null {
+  const fold = parseFold(t.fold);
+  if (!fold) return null;
+  const panels = foldPanels(fold, foldAxisLength(fold, Number(t.width_mm), Number(t.height_mm)), side);
+  return { direction: fold.direction, positionsMm: panels.slice(1).map((p) => p.start), safetyMm: fold.safetyMm };
+}
+
+/**
+ * Format d'un thème « par volet » : le volet fini (le plus grand, dans le sens
+ * des plis — voir finishedSize), dessiné avec le fond perdu du modèle des 4
+ * côtés pour pouvoir se poser sur n'importe quel volet. null sans pli.
+ */
+export function panelThemeFormat<T extends { width_mm: number; height_mm: number; fold?: unknown }>(
+  t: T,
+  // Volet précis (voir panelKey) : son format à lui (le volet rabattu d'un
+  // pli roulé est plus étroit). Absent = le plus grand volet.
+  key?: string | null
+): T | null {
+  const size = finishedSize(t);
+  if (!size.open) return null;
+  const at = key ? parsePanelKey(key) : null;
+  const placement = at ? panelThemePlacement({ ...t, fold: t.fold ?? null }, at.side, at.index) : null;
+  if (placement) return { ...t, width_mm: placement.trimWidthMm, height_mm: placement.trimHeightMm, fold: null };
+  return { ...t, width_mm: size.widthMm, height_mm: size.heightMm, fold: null };
+}
+
+// Identifiant d'un volet : son côté et son indice sur ce côté (« back:0 »).
+export const panelKey = (side: "front" | "back", index: number) => `${side}:${index}`;
+
+export function parsePanelKey(key: string): { side: "front" | "back"; index: number } | null {
+  const m = /^(front|back):(\d+)$/.exec(key);
+  return m ? { side: m[1] as "front" | "back", index: Number(m[2]) } : null;
+}
+
+/**
+ * Volets d'un modèle plié, recto puis verso (verso seulement s'il est
+ * recto-verso), avec leur nom et leur place : « Couverture (recto, à droite) ».
+ */
+export function panelChoices(t: { width_mm: number; height_mm: number; fold?: unknown; two_sided?: boolean }): {
+  key: string;
+  label: string;
+}[] {
+  const fold = parseFold(t.fold);
+  if (!fold) return [];
+  const length = foldAxisLength(fold, Number(t.width_mm), Number(t.height_mm));
+  const sides: ("front" | "back")[] = t.two_sided === false ? ["front"] : ["front", "back"];
+  return sides.flatMap((side) => {
+    const panels = foldPanels(fold, length, side);
+    return panels.map((p, i) => {
+      const where =
+        fold.direction === "vertical"
+          ? panels.length === 2 ? (i === 0 ? "à gauche" : "à droite") : ["à gauche", "au centre", "à droite"][i] ?? `n° ${i + 1}`
+          : panels.length === 2 ? (i === 0 ? "en haut" : "en bas") : ["en haut", "au milieu", "en bas"][i] ?? `n° ${i + 1}`;
+      return { key: panelKey(side, i), label: `${p.label} (${side === "front" ? "recto" : "verso"}, ${where})` };
+    });
+  });
+}
+
+/**
+ * Où se pose un thème « par volet » dans un volet donné : la taille finie du
+ * volet (mm), et de quels côtés retirer le fond perdu du thème (côté pli —
+ * seuls les bords de la feuille gardent leur fond perdu, comme les cases de
+ * panelCells). `start`/`end` : début et fin le long de l'axe des plis.
+ */
+export function panelThemePlacement(
+  t: { width_mm: number; height_mm: number; fold: unknown },
+  side: "front" | "back",
+  index: number
+): { direction: FoldDirection; trimWidthMm: number; trimHeightMm: number; cutStart: boolean; cutEnd: boolean } | null {
+  const fold = parseFold(t.fold);
+  if (!fold) return null;
+  const vertical = fold.direction === "vertical";
+  const panels = foldPanels(fold, foldAxisLength(fold, Number(t.width_mm), Number(t.height_mm)), side);
+  const panel = panels[index];
+  if (!panel) return null;
+  return {
+    direction: fold.direction,
+    trimWidthMm: vertical ? panel.size : Number(t.width_mm),
+    trimHeightMm: vertical ? Number(t.height_mm) : panel.size,
+    cutStart: index > 0,
+    cutEnd: index < panels.length - 1,
+  };
+}

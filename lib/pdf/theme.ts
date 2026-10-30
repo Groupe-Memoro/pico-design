@@ -1,7 +1,7 @@
 import sharp from "sharp";
 import type { OverlayOptions } from "sharp";
 import { coverCropToBuffer } from "./crop";
-import type { ThemeSlot, ThemeSlotAdjust, ThemeTextZone } from "../types";
+import type { ThemeFit, ThemeSlot, ThemeSlotAdjust, ThemeTextZone } from "../types";
 import { themeZoneText } from "../themeText";
 import { preloadFonts, themeTextToSvgGroup } from "./textLayer";
 import { MAX_THEME_SLOTS, maskSvgSized, normalizeRotation, sanitizeSlotShape, slotShape, slotSvgShape } from "../themeShapes";
@@ -16,8 +16,8 @@ const DEFAULT_ADJUST: ThemeSlotAdjust = { positionX: 0.5, positionY: 0.5, scale:
  * du client (`slotAdjust[i]`, voir ThemeSlotAdjust — même mécanique que
  * positionX/positionY/scale pour un fond simple, voir coverCropToBuffer),
  * découpée selon la forme de l'emplacement (rectangle, ovale ou polygone,
- * voir lib/themeShapes.ts), sur l'image de fond du thème (`backgroundImage`,
- * étirée à la page) ou à défaut un fond blanc, puis le graphisme du thème
+ * voir lib/themeShapes.ts), sur l'image de fond du thème (`backgroundImage`)
+ * ou à défaut un fond blanc, puis le graphisme du thème
  * (`overlayImage`, avec transparence) est posé par-dessus — ses zones
  * opaques (cadre, décor) restent visibles, ses zones transparentes laissent
  * voir les photos en dessous.
@@ -37,13 +37,16 @@ export async function composeThemeImage(
   backgroundImage: Buffer | null = null,
   // Zones de texte du thème et texte du client pour chacune (même ordre),
   // posés par-dessus le graphisme ; `dpi` convertit leurs tailles en mm.
-  text: { zones: ThemeTextZone[]; texts: (string | null | undefined)[]; dpi: number } | null = null
+  text: { zones: ThemeTextZone[]; texts: (string | null | undefined)[]; dpi: number } | null = null,
+  // Graphisme et fond : étirés à la page ('fill', thèmes d'avant la migration
+  // 0085) ou agrandis sans déformation et recadrés au centre ('cover').
+  fit: ThemeFit = "fill"
 ): Promise<Buffer> {
   const composites: OverlayOptions[] = [];
 
   if (backgroundImage) {
     const backgroundResized = await sharp(backgroundImage)
-      .resize(targetWidthPx, targetHeightPx, { fit: "fill" })
+      .resize(targetWidthPx, targetHeightPx, { fit })
       .png()
       .toBuffer();
     composites.push({ input: backgroundResized, left: 0, top: 0 });
@@ -94,7 +97,7 @@ export async function composeThemeImage(
   }
 
   const overlayResized = await sharp(overlayImage)
-    .resize(targetWidthPx, targetHeightPx, { fit: "fill" })
+    .resize(targetWidthPx, targetHeightPx, { fit })
     .png()
     .toBuffer();
   composites.push({ input: overlayResized, left: 0, top: 0 });
